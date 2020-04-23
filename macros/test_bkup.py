@@ -26,12 +26,14 @@ import logging
 import random
 import re
 import sys
+from typing import Union
 import uno
 import msgbox  # this is provided when launched as a macro
 global XSCRIPTCONTEXT, Session, log
 # -*- coding: utf-8 -*-
 
 
+# TODO: move spreadsheet_related utilites to another module
 def message_box(message, title='My Message Box'):
     box = msgbox.MsgBox(uno.getComponentContext())
     box.addButton("OK")
@@ -78,23 +80,51 @@ def put_data_range(sheet_name, data_range, data):
     model = get_model()
     sheet = validate_sheet_name(model, sheet_name)
     try:
-        if ':' not in data_range:
-            range1 = sheet.getCellRangeByName(data_range)
+        range1 = sheet.getCellRangeByName(data_range)
+        if ':' not in data_range:  # single cell
             range1.setDataArray(data)
         else:
-            ccrr = data_range.split(':', 1)
-            cols = [chr(i)
-                    for i in range(ord(ccrr[0][0]), ord(ccrr[1][0]) + 1)]
-            rows = range(int(ccrr[0][1:]), int(ccrr[1][1:])+1)
-            for row, row_data in zip(rows, data):
-                for col, cell_data in zip(cols, row_data):
-                    cell = f'{col}{row}'
-                    tRange = sheet.getCellRangeByName(cell)
-                    tRange.String = cell_data
+            range1.setDataArray(data)
     except Exception as e:
         log.error("%r in put_data_range(%s, %s, %s)", e, sheet_name,
                   data_range, data)
         raise
+
+
+def get_data_range_as_dict(sheet_name, range_name):
+    """ return contents of data range as a dict, with keys = first column """
+    info = get_data_range(sheet_name, range_name)
+    # transform to dict
+    return {title: list(values) for title, *values in info}
+
+
+def put_data_range_from_dict(sheet_name, range_name, data):
+    """ update a data range from a dict of values """
+    data_array = [[key] + value for key, value in data.items()]
+    put_data_range(sheet_name, range_name, data_array)
+
+
+def get_data_range_as_class(sheet_name, range_name, cls):
+    """ return a list instances of cls, one per row,
+        cls signature is cls(keys, values) with keys = row[0]
+        Also return the first row, which should be a list of fields"""
+    info = get_data_range(sheet_name, range_name)
+    fields = info[0]
+    # global log
+    # log.info('get_data_range_as_class: info=%s', info)
+    return fields, [cls(fields, row) for row in info[1:]]
+
+
+def get_data_range_as_settings(sheet_name, range_name):
+    """ return a dict of settings.  The range must be two columns wide,
+    col0 is the key and col1 is the value.
+    NB the key will be in the same case (upper/lower/mixed) as the spreadsheet.
+    """
+    info = get_data_range(sheet_name, range_name)
+    if len(info[0]) != 2:
+        raise TypeError(
+            f"range {range_name} should have 2 columns, not {len(info[0])}.")
+    return dict(info)
 
 
 def clear_data_range(sheet_name, data_range):
@@ -144,11 +174,12 @@ class LoggingSetup():
 
 def train_can_move(prev_pos, pos, trains, last_train_time, current_time,
                    wait, is_last_stop: bool):
-    """ train can move if there is a train there to move,
+    """ train can move from prev_pos to pos if there is a train there to move,
+        it has no incidents
         the line ahead is clear,
         and it's waited long enough at the current place """
     global log
-    if not trains[prev_pos]:
+    if not trains[prev_pos]:  # no train to move
         return False
     if trains[pos] and not is_last_stop:  # multiple trains ok at end of line
         return False
@@ -167,6 +198,7 @@ def train_can_move(prev_pos, pos, trains, last_train_time, current_time,
 
 def move_train(prev_pos, pos, trains, last_train_time, current_time):
     """ move a train from i to i+1, updating trains and last_train_time """
+    # TODO:  Update incident.location when moving train
     log.info("Moving train from %d to %d at t=%d, trains=%s",
              prev_pos, pos, current_time, trains)
     assert trains[prev_pos], f'no train to move at position {prev_pos}'
@@ -186,40 +218,37 @@ def get_int(value):
     return int(value) if value else 0
 
 
-def get_data_range_as_dict(sheet_name, range_name):
-    """ return contents of data range as a dict, with keys = first column """
-    info = get_data_range(sheet_name, range_name)
-    # transform to dict
-    return {title: list(values) for title, *values in info}
+class Place:
+    def __init__(self, place_type, name, line, pos=None, direction=None):
+        self.place_type = place_type
+        self.name = name
+        self.line = line
+        self.pos = pos
+        self.direction = None
+
+    def __str__(self):
+        return f"{self.name} on {self.line}"
 
 
-def put_data_range_from_dict(sheet_name, range_name, data):
-    """ update a data range from a dict of values """
-    data_array = [[key] + value for key, value in data.items()]
-    put_data_range(sheet_name, range_name, data_array)
+class Train:
+    train_number = 0
+    # TODO:  include can_move, move_train inside this class
+    # TODO: test incidents that move with the train (load/save)
 
+    def __init__(self, line, current_place):
+        self.line = line
+        self.location = current_place
+        self.number = self.__class__.allocate_train_number()
+        self.incidents = []  # allow incidents to move with the train
 
-def get_data_range_as_class(sheet_name, range_name, cls):
-    """ return a list instances of cls, one per row,
-        cls signature is cls(keys, values) with keys = row[0]
-        Also return the first row, which should be a list of fields"""
-    info = get_data_range(sheet_name, range_name)
-    fields = info[0]
-    # global log
-    # log.info('get_data_range_as_class: info=%s', info)
-    return fields, [cls(fields, row) for row in info[1:]]
+    @classmethod
+    def allocate_train_number(cls):
+        cls.train_number += 1
+        return cls.train_number
 
-
-def get_data_range_as_settings(sheet_name, range_name):
-    """ return a dict of settings.  The range must be two columns wide,
-    col0 is the key and col1 is the value.
-    NB the key will be in the same case (upper/lower/mixed) as the spreadsheet.
-    """
-    info = get_data_range(sheet_name, range_name)
-    if len(info[0]) != 2:
-        raise TypeError(
-            f"range {range_name} should have 2 columns, not {len(info[0])}.")
-    return dict(info)
+    def __str__(self):
+        flag = '*' * len(self.incidents)
+        return f"{flag}Train {self.number} at {self.location} on {self.line}"
 
 
 class Line():
@@ -289,7 +318,7 @@ class Line():
         # move trains from end-of-line depots to start-of-line depots in
         # opposite direction
         # TODO: implement train turnarounds where Turnaround% > 0
-        end1, end2 = 0, len(self.info[self.train_directions[0]]) - 1
+        end1, end2 = 0, -1
         trains_dir0 = self.info[self.train_directions[0]]
         trains_dir1 = self.info[self.train_directions[1]]
         # should really update last_train_time at depots too
@@ -400,7 +429,7 @@ def update_line(*_args):
 
 def list_to_str(l: list):
     """ return a string version with str(item) for items in list """
-    return ', '.join(str(item) for item in l)
+    return [str(item) for item in l]
 
 
 def reset_line(*_args):
@@ -429,8 +458,8 @@ class ResponseOption:
         """ calculate and return overall impact of this response option """
         fix_time = self.time_to_fix or 5
         self.overall_impact = fix_time * (
-            5 - get_int(self.reputation_impact) -
-            get_int(self.passenger_impact_percent) / 30)
+            5 + abs(get_int(self.reputation_impact)) +
+            abs(get_int(self.passenger_impact_percent)) / 30)
         return self.overall_impact
 
     def __str__(self):
@@ -639,7 +668,7 @@ class Incident:
     response_option = None
     response_start = None
     incident_types = None  # used to lookup incident types by load()
-    place_finder = lambda x: f'Place({x})'
+    place_finder = None  # used to find places by load()
 
     def __init__(self, incident_type):
         self.incident_type = incident_type
@@ -651,7 +680,7 @@ class Incident:
     def load(cls, fields, values):
         value_dir = dict(zip(fields, values))
         # create & set incident type first
-        log.info("Incident.load(%s)", value_dir)
+        # log.info("Incident.load(%s)", value_dir)
         incident_type = cls.incident_types.get_by_type(
             int(value_dir.pop('Incident_Type')))
         incident = cls(incident_type)
@@ -663,6 +692,9 @@ class Incident:
                     f"IncidentType.name={incident_type.incident_name}"
             elif field_name == 'Location':
                 incident.location = cls.place_finder(value)
+                if isinstance(incident.location, Train):
+                    # put the incident on the train
+                    incident.location.incidents.append(incident)
             elif field_name == 'Severity':
                 incident.severity = float(value)
             elif field_name == 'Start_Time':
@@ -687,7 +719,7 @@ class Incident:
         value_sources = {"Incident_Name": str(self.incident_type),
                          "Location": str(self.location),
                          "Incident_Type": self.incident_type.incident_type,
-                         "Severity": f'{self.severity:0.2f}',
+                         "Severity": self.severity,
                          "Start_Time": self.start_time,
                          "Response_Option": self.response_option or '',
                          "Response_Start": self.response_start or ''}
@@ -697,22 +729,45 @@ class Incident:
 
 class GameIncidents:
     """ represent incidents in an operational game """
-    def __init__(self):
+    def __init__(self, places):
+        self.places = places  # used by find_place in load_incidents
         self.incidents_by_line = defaultdict(list)
         self.incident_responses = IncidentResponses()
         self.incident_types = IncidentTypes(self.incident_responses)
-        Incident.incident_types = self.incident_types  # used by load()
         self.get_incident_settings()
         self.load_incidents()
 
     def load_incidents(self):
+        # initialise helper functions
+        Incident.incident_types = self.incident_types  # used by load()
+        Incident.place_finder = self.find_place
+        self.train_pattern = re.compile(r'^\**Train \d+ at (.+) on (.+)$')
+        self.place_pattern = re.compile(r'^.*, .* on .*$|^')
         # get address of incident table
         self.data_range = get_data_range('Incidents', 'Data_Range')[0][0]
         self.fields, self.incidents = get_data_range_as_class(
             'Incidents', self.data_range, Incident.load)
-        self.incidents = []
-        log.info("load_incidents: self.incidents is now %s", self.incidents)
-        # TODO: now link them back to places etc
+        log.info("load_incidents loaded %s", list_to_str(self.incidents))
+
+    def find_place(self, loc_name: str) -> Union[Place, Train]:
+        train_match = self.train_pattern.fullmatch(loc_name)  # Train ?
+        if train_match:
+            # match on train location, not number
+            for place in self.places['Train']:
+                place_match = self.train_pattern.fullmatch(str(place))
+                if place_match.groups() == train_match.groups():
+                    return place
+        else:
+            if self.place_pattern.fullmatch(loc_name):
+                key = 'Line'
+            else:
+                key = 'Station'
+            log.info("trying to find %s: %s in %s", key, loc_name,
+                     list_to_str(self.places[key]))
+            for place in self.places[key]:
+                if loc_name == str(place):
+                    return place
+        raise ValueError(f"Unable to locate {loc_name}")
 
     def save(self):
         log.info("Incidents = %s", list_to_str(self.incidents))
@@ -747,7 +802,7 @@ class GameIncidents:
         return new_data_range
 
     def get_incident_settings(self):
-        """ return a dict of the settings in Incident_Types """
+        """ create a dict of the settings in Incident_Types """
         self.incident_settings = get_data_range_as_settings("Incident_Types",
                                                             "Settings")
         self.incident_freq = self.incident_settings['Incident_Frequency']
@@ -794,46 +849,18 @@ class TestDataRange(GameIncidents):
         """
 
 
-class Place:
-    def __init__(self, place_type, name, line, pos=None, direction=None):
-        self.place_type = place_type
-        self.name = name
-        self.line = line
-        self.pos = pos
-        self.direction = None
-
-    def __str__(self):
-        return f"{self.name} on {self.line}"
-
-
-class Train:
-    train_number = 0
-
-    def __init__(self, line, place):
-        self.line = line
-        self.location = place
-        self.number = self.__class__.allocate_train_number()
-        self.incidents = []  # allow incidents to move with the train
-
-    @classmethod
-    def allocate_train_number(cls):
-        cls.train_number += 1
-        return cls.train_number
-
-    def __str__(self):
-        flag = '*' * len(self.incidents)
-        return f"{flag}Train {self.number} at {self.location}"
-
-
 class NetworkGame:
     """ represent the characteristics of whole network,
     with lines, incidents, responses, and status.   """
-    current_time = 0
+    INCIDENT_LIMIT = 1  # per place
+    INCIDENT_SEVERITY_VARIATION = 0.5  # in range  +/- variation
 
     def __init__(self):
         self.line = Line()
-        self.incidents = GameIncidents()
+        self.current_time = self.line.current_time
         self.catalog_places()
+        self.incidents = GameIncidents(self.places)
+        assert self.INCIDENT_SEVERITY_VARIATION < 1  # or negative severity
 
     def save(self):
         self.line.save()
@@ -854,18 +881,37 @@ class NetworkGame:
 
     def sprinkle_incidents(self):
         for incident in self.incidents.generate_incidents():
-            incident.location = self.random_place(incident.incident_type.type)
-            if isinstance(incident.location, Train):
-                incident.location.incidents.append(incident)
+            for _i in range(10):
+                incident.location = self.random_place(
+                    incident.incident_type.type)
+                if self.place_incident(incident):
+                    break
+            else:
+                log.warning("Unable to find available location for incident: "
+                            f"discarding it")
+                return
             incident.start_time = self.current_time
             # severity in range 0.5-1.5
-            incident.severity = 0.5 + random.random()
+            incident.severity = 0.5 + random.uniform(
+                1-self.INCIDENT_SEVERITY_VARIATION,
+                1+self.INCIDENT_SEVERITY_VARIATION)
             self.incidents.record(incident, incident.location)
+
+    def place_incident(self, incident):
+        # TODO: update place_incident for Lines and Stations
+        """ update the incident location so it knows it has an incident
+        Return False if there is already an incident there """
+        if isinstance(incident.location, Train):
+            if len(incident.location.incidents) >= self.INCIDENT_LIMIT:
+                return False  # already has an incident
+            incident.location.incidents.append(incident)
+        return True  # successfully placed incident
 
     def do_stage(self):
         """ generate incidents, update trains, accumulate impacts """
         self.sprinkle_incidents()
         self.current_time += 1
+        self.line.update_trains()
 
 
 def incident_types_likelihood(*_args):
@@ -876,7 +922,7 @@ def incident_types_likelihood(*_args):
         incident_types.save()
 
 
-def generate_incidents(*_args):
+def do_stage(*_args):
     """  """
     global log
     with LoggingSetup('generate_incidents') as log:
@@ -885,12 +931,27 @@ def generate_incidents(*_args):
             log.info("%d %ss: %s", len(game.places[k]), k,
                      [str(p) for p in game.places[k]])
         for _j in range(10):
-            game.sprinkle_incidents()
+            game.do_stage()
         log.info("Trains: %s", list_to_str(game.places['Train']))
-        game.incidents.save()  # see if this works...
+        game.save()
+
+
+def clear_incidents(*_args):
+    """ clear the incidents page """
+    global log
+    with LoggingSetup("clear_incidents") as log:
+        range1 = get_data_range('Incidents', 'Data_Range')[0][0]
+        headings = get_data_range('Incidents', range1)[:1]
+        new_data_range = range1[:4]+range1[1]  # eg.A6:G20 -> A6:G6
+        log.info('data_range changed from %s to %s, headings=%s',
+                 range1, new_data_range, headings)
+        clear_data_range('Incidents', range1)
+        put_data_range('Incidents', new_data_range, headings)
+        put_data_range('Incidents', 'Data_Range', [[new_data_range]])
 
 
 def test_range(*_args):
+    global log
     with LoggingSetup('test_range') as log:
         model = get_model()
         sheet = model.Sheets.getByName('Incidents')
@@ -924,4 +985,4 @@ if __name__ == '__main__':
         log.exception('%s in %s', e, __name__)
 
 g_exportedScripts = update_line, reset_line, overall_response_impacts, \
-    incident_types_likelihood, generate_incidents, test_range
+    incident_types_likelihood, do_stage, test_range, clear_incidents
