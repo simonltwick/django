@@ -57,10 +57,11 @@ class LoggingSetup():
     def __init__(self, msg='', level=logging.DEBUG):
         log = logging.getLogger(__name__)
         log.setLevel(level)
-        logging.basicConfig(filename='/home/simon/code/kitten/test.log',
-                            filemode='w',
-                            level=logging.DEBUG,
-                            format='%(levelname)s: %(message)s')
+        logging.basicConfig(
+            filename='/home/simon/code/kitten/prototype/test.log',
+            filemode='w',
+            level=logging.DEBUG,
+            format='%(levelname)s: %(message)s')
         if msg:
             log.info(msg)
         self.log = log

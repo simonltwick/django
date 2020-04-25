@@ -23,9 +23,13 @@ Importing libreoffice functions into python scripts: (see
 '''
 
 import sys
-sys.path.append('/home/simon/code/kitten')
+sys.path.append('/home/simon/code/kitten/prototype')
+
 from test_macros import update_line, reset_line, overall_response_impacts, \
     incident_types_likelihood, do_stage, test_range, clear_incidents
-
 g_exportedScripts = update_line, reset_line, overall_response_impacts, \
     incident_types_likelihood, do_stage, test_range, clear_incidents
+
+import sheetdb
+global XSCRIPTCONTEXT
+sheetdb.XSCRIPTCONTEXT = XSCRIPTCONTEXT
