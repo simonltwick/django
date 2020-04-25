@@ -7,7 +7,10 @@ Created on 25 Apr 2020
 
 from utils import make_ints, list_to_str
 from sheetdb import get_data_range_as_dict, put_data_range_from_dict
-import logging  # redefined by import *
+# import sheetdb
+
+import logging
+import random
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
@@ -24,7 +27,7 @@ class Station:
 
 class Place:
     def __init__(self, name, line, pos, direction, dir_no, last_train_time,
-                 wait):
+                 wait, turnaround_percent):
         self.name = name
         self.line = line
         self.pos = pos
@@ -32,6 +35,7 @@ class Place:
         self.dir_no = dir_no  # 0=forward,1=backward
         self.last_train_time = last_train_time
         self.wait = wait
+        self.turnaround_percent = turnaround_percent  # % of trains turnaround
         self.trains = []  # this is maintained by Train.move()
 
     def __str__(self):
@@ -64,11 +68,22 @@ class Place:
         return None  # hit buffers
 
     def is_depot(self):
-        return self.pos == 0 or self.pos == len(self.line)
+        return self.pos == 0 or self.pos == len(self.line) - 1
+
+    def is_start_of_line(self):
+        return (self.dir_no == 0 and self.pos == 0) or \
+            self.dir_no == 1 and self.pos == len(self.line) - 1
+
+    def reverse_direction(self):
+        """ return the place on the same line in the opposite direction """
+        reverse_dir_no = 1 - self.dir_no  # swap 0 <-> 1
+        reverse_dir = self.line.directions[reverse_dir_no]
+        return self.line.places[reverse_dir][self.pos]
 
 
 class Train:
     train_number = 0
+    awaiting_turnaround = False
 
     def __init__(self, line, current_place):
         self.line = line
@@ -126,7 +141,7 @@ class Train:
             # log.info("try_move for %s: line blocked", self)
             # blocked.  count delay.
             self.line.delays += 1
-            return
+            return False
         """ consider delays.   If no last-train_time recorded, or we've
            waited 'delay' time since the last train, we can move """
         # log.info("try_move for %s: considering delays. current_time=%d,"
@@ -137,6 +152,33 @@ class Train:
                 self.location.last_train_time + self.location.wait):
             # log.info("try_move for %s -> Success! calling move", self)
             self.move(next_place)
+
+    def try_turnaround(self):
+        """ assess moving train to opposite direction on line -> True if OK
+        If it's not a depot and it's blocked, delay & return False """
+        if self.location.is_depot():
+            # log.info("try_turnaround(%s) in depot: is_start_of_line=%s",
+            #          self, self.location.is_start_of_line())
+            return not self.location.is_start_of_line()
+        if self.awaiting_turnaround or \
+                random.random() * 100 < self.location.turnaround_percent:
+            self.awaiting_turnaround = True
+            blocked = self.turnaround_blocked()
+            # log.info("want to turnaround(%s): blocked=%s", self, blocked)
+            return not blocked
+        # log.info("try_turnaround(%s): no turnaround", self)
+        return False
+
+    def turnaround_blocked(self):
+        if self.location.reverse_direction().trains:
+            self.line.delays += 1
+            return True
+
+    def turnaround(self):
+        """ move the train to the reverse direction """
+        reverse_direction = self.location.reverse_direction()
+        self.move(reverse_direction)
+        self.awaiting_turnaround = False
 
 
 class Line():
@@ -163,12 +205,14 @@ class Line():
         self.setup_places()  # setup self.places:{direction:[Place]}
         self.setup_stations()  # setup self.stations: [Station]
 
-        make_ints(self.info,  # turm blanks into zeros
-                  self.train_directions + self.last_train_times + ['Wait'])
+        make_ints(self.info,  # turn floats into ints & blanks into zeros
+                  self.train_directions + self.last_train_times + ['Wait'] +
+                  ['Turnaround%' + d for d in self.directions])
         self.setup_trains()  # setup self.trains: {direction: [[Trains]]}
         self.current_time = int(self.info['Current_Time'][0])
         self.delays = int(self.info['Delays'][0])
         self.name = self.info['Line_Name'][0]
+        self.validate_turnarounds()
 
     def setup_places(self):
         """ setup dict of Places on the line, keyed by direction """
@@ -177,7 +221,8 @@ class Line():
             Place(name=self.place_name(pos, dir_no), line=self, pos=pos,
                   direction=direction, dir_no=dir_no,
                   last_train_time=self.info['Last_Train_Time'+direction][pos],
-                  wait=self.info['Wait'][pos])
+                  wait=self.info['Wait'][pos],
+                  turnaround_percent=self.info['Turnaround%'+direction][pos])
             for pos in range(len(self))
             ]
             for dir_no, direction in enumerate(self.directions)}
@@ -199,7 +244,8 @@ class Line():
         return place_name
 
     def setup_trains(self):
-        """ create a dict of Trains for this line by direction """
+        """ create a dict of Trains for this line by direction
+        actually: dict by direction of dict by position of list of trains """
         train_qty = {direction: [
             (place, self.info['Trains'+direction][place.pos])
             for place in places]
@@ -214,6 +260,14 @@ class Line():
         self.stations = [Station(name, self, pos=pos)
                          for pos, name in enumerate(self.place_names)
                          if name not in ('Line', 'Depot', 'Depot2')]
+
+    def validate_turnarounds(self):
+        z = zip(*(self.info['Turnaround%' + dirn]
+                for dirn in self.directions))
+        for pos, (t1, t2) in enumerate(z):
+            if t1 and t2:
+                raise ValueError("Line Turnaround% cannot be specified in both"
+                                 f" directions at {self.info['Place'][pos]}")
 
     def __str__(self):
         return self.name
@@ -236,21 +290,21 @@ class Line():
     def reset(self):
         size = len(self)
         for direction in self.directions:
-            self.info["Trains" + direction] = size * ['']
-            self.info['Last_Train_Time' + direction] = size * ['']
+            self.info["Trains" + direction] = size * [0]
+            self.info['Last_Train_Time' + direction] = size * [0]
         # override turnaround at depots
         turnaround0 = self.info['Turnaround%'+self.directions[0]]
-        turnaround0[0] = ''
+        turnaround0[0] = 0
         turnaround0[-1] = 100
         turnaround1 = self.info['Turnaround%'+self.directions[1]]
         turnaround1[0] = 100
-        turnaround1[-1] = ''
+        turnaround1[-1] = 0
         self.info[self.train_directions[0]] = self.info['Initial_Trains']
         self.info['Wait'][0] = self.info['Train_Freq'][0]
         self.info['Wait'][-1] = self.info['Train_Freq'][0]
         self.info['Current_Time'][0] = self.current_time = 0
         self.info['Delays'][0] = self.delays = 0
-        log.info("Reset: self.info=%s", self.info)
+        # log.info("Reset: self.info=%s", self.info)
         put_data_range_from_dict("Line", "Data", self.info)
 
     def save(self):
@@ -276,19 +330,19 @@ class Line():
         """train turnaround at depots and where turnaround specified
         move trains from end-of-line depots to start-of-line depots in
         opposite direction, and update last_train_time """
-        # TODO: implement train turnarounds where Turnaround% > 0
         if len(self.directions) < 2:
-            return
-        depot1, depot2 = 0, -1
-        forward, backward = tuple(self.directions)
-        trains, places = self.trains, self.places
+            return  # no turnarounds possible
 
-        # depot1 at start of line
-        for train in trains[backward][depot1]:
-            train.move(places[forward][depot1])
-        # depot2 at end of line
-        for train in trains[forward][depot2]:
-            train.move(places[backward][depot2])
+        # create a list of trains which can turnaround first
+        trains_to_turnaround = [
+            train
+            for direction in self.directions
+            for trains_at_position in self.trains[direction]
+            for train in trains_at_position
+            if train.try_turnaround()]
+        # and then turnaround, to prevent double turnarounds
+        for train in trains_to_turnaround:
+            train.turnaround()
 
     def move_trains(self):
         # move trains: run through places in reverse order

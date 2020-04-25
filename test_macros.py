@@ -34,9 +34,6 @@ from game import NetworkGame
 from sheetdb import get_model, message_box, get_data_range, put_data_range, \
     clear_data_range
 
-# global XSCRIPTCONTEXT
-# sheetdb.XSCRIPTCONTEXT = XSCRIPTCONTEXT
-
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
@@ -80,17 +77,16 @@ class LoggingSetup():
 # ---- Macro commands ----
 def update_line(*_args):
     """ update the status of all trains on the line """
-    global current_time, log
+    global log
     with LoggingSetup('update_line') as log:
         line = Line()
-        # line.dump_places()
         line.update_trains()
         line.save()
 
 
 def reset_line(*_args):
     """ reset trains and incidents on the line to the starting value """
-    global current_time, log
+    global log
     with LoggingSetup('reset_line') as log:
         line = Line()
         line.reset()
