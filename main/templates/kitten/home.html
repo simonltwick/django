@@ -1,0 +1,12 @@
+{% extends 'kitten/base.html' %}
+{% block content %}
+<p>Welcome to Kitten on the Line</p>
+<h3>My teams</h3>
+<ul>
+{% for team in teams %}
+<li><a href="{% url 'games' team.id %}">{{ team.name }}</a>
+{% endfor %}
+<p> </p>
+<li><a href="{% url 'team_join' %}">Join a team</a>
+</ul>
+{% endblock%}
