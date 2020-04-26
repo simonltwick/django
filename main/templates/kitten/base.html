@@ -1,13 +1,24 @@
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="style.css">
+    <!-- <link rel="stylesheet" href="style.css"> -->
+    <!-- w3c core styles: eight offerings: Chocolate, Midnight, Modernist,
+    Oldstyle, Steely, Swiss, Traditional, and Ultramarine -->
+    <link rel="stylesheet" href="https://www.w3.org/StyleSheets/Core/Steely"
+    type="text/css">
     <title>{% block title %}Kitten on the Tracks{% endblock %}</title>
 </head>
 
 <body>
+
 {% block content %}
 {% endblock %}
-<p><a href="{% url 'home' %}">Home</a>
-</p>
+
+<p><a href="{% url 'home' %}">Home</a></p>
+
+{% if user.is_authenticated %}
+<p><a href="{% url 'logout' %}">Logout</a></p>
+{% endif %}
+
+<p><small>&copy. Simon Lambourn 2020</small></p>
 </body>
 </html>

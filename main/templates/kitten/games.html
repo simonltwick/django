@@ -6,6 +6,6 @@
 <li><a href="{% url 'game' game.id %}">{{ game }}</a>
 {% endfor %}
 <p> </p>
-<li><a href="{% url 'game_new' %}">New game</a>
+<li><a href="{% url 'game_new' team.id %}">New game</a>
 </ul>
 {% endblock %}

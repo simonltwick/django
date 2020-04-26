@@ -1,6 +1,8 @@
 {% extends 'kitten/base.html' %}
 {% block content %}
 <h1>{{ game.name }}</h1>
+
+
 <p>Here are the details of your game.</p>
 <ul>
 <li>Scheduling Centre
@@ -9,5 +11,12 @@
 <li>Engineering dashboard
 <li>Boardroom
 </ul>
-<p><b>Save</b></p>
+<button class="btn btn-default">Add team</button>
+<button class="btn btn-default">Play</button>
+<h3>Game settings:</h3>
+<form method="POST" class="post-form" action="{% url 'game' game.id %}">
+{% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" class="save btn btn-default" value="Save">
+</form>
 {% endblock %}
