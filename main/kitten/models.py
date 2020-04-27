@@ -1,6 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import User
 from typing import List, Optional
+import logging
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 
 class GameLevel:
@@ -9,9 +12,9 @@ class GameLevel:
     ADVANCED = 30
     EXPERT = 40
     CHOICES = ((BASIC, 'Basic'),
-              (INTERMEDIATE, 'Intermediate'),
-              (ADVANCED, 'Advanced'),
-              (EXPERT, 'Expert'))
+               (INTERMEDIATE, 'Intermediate'),
+               (ADVANCED, 'Advanced'),
+               (EXPERT, 'Expert'))
 
 
 class Team(models.Model, GameLevel):
@@ -34,7 +37,7 @@ class Network(models.Model):
     name = models.CharField(max_length=40)
     description = models.CharField(max_length=300)
     created = models.DateField(auto_now_add=True)
-    last_saved = models.DateField(auto_now=True)
+    last_updated = models.DateField(auto_now=True)
     owner = models.ForeignKey(User, on_delete=models.PROTECT,
                               null=True)
     # lines = reverse FK (to LineTemplate)
@@ -74,6 +77,9 @@ class Game(models.Model, GameLevel):
     network_name = models.CharField(max_length=40)
     level = models.IntegerField(choices=GameLevel.CHOICES)
 
+    class meta:
+        unique_together = [['name', 'team']]
+
     def __str__(self):
         return f"{self.name if self.name else ''} started {self.started}, "\
             f"last played {self.last_played}"
@@ -92,8 +98,10 @@ class Game(models.Model, GameLevel):
                                    **kwargs)
         game.teams.add(*teams)
         line_templates = LineTemplate.objects.filter(network=template.network)
+        operator = teams[0] if level <= GameLevel.BASIC else None
         for line_template in line_templates:
-            Line.new_from_template(template=line_template, game=game)
+            Line.new_from_template(template=line_template, game=game,
+                                   operator=operator)
             # lines then create the Station, LineLocations and Trains
         return game
 
@@ -122,7 +130,8 @@ class LineTemplate(models.Model):
 class Line(models.Model):
     # name, direction1, direction2, trains_dir1, trains_dir2, train_interval
     # train_type = all from LineParameters
-    game = models.ForeignKey(Game, on_delete=models.CASCADE, null=True)
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, null=True,
+                             related_name='lines')
     operator = models.ForeignKey(Team, null=True,
                                  on_delete=models.SET_NULL)
     line_reputation = models.IntegerField(default=100)
@@ -194,7 +203,7 @@ class PlaceTemplate(models.Model, LocationType):
         max_length=40, help_text="A name is only required for stations",
         default='', verbose_name="Name (if station)", blank=True)
     type = models.IntegerField(choices=LocationType.CHOICES,
-                               default=LocationType.DEPOT)
+                               default=LocationType.TRACK)
     position = models.IntegerField()
     line = models.ForeignKey(LineTemplate, related_name='places',
                              on_delete=models.CASCADE)
@@ -238,7 +247,7 @@ class LineLocation(models.Model, LocationType):
         assert isinstance(line, Line)
         start_of_line = position == 0
         end_of_line = position == line_length-1
-        if start_of_line or end_of_line and not is_forward:
+        if (start_of_line or end_of_line) and not is_forward:
             start_of_line, end_of_line = end_of_line, start_of_line
 
         ll = LineLocation(
@@ -253,10 +262,9 @@ class LineLocation(models.Model, LocationType):
             # apply calculated station name if not set
             ss = Station(line=line, name=ll.name or ll.calculate_name())
             ss.save()
-        elif ll.is_start_of_line and ll.direction_is_forward:
-            ll.create_trains(line.trains_dir1)
-        elif ll.is_end_of_line and not ll.direction_is_forward:
-            ll.create_trains(line.trains_dir2)
+        if ll.is_start_of_line:
+            ll.create_trains(line.trains_dir1 if ll.direction_is_forward
+                             else line.trains_dir2)
         return ll
 
     def update_name(self):
@@ -284,8 +292,8 @@ class LineLocation(models.Model, LocationType):
                 return f"Track{self.sequence}"
 
     def create_trains(self, num_trains):
-        self.line.num_trains += 1
         for _i in range(num_trains):
+            self.line.num_trains += 1
             train = Train(location=self, type=self.line.train_type,
                           serial=self.line.num_trains)
             train.save()
@@ -329,7 +337,7 @@ class LineLocation(models.Model, LocationType):
         """ return the 'twin' location in the reverse direction """
         return LineLocation.objects.filter(
             line=self.line, sequence=self.sequence,
-            is_forward=not self.is_forward)
+            direction_is_forward=not self.direction_is_forward)
 
 
 class Train(models.Model):
@@ -341,6 +349,10 @@ class Train(models.Model):
 
     def __str__(self):
         return f"{self.type} #{self.serial} at {self.location}"
+
+    @classmethod
+    def trains_at_loc(cls, loc: LineLocation):
+        return cls.objects.filter(location=loc)
 
 
 class Station(models.Model):

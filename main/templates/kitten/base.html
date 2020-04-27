@@ -1,15 +1,16 @@
 <!doctype html>
 <html lang="en">
+{% load static %}
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- <link rel="stylesheet" href="style.css"> -->
     <!-- w3c core styles: eight offerings: Chocolate, Midnight, Modernist,
     Oldstyle, Steely, Swiss, Traditional, and Ultramarine 
     ref: https://www.w3.org/StyleSheets/Core/Overview.html -->
     <link rel="stylesheet" href="https://www.w3.org/StyleSheets/Core/Steely"
     type="text/css">
+    <link rel="stylesheet" href="{% static 'style.css' %}" type="text/css">
 
-    <title>{% block title %}Kitten on the Tracks{% endblock %}</title>
+    <title>{% block title %}Kitten on the Line{% endblock %}</title>
 </head>
 
 <body>
@@ -17,11 +18,20 @@
 {% block content %}
 {% endblock %}
 <ul style="list-style-type: none">
+
+{% if game.id and team_id %}
+<li style="display: inline-block;">
+	<a href="{% url 'game_details' game.id team_id %}">Details</a></li>
+<li style="display: inline-block;">
+	<a href="{% url 'game_delete' game.id team_id %}">Delete</a></li>
+{% endif %}
+
 <li style="display: inline-block;"><a href="{% url 'home' %}">Home</a></li>
 
 {% if user.is_authenticated %}
 <li style="display: inline-block;"><a href="{% url 'logout' %}">Logout</a></li>
 {% endif %}
+
 </ul>
 <p><small>&copy Simon Lambourn 2020</small></p>
 </body>

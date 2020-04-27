@@ -5,17 +5,24 @@
 <p>Here are the details of your game.</p>
 <ul>
 <li>Scheduling Centre</li>
-<li>Operations Control Room</li>
+
+<li><a href="{% url 'game_operations' game.id team_id %}">Operations Control Room</a>
+	</li>
+
 {% if game.level >= 30 %}
 <li>HR dashboard </li>
 {% endif %}
+
 {% if game.level >= 40 %}
 <li>Engineering dashboard</li>
 {% endif %}
+
 {% if game.level >= 20 %}
 <li>Boardroom</li>
 {% endif %}
+
 </ul>
+
 <button class="btn btn-default">Add team</button>
 <button class="btn btn-default">Play</button>
 <h3>Game settings:</h3>

@@ -1,0 +1,7 @@
+/* additional styles for kotl.  Doesn't seem to work */
+
+<style>
+table, tbody, tr, td  {
+	border: 1px solid black;
+}
+</style>
