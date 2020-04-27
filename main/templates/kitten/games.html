@@ -1,9 +1,9 @@
 {% extends 'kitten/base.html' %}
 {% block content %}
 <h2>Saved Games {% if team %}for {{ team.name }}:{% endif %}</h2>
-{% for game in games %}
 <ul>
-<li><a href="{% url 'game' game.id %}">{{ game }}</a>
+{% for game in games %}
+<li><a href="{% url 'game' game.id team.id %}">{{ game }}</a>
 {% endfor %}
 <p> </p>
 <li><a href="{% url 'game_new' team.id %}">New game</a>
