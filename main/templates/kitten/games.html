@@ -4,8 +4,11 @@
 <ul>
 {% for game in games %}
 <li><a href="{% url 'game' game.id team.id %}">{{ game }}</a>
+{% empty %}
+<li>(no saved games)</li>
 {% endfor %}
-<p> </p>
+</ul>
+<ul>
 <li><a href="{% url 'game_new' team.id %}">New game</a>
 </ul>
 {% endblock %}

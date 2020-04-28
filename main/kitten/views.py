@@ -2,9 +2,12 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 
-from .models import Game, Team, GameTemplate, Line, LineLocation, Train
+from .models import Game, Team, GameTemplate, Line, LineLocation, Train, \
+    GameInterval
 from .forms import GameForm
-
+import logging
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 @login_required
 def index(request):
@@ -80,31 +83,40 @@ def game_delete(request, game_id, team_id):
 
 
 @login_required
-def game_details(request, game_id, team_id):
+def game_tick(request, game_id, team_id):
+    return game_details(request, game_id, team_id,
+                        tick_interval=GameInterval.TICK_SINGLE)
+
+
+@login_required
+def game_stage(request, game_id, team_id):
+    return game_details(request, game_id, team_id,
+                        tick_interval=GameInterval.TICK_STAGE)
+
+
+@login_required
+def game_details(request, game_id, team_id, tick_interval=None):
     if not Team.objects.filter(id=team_id, members=request.user).exists():
         return HttpResponse('Unauthorised team', status=401)
     if not Game.objects.filter(id=game_id, teams=team_id).exists():
         return HttpResponse('Unauthorized game', status=401)
     team = get_object_or_404(Team, pk=team_id)
     game = get_object_or_404(Game, pk=game_id)
+    if tick_interval is not None:
+        game.run(tick_interval)
     lines = Line.objects.filter(game=game, operator=team)
-    details = {line: line_details(line) for line in lines}
+
+    details = {line: [(trains_dir1, location, trains_dir2)
+                      for location, (trains_dir1, trains_dir2)
+                      in line.details().items()]
+               for line in lines
+               }
     lines_other_op = Line.objects.filter(game=game).exclude(
         operator=team).order_by('operator')
     return render(request, 'kitten/game_details.html',
                   {'game': game, 'team': team,
                    'details': details,
                    'lines_other_op': lines_other_op})
-
-
-def line_details(line):
-    """ return an ordered list of locations along the line .. details of trains
-    and incidents to be added """
-    locations_dir1 = LineLocation.objects.filter(line=line).filter(
-        direction=line.direction1)
-    return {location: (Train.trains_at_loc(location).all(),
-                       Train.trains_at_loc(location.reverse()).all())
-            for location in locations_dir1}
 
 
 @login_required

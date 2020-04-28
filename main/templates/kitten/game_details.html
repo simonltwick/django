@@ -1,51 +1,58 @@
 {% extends 'kitten/base.html' %}
 {% block content %}
-<h1>{{ game.name }}: Lines operated by {{ team.name }}</h1>
+<h1>{{ team.name }}: Operations Control Room</h1>
+<h2>Line Status on {{ game.current_time|date:"D, g:i a" }}</h2>
 {% for line, place_details in details.items %}
-<h2>{{ line.name }}</h2>
+<h4>{{ line.name }}</h4>
 
 {% if place_details %}
 <table style="border: 1px solid grey;; border-collapse: collapse;">
-<tr><th>Location</th><th>{{ line.direction1 }}</th>
+<tr><th>{{ line.direction1 }}</th><th>Location</th>
 <th>{{ line.direction2 }}</th></tr>
-{% for location, trains in place_details.items %}
+{% for trains_dir1, location, trains_dir2 in place_details %}
 
 <tr>
 
 <td style="border: 1px solid grey;">
-{% if location.is_station %}<b>{% endif %}
-{{ location.name|default:"[Track]" }}
-{% if location.is_station %}</b>{% endif %}
+{% for train in trains_dir1 %}
+{{ train.type }} #{{ train.serial }}<br>
+{% endfor %} <!-- trains -->
 </td>
-
-{% for trains_by_dir in trains %}
 
 <td style="border: 1px solid grey;">
-{% for train in trains_by_dir %}
-
-{{ train.type }} #{{ train.serial }}<br>
-
-{% endfor %}
+{% if location.is_station %}<b>{% endif %}
+{{ location.name|default:"[Track]" }}
+<br>
+{% if location.is_station %}</b>{% endif %}
+<small>Transit delay: {{ location.transit_delay }}</small>
 </td>
 
-{% endfor %}
+<td style="border: 1px solid grey;">
+{% for train in trains_dir2 %}
+{{ train.type }} #{{ train.serial }}<br>
+{% endfor %}  <!-- trains 2 -->
+</td>
+
 </tr>
 
-{% endfor %}
+{% endfor %}  <!-- line locations -->
 </table>
-{% endif %}
+<p>Delays today: {{ line.delay }}</p>
+{% endif %} <!-- places -->
 
 {% empty %}
 <p>(No lines for {{ team.name }}.)</p>
-{% endfor %}
+{% endfor %}  <!-- lines -->
+
+<a href="{% url 'game_tick' game.id team.id %}">Tick</a>
 
 {% if lines_other_op %}
 
-<h2>Other teams' lines:</h2>
+<h2>Other lines:</h2>
 <ul>
 {% for line in lines_other_op %}
 <li>{{ line.name }}
-	({{ line.team.name|default_if_none:"<b>No operators</b>>" }})</li>
+	({{ line.team.name|default_if_none:"<b>No operator</b>>" }})</li>
 {% endfor %}
 </ul>
 

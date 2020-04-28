@@ -10,7 +10,7 @@
     type="text/css">
     <link rel="stylesheet" href="{% static 'style.css' %}" type="text/css">
 
-    <title>{% block title %}Kitten on the Line{% endblock %}</title>
+    <title>{% block title %}{% if game %}{{game.name}} - {% endif %}Kitten on the Line{% endblock %}</title>
 </head>
 
 <body>
@@ -23,16 +23,26 @@
 <li style="display: inline-block;">
 	<a href="{% url 'game_details' game.id team_id %}">Details</a></li>
 <li style="display: inline-block;">
-	<a href="{% url 'game_delete' game.id team_id %}">Delete</a></li>
+	<a 
+	{% if user.is_superuser %}
+	href="{% url 'admin:kitten_game_delete' game.id %}"
+	{% else %}
+	href="{% url 'game_delete' game.id team_id %}"
+	{% endif %}
+	>Delete</a></li>
 {% endif %}
 
 <li style="display: inline-block;"><a href="{% url 'home' %}">Home</a></li>
+
+{% if user.is_superuser %}
+<li style="display: inline-block;"><a href="{% url 'admin:index' %}">Admin</a>
+{% endif %}
 
 {% if user.is_authenticated %}
 <li style="display: inline-block;"><a href="{% url 'logout' %}">Logout</a></li>
 {% endif %}
 
 </ul>
-<p><small>&copy Simon Lambourn 2020</small></p>
+<p style="color: grey;"><small>&copy Simon Lambourn 2020</small></p>
 </body>
 </html>

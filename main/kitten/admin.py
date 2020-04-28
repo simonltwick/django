@@ -31,6 +31,7 @@ class NetworkAdmin(admin.ModelAdmin):
 
 class PlaceTemplateInline(admin.TabularInline):
     model = PlaceTemplate
+    ordering = ['position']
 
 
 @admin.register(LineTemplate)
@@ -49,6 +50,7 @@ class GameAdmin(admin.ModelAdmin):
 
 class LineLocationInline(admin.TabularInline):
     model = LineLocation
+    ordering = ['position']
 
 
 @admin.register(Line)
