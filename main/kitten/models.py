@@ -25,6 +25,12 @@ def hhmm(dt: Union[datetime.time, datetime.datetime]) -> str:
     return dt.strftime('%H:%M')
 
 
+def escape(s):
+    """ escape html < character in user strings so it won't be treated as html
+    """
+    return None if s is None else s.replace('<', '&lt.')
+
+
 # TODO: change IntegerFields to PositiveIntegerFields for validation
 class GameLevel:
     BASIC = 10
@@ -158,7 +164,8 @@ class Game(models.Model, GameLevel):
             num_ticks = max(min(self.game_round_duration // self.tick_interval,
                                 GameInterval.MAX_TICKS_PER_ROUND),
                             1)
-        log.info("Game.run called for %d ticks with save=%s", num_ticks, save)
+        # log.info("Game.run called for %d ticks with save=%s", num_ticks,
+        #          save)
         for _t in range(num_ticks - 1):
             self.tick(save=False)
         self.tick(save=save)
@@ -166,7 +173,7 @@ class Game(models.Model, GameLevel):
     def tick(self, save=False):
         """ run the game for one tick of the clock """
         for line in self.lines.all():
-            self.delay += line.update_trains(self.current_time)
+            line.update_trains(self.current_time)
         self.current_time += self.tick_interval
         self.save()
         # update incidents
@@ -212,7 +219,9 @@ class Line(models.Model):
     trains_dir2 = models.IntegerField(default=3)
     train_interval = models.IntegerField(default=10)
     train_type = models.CharField(max_length=20, default='Train')
-    delay = models.PositiveIntegerField(default=0)
+    total_arrivals = models.PositiveIntegerField(default=0)
+    total_delay = models.DurationField(default=datetime.timedelta(0))
+    on_time_arrivals = models.PositiveIntegerField(default=0)
     # num_trains local variable for assigning train serial numbers
     # line style / colour
     # train icon
@@ -223,6 +232,17 @@ class Line(models.Model):
 
     def __str__(self):
         return self.name
+
+    def display_punctuality(self):
+        if self.total_arrivals == 0:
+            return '(no punctuality stats)'
+        punctuality_percent = self.on_time_arrivals/self.total_arrivals*100
+        s = f"{punctuality_percent:0.1f}% punctuality."
+        if self.total_arrivals != self.on_time_arrivals:
+            av_delay = self.total_delay / (
+                self.total_arrivals - self.on_time_arrivals)
+            s += f" Average delay={hhmm(av_delay)}."
+        return s
 
     @classmethod
     def new_from_template(cls, template: LineTemplate, game: Game,
@@ -269,7 +289,7 @@ class Line(models.Model):
                 for location in locations_dir1}
 
     def update_trains(self, current_time):
-        log.info("Line.update_trains(%s)", self)
+        # log.info("Line.update_trains(%s)", self)
         # ### HACK get start of line in 1st direction & turnaround a train ###
         # loc0=LineLocation.objects.get(position=0, direction=self.direction1)
         # trains_loc0 = Train.objects.filter(location=loc0).all()
@@ -285,7 +305,6 @@ class Line(models.Model):
         # log.info("Turnaround test worked")
 
         self.try_move_trains(current_time)
-        return self.delay
 
     def turnaround_trains(self, current_time):
         """train turnaround at depots and where turnaround specified
@@ -321,8 +340,13 @@ class Line(models.Model):
         for train in trains_direction1:
             train.try_move(current_time)
 
-    def record_delay(self, delay_num=1):
-        self.delay += delay_num
+    def report_puncuality(self, delay: datetime.timedelta):
+        """ record train arrival punctuality """
+        self.total_arrivals += 1
+        self.total_delay += delay
+        if not delay:
+            self.on_time_arrivals += 1
+        self.save()
 
 
 class LocationType:
@@ -450,6 +474,32 @@ class LineLocation(models.Model, LocationType):
     def __str__(self):
         return f'{self.name}, {self.direction}'
 
+    def html(self):
+        """ return description for display, including <span> classes """
+        # TODO: escape user-provided names in .html methods:replace < with &lt.
+        classes = ['location']
+        if self.is_station():
+            classes.append('station')
+        classes = ' '.join(classes)
+        name = escape(self.name) or '[Track]'
+        # TODO: add turnaround indicator
+        return ('<div class="location">'  # allows transit-delay -> right
+                f'<span class="{classes}">{name}</span>'
+                f'<span class="transit-delay">{self.transit_delay}</span>'
+                f'<span class="turnaround">{self.display_turnaround()}</span>'
+                '</div>')
+
+    def display_turnaround(self):
+        """ return a string describing turnaround % in both directions """
+        if self.is_depot():
+            return ""
+        turnaround = (self.turnaround_percent or
+                      self.reverse().turnaround_percent)
+        if not turnaround:
+            return ""
+        char = "⮍" if self.turnaround_percent else "⮏"
+        return f", {char}{turnaround}%"
+
     def display_type(self):
         return (self.name if self.name else
                 f'[{self.get_location_type_display()}]')
@@ -497,17 +547,25 @@ class Train(models.Model):
                                  related_name='trains')
     serial = models.PositiveIntegerField(default=1)
     awaiting_turnaround = models.BooleanField(default=False)
+    blocked = models.BooleanField(default=False)
+    delay = models.DurationField(default=datetime.timedelta(0))
 
     def __str__(self):
         return f"{self.type} #{self.serial} at {self.location}"
 
+    def html(self):
+        classes = ['train']
+        if self.blocked:  # this overrides train-delayed in the css
+            classes.append('train-blocked')
+        elif self.delay:
+            classes.append('train-delayed')
+        classes = ' '.join(classes)
+        return (f'<span class="{classes}">{escape(self.type)} {self.serial}'
+                '</span>')
+
     def move(self, new_location, current_time):
         """ move a train, unconditionally, and update last_train_time """
-        # log.info("move(%s, -> %s.", self, new_location)
-        # log.info("before move, %s has %s", self.location,
-        #          list_to_str(str(t) for t in self.location.trains))
-        # log.info("before move, %s has %s", new_location,
-        #          list_to_str(str(t) for t in new_location.trains))
+        # log.info("%s, -> %s", self, new_location)
         # update last_train_time
         if not new_location.trains.exists():
             # don't update if there's a train already waiting to go (depot)
@@ -516,7 +574,11 @@ class Train(models.Model):
         self.location.last_train_time = current_time
         self.location.save()
 
+        if new_location.is_station():
+            self.location.line.report_puncuality(self.delay)
+
         self.location = new_location
+        self.blocked = False
         # No need to update location of incidents - they move with the train
         self.save()
 
@@ -528,27 +590,39 @@ class Train(models.Model):
         if self.location.is_end_of_line:
             log.warning("%s stuck at end of line?", self)
             return  # end of line, can't move
+
+        if self.awaiting_turnaround:
+            return  # already logged in turnaround_clear()
+
         next_place = self.location.next()
         """ consider transit_time.   If no last-train_time recorded, or we've
            waited transit_time since we arrived,
            (or the last train departed from a depot) we can move """
-        # log.info("try_move for %s: considering delays. current_time=%s,"
-        #          "last_train_time=%s, transit_delay=%s", self,
-        #          hhmm(current_time), hhmm(self.location.last_train_time),
-        #          hhmm(self.location.transit_delay *
-        #               self.location.line.game.tick_interval))
+
         if self.location.last_train_time is not None and (
             current_time < self.location.last_train_time + (
                 self.location.transit_delay *
                 self.location.line.game.tick_interval)):
-            # log.info("%s waiting for transit_delay...", self)
-            return  # not delayed, not time to move yet
-        # log.info("%s ready to move", self)
+            # log.info("%s in transit at %s "
+            #          "(last train=%s, transit_delay=%s)",
+            #          self, hhmm(current_time),
+            #          hhmm(self.location.last_train_time),
+            #          hhmm(self.location.transit_delay *
+            #               self.location.line.game.tick_interval))
+            return
+
+        # log.info("%s ready to move at %s (last train=%s, transit_delay=%s)",
+        #          self, hhmm(current_time),
+        #          hhmm(self.location.last_train_time),
+        #          hhmm(self.location.transit_delay *
+        #               self.location.line.game.tick_interval))
         if next_place.trains.exists() and not next_place.is_depot():
-            log.warning("%s is delayed (red signal)", self)
-            self.location.line.record_delay(1)
+            log.warning("%s is blocked (train ahead)", self)
+            self.blocked = True
+            self.delay += self.location.line.game.tick_interval
+            self.save()
             return False
-        # log.info("%s -> %s", self, next_place)
+
         self.move(next_place, current_time)
 
     def will_turnaround(self):
@@ -559,29 +633,39 @@ class Train(models.Model):
             # always turnaround at end of line
             # log.info("will_turnaround: %s: is_depot=True", self)
             return self.location.is_end_of_line
+        if self.location.turnaround_percent == 0:
+            return False
+        rand = random.random() * 100
+        log.info("Considering turnaround for %s, random#=%d, chance %s%%",
+                 self, rand, self.location.turnaround_percent)
         if self.awaiting_turnaround or \
-                random.random() * 100 < self.location.turnaround_percent:
-            # log.info("will_turnaround: %s setting awaiting_turnaround "
-            #          "(was %s). location.turnaround%%=%s",
-            #          self, self.awaiting_turnaround,
-            #          self.location.turnaround_percent)
-            self.awaiting_turnaround = True
-            self.save()
-            return not self.turnaround_blocked()
+                rand < self.location.turnaround_percent:
+            return self.attempt_turnaround()
+            turnaround_ok = self.turnaround_clear()
+            return turnaround_ok
         # log.info("will_turnaround(%s): no turnaround", self)
         return False
 
-    def turnaround_blocked(self):
-        if self.location.reverse().trains.exists():
-            log.warning("%s turnaround is delayed (train on reverse track)",
-                        self)
-            self.location.line.record_delay(1)
+    def attempt_turnaround(self):
+        """ the train is for turning.  Can it be done this time? """
+        if not self.location.reverse().trains.exists():
+            # log.info("%s will turnaround", self,)
             return True
+        log.warning("%s turnaround is blocked (train on reverse track)", self)
+        self.blocked = True
+        self.delay += self.location.line.game.tick_interval
+        self.awaiting_turnaround = True
+        self.save()
+        return False
 
     def turnaround(self, current_time):
         """ move the train to the reverse direction """
-        log.info("%s -> %s (turnaround)", self, self.location.reverse())
+        # log.info("%s -> %s (turnaround)", self, self.location.reverse())
         self.awaiting_turnaround = False
+        reverse_loc = self.location.reverse()
+        if reverse_loc.trains.exists():
+            # clear delays if there's already a train in the depot
+            self.delay = datetime.timedelta(0)
         self.move(self.location.reverse(), current_time)
 
 
@@ -592,3 +676,45 @@ class Station(models.Model):
 
     def __str__(self):
         return f"{self.name} on {self.line}"
+
+
+class Impact(models.Model):
+    name = models.CharField(max_length=40, default='?')
+    blocking = models.BooleanField(default=False)
+    network = models.ForeignKey(Network, related_name='impacts')
+
+
+class Response(models.Model):
+    name = models.CharField(max_length=40, default='?')
+    developer_description = models.CharField(max_length=100, null=True, blank=True)
+    network = models.ForeignKey(Network, null=True)
+    effectiveness_percent = models.PositiveSmallIntegerField(default=100)
+    impacts = models.ManyToManyField(Impact)
+    time_to_fix = models.DurationField(default=datetime.timedelta(0))
+
+
+class IncidentFamily:
+    LINE = 1
+    TRAIN = 2
+    STATION = 3
+    CHOICES = ((1, 'Line'), (2, 'Train'), (3, 'Station'))
+
+
+class IncidentType(models.Model):
+    network = models.ForeignKey(Network, related_name='incident_types')
+    name = models.CharField(max_length=40, default='?')
+    type = models.IntegerField(choices=IncidentFamily.CHOICES)
+    description = models.CharField(max_length=100, null=True, blank=True)
+    responses = models.ManyToManyField(Response)
+    impacts = models.ManyToManyField(Impact)
+
+
+class Incident(models.Model):
+    line = models.ForeignKey(Line)
+    incident_type = models.ForeignKey(IncidentType)
+    response = models.ForeignKey(Response, null=True, blank=True)
+    # severity
+    incident_start_time = models.DateTimeField(null=True)
+    response_start_time = models.DateTimeField(null=True)
+    location = models.ForeignKey(LineLocation)
+    # fk train (if on a train)

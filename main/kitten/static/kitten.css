@@ -1,0 +1,47 @@
+/* additional styles for kotl.  Doesn't seem to work */
+
+table, tbody, tr, td, th  {
+	border: 1px solid grey;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+.station {
+	font-weight: bold;
+}
+
+div.location {
+	justify-content: space-between;
+	align-content: space-between;
+}
+
+.transit-delay, .turnaround {
+	color: grey;
+	font-size: 50%;
+}
+
+.transit-delay::before {
+	content: '\00a0';
+}
+
+.train-delayed::before {
+	background-color: orange;
+	content: '\00a0\00a0\00a0';
+	font-size: 20%;
+	border-radius: 50%;
+	/*width: 4px;
+	height: 4px; */
+	vertical-align: sub;
+}
+
+.train-blocked::before {
+	background-color: red;
+	content: '\00a0\00a0\00a0';
+	font-size: 20%;
+	border-radius: 50%;
+	/*width: 4px;
+	height: 4px; */
+	vertical-align: super;
+}

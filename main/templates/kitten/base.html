@@ -8,7 +8,7 @@
     ref: https://www.w3.org/StyleSheets/Core/Overview.html -->
     <link rel="stylesheet" href="https://www.w3.org/StyleSheets/Core/Steely"
     type="text/css">
-    <link rel="stylesheet" href="{% static 'style.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'kitten.css' %}" type="text/css">
 
     <title>{% block title %}{% if game %}{{game.name}} - {% endif %}Kitten on the Line{% endblock %}</title>
 </head>
@@ -33,6 +33,11 @@
 {% endif %}
 
 <li style="display: inline-block;"><a href="{% url 'home' %}">Home</a></li>
+
+{% if team.id %}
+<li style="display: inline-block;"><a href="{% url 'games' team.id %}">Games</a>
+</li>
+{% endif %}
 
 {% if user.is_superuser %}
 <li style="display: inline-block;"><a href="{% url 'admin:index' %}">Admin</a>

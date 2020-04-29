@@ -6,30 +6,26 @@
 <h4>{{ line.name }}</h4>
 
 {% if place_details %}
-<table style="border: 1px solid grey;; border-collapse: collapse;">
+<table>
 <tr><th>{{ line.direction1 }}</th><th>Location</th>
 <th>{{ line.direction2 }}</th></tr>
 {% for trains_dir1, location, trains_dir2 in place_details %}
 
 <tr>
 
-<td style="border: 1px solid grey;">
+<td>
 {% for train in trains_dir1 %}
-{{ train.type }} #{{ train.serial }}<br>
+{{ train.html|safe }}<br>
 {% endfor %} <!-- trains -->
 </td>
 
-<td style="border: 1px solid grey;">
-{% if location.is_station %}<b>{% endif %}
-{{ location.name|default:"[Track]" }}
-<br>
-{% if location.is_station %}</b>{% endif %}
-<small>Transit delay: {{ location.transit_delay }}</small>
+<td>
+{{ location.html|safe }}
 </td>
 
-<td style="border: 1px solid grey;">
+<td>
 {% for train in trains_dir2 %}
-{{ train.type }} #{{ train.serial }}<br>
+{{ train.html|safe }}<br>
 {% endfor %}  <!-- trains 2 -->
 </td>
 
@@ -37,7 +33,7 @@
 
 {% endfor %}  <!-- line locations -->
 </table>
-<p>Delays today: {{ line.delay }}</p>
+<p>{{ line.display_punctuality }}</p>
 {% endif %} <!-- places -->
 
 {% empty %}
