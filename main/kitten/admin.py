@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 from .models import Network, Team, LineTemplate, GameTemplate, PlaceTemplate, \
-    Game, Line, LineLocation, Station, Train
+    Game, Line, LineLocation, Station, Train, Incident, Impact, IncidentType, \
+    Response
 
 
 admin.site.register(GameTemplate)
@@ -9,6 +10,10 @@ admin.site.register(Team)
 admin.site.register(LineLocation)
 admin.site.register(Station)
 admin.site.register(Train)
+admin.site.register(Incident)
+admin.site.register(Impact)
+admin.site.register(IncidentType)
+admin.site.register(Response)
 
 
 """class UserInline(admin.TabularInline):
@@ -56,4 +61,3 @@ class LineLocationInline(admin.TabularInline):
 @admin.register(Line)
 class LineAdmin(admin.ModelAdmin):
     inlines = [LineLocationInline]
-    

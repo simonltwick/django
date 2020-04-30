@@ -2,10 +2,17 @@
 
 table, tbody, tr, td, th  {
 	border: 1px solid grey;
+	padding: 2px;
+	vertical-align: top;
+	text-align: top;
 }
 
 table {
 	border-collapse: collapse;
+}
+
+.no-border, table.no-border {
+	border-style: none;
 }
 
 .station {

@@ -91,12 +91,60 @@ class GameTemplate(models.Model, GameLevel):
     network = models.ForeignKey(Network, related_name='levels',
                                 on_delete=models.CASCADE)
     level = models.IntegerField(choices=GameLevel.CHOICES)
+    incident_rate = models.PositiveSmallIntegerField(
+        default=100, help_text="average rate of incidents, with 100 generating"
+        "1 incident per tick of the clock")
 
     class Meta:
         unique_together = (('network', 'level'))
 
     def __str__(self):
         return f'{self.get_level_display()} game on {self.network}'
+
+
+# ----- Incident Types and responses -----
+class Impact(models.Model):
+    name = models.CharField(max_length=40, default='?')
+    blocking = models.BooleanField(default=False)
+    network = models.ForeignKey(Network, related_name='impacts')
+
+    def __str__(self):
+        return self.name
+
+
+class Response(models.Model):
+    name = models.CharField(max_length=40, default='?')
+    developer_description = models.CharField(max_length=100, null=True,
+                                             blank=True)
+    network = models.ForeignKey(Network, null=True)
+    effectiveness_percent = models.PositiveSmallIntegerField(default=100)
+    impacts = models.ManyToManyField(Impact)
+    time_to_fix = models.DurationField(default=datetime.timedelta(0))
+
+    def __str__(self):
+        return self.name
+
+
+class IncidentFamily:
+    LINE = 1
+    TRAIN = 2
+    STATION = 3
+    CHOICES = ((1, 'Line'), (2, 'Train'), (3, 'Station'))
+
+
+class IncidentType(models.Model):
+    network = models.ForeignKey(Network, related_name='incident_types')
+    name = models.CharField(max_length=40, default='?')
+    type = models.IntegerField(choices=IncidentFamily.CHOICES)
+    description = models.CharField(max_length=100, null=True, blank=True)
+    likelihood = models.PositiveSmallIntegerField(
+        default=10, help_text="0-100: likelihood of this incident type "
+        "occuring compared to other incident types")
+    responses = models.ManyToManyField(Response)
+    impacts = models.ManyToManyField(Impact)
+
+    def __str__(self):
+        return self.name
 
 
 # ----- Game related models ------
@@ -107,11 +155,17 @@ class GameInterval(IntEnum):
 
 
 class Game(models.Model, GameLevel):
-    name = models.CharField(max_length=40, null=True, blank=True)
+    INCIDENT_LIMIT = 1  # per place
+    INCIDENT_SEVERITY_VARIATION = 0.5  # in range  +/- variation
+    name = models.CharField(max_length=40)
     started = models.DateField(auto_now_add=True)
     last_played = models.DateField(auto_now=True)
     teams = models.ManyToManyField(Team, related_name='games')
     network_name = models.CharField(max_length=40)
+    incident_types = models.ManyToManyField(IncidentType)
+    incident_rate = models.PositiveSmallIntegerField(
+        default=100, help_text="average rate of incidents, with 100 generating"
+        "1 incident per tick of the clock")
     level = models.IntegerField(choices=GameLevel.CHOICES)
     day_start_time = models.TimeField(default=datetime.time(hour=6))
     day_end_time = models.TimeField(default=datetime.time(hour=22))
@@ -144,8 +198,10 @@ class Game(models.Model, GameLevel):
             game_round_duration=template.network.game_round_duration,
             current_time=datetime.datetime.combine(
                 datetime.date.today(), template.network.day_start_time),
+            incident_rate=template.incident_rate, 
             **kwargs)
         game.teams.add(*teams)
+        game.incident_types.add(template.network.incident_types)
         line_templates = LineTemplate.objects.filter(network=template.network)
         operator = teams[0] if level <= GameLevel.BASIC else None
         for line_template in line_templates:
@@ -172,12 +228,103 @@ class Game(models.Model, GameLevel):
 
     def tick(self, save=False):
         """ run the game for one tick of the clock """
+        self.sprinkle_incidents()
+        return
         for line in self.lines.all():
             line.update_trains(self.current_time)
         self.current_time += self.tick_interval
         self.save()
-        # update incidents
+        # sprinkle_incidents
         # update scoreboard
+
+    # ----- incident generation ------
+    def sprinkle_incidents(self):
+        """ generate a random number of incidents at random locations """
+        for incident in self.generate_incidents():
+            if incident is None:  # if no incident types defined
+                return
+
+            for _i in range(10):  # try 10 times for an incident-free place
+                incident.location = self.random_place(
+                    incident.type.type)
+                if self.can_place_incident(incident):
+                    break
+            else:
+                log.warning("Unable to find available location for incident: "
+                            f"discarding it")
+                return
+
+            # severity in range 0.5-1.5
+            # TODO: make incident variability (more) customisable
+            incident.severity = 0.5 + random.uniform(
+                1-self.INCIDENT_SEVERITY_VARIATION,
+                1+self.INCIDENT_SEVERITY_VARIATION)
+            incident.occur()
+
+    def can_place_incident(self, incident):
+        """ update the incident location so it knows it has an incident
+        Return False if there is already an incident there
+        Currently only limits number of Incidents on Trains"""
+        if isinstance(incident.location, Train):
+            if incident.location.incidents.count() >= self.INCIDENT_LIMIT:
+                return False  # already has an incident
+        return True
+
+    def incident_type_likelihoods(self):
+        """ return (list(IncidentTypes), list(incident_type_percent_chance))
+        """
+        try:
+            return self._incident_type_likelihoods
+        except AttributeError:
+            pass  # first time: calculate it
+        pairs = ((incident_type, incident_type.likelihood)
+                 for incident_type in self.incident_types.all())
+        # and transpose into a pair of lists
+        self._incident_type_likelihoods: Tuple[
+            List[IncidentType], List[int]] = tuple(zip(*pairs))
+        return self._incident_type_likelihoods
+
+    def random_incident(self):
+        """ return a random incident based on all incidentType likelihoods
+        The incident doesn't have a start time or place specified yet """
+        incident_types, weights = self.incident_type_likelihoods()
+        if not incident_types or not sum(weights):
+            return None
+        incident_type = random.choices(incident_types, weights, k=1)[0]
+        return Incident(type=incident_type, start_time=self.current_time)
+
+    def random_place(self, place_type):
+        """ find a place at random.  Place type could be station, line or train
+        """
+        try:
+            return random.choice(self._places[place_type])
+        except AttributeError:
+            pass
+        self._places = {IncidentFamily.LINE: [],
+                        IncidentFamily.STATION: [],
+                        IncidentFamily.TRAIN: []
+                        }
+        for line in self.lines.all():
+            for k in self._places:
+                self._places[k].extend(line.places(k))
+        # log.info("Places for %s:", self)
+        # for k, v in self._places.items():
+        #     log.info('%s: [%s]', k, ', '.join(str(e) for e in v))
+        return random.choice(self._places[place_type])
+
+    def generate_incidents(self):
+        """ yield a random number of new incidents up to twice the average
+        incident frequency.
+        The new incidents need a place, start time and severity allocating
+        (done by caller)
+        and they need to added to the GameIncidents by GameIncidents.record
+
+        generates up to 2*freq/100 incidents per call, with an average
+        event frequency of freq/100 """
+        num = random.randrange(200 * self.incident_rate + 10000) // 10000
+
+        for _i in range(num):
+            yield self.random_incident()
 
 
 class LineTemplate(models.Model):
@@ -278,6 +425,24 @@ class Line(models.Model):
             for line_location in lls:
                 if line_location.update_name():
                     line_location.save()
+
+    def places(self, location_type):
+        try:
+            return self._places[location_type]
+        except AttributeError:
+            pass
+
+        self._places = {
+            IncidentFamily.LINE: LineLocation.objects.filter(line=self).all(),
+            IncidentFamily.STATION: Station.objects.filter(line=self).all(),
+            }
+        self._places[IncidentFamily.TRAIN] = [
+            train for lineloc in self._places[IncidentFamily.LINE]
+            for train in lineloc.trains.all()]
+        # log.info("Places for %s:", self)
+        # for k, v in self._places.items():
+        #     log.info('%s: [%s]', k, ', '.join(str(e) for e in v))
+        return self._places[location_type]
 
     def details(self):
         """ return a dict of locations along the line with trains
@@ -550,6 +715,11 @@ class Train(models.Model):
     blocked = models.BooleanField(default=False)
     delay = models.DurationField(default=datetime.timedelta(0))
 
+    @property
+    def line(self):
+        """ used when recording incidents, to allocate to the correct line """
+        return self.location.line
+
     def __str__(self):
         return f"{self.type} #{self.serial} at {self.location}"
 
@@ -678,43 +848,60 @@ class Station(models.Model):
         return f"{self.name} on {self.line}"
 
 
-class Impact(models.Model):
-    name = models.CharField(max_length=40, default='?')
-    blocking = models.BooleanField(default=False)
-    network = models.ForeignKey(Network, related_name='impacts')
-
-
-class Response(models.Model):
-    name = models.CharField(max_length=40, default='?')
-    developer_description = models.CharField(max_length=100, null=True, blank=True)
-    network = models.ForeignKey(Network, null=True)
-    effectiveness_percent = models.PositiveSmallIntegerField(default=100)
-    impacts = models.ManyToManyField(Impact)
-    time_to_fix = models.DurationField(default=datetime.timedelta(0))
-
-
-class IncidentFamily:
-    LINE = 1
-    TRAIN = 2
-    STATION = 3
-    CHOICES = ((1, 'Line'), (2, 'Train'), (3, 'Station'))
-
-
-class IncidentType(models.Model):
-    network = models.ForeignKey(Network, related_name='incident_types')
-    name = models.CharField(max_length=40, default='?')
-    type = models.IntegerField(choices=IncidentFamily.CHOICES)
-    description = models.CharField(max_length=100, null=True, blank=True)
-    responses = models.ManyToManyField(Response)
-    impacts = models.ManyToManyField(Impact)
-
-
 class Incident(models.Model):
-    line = models.ForeignKey(Line)
-    incident_type = models.ForeignKey(IncidentType)
+    line = models.ForeignKey(Line, related_name='incidents')
+    type = models.ForeignKey(IncidentType)
     response = models.ForeignKey(Response, null=True, blank=True)
     # severity
-    incident_start_time = models.DateTimeField(null=True)
+    start_time = models.DateTimeField(null=True)
     response_start_time = models.DateTimeField(null=True)
-    location = models.ForeignKey(LineLocation)
-    # fk train (if on a train)
+    # exactly one of these location fields should be completed
+    location_line = models.ForeignKey(LineLocation, null=True,
+                                      related_name="incidents")
+    location_station = models.ForeignKey(Station, null=True,
+                                         related_name="incidents")
+    location_train = models.ForeignKey(Train, null=True,
+                                       related_name="incidents")
+
+    @property
+    def location(self):
+        try:
+            return self._location
+        except AttributeError:
+            pass
+        self._location = (
+            self.location_line if self.location_line is not None else
+            self.location_train if self.location_train is not None else
+            self.location_station)
+        if self._location is None:
+            raise ValueError(f"Incident %s location not set")
+        return self._location
+
+    @location.setter
+    def location(self, loc):
+        self._location = loc
+        if isinstance(loc, LineLocation):
+            self.location_line = loc
+        elif isinstance(loc, Train):
+            self.location_train = loc
+        elif isinstance(loc, Station):
+            self.location_station = loc
+        else:
+            raise TypeError(f"Unrecognised location type {loc!r}")
+
+    def __str__(self):
+        return str(self.type)
+
+    def html(self):
+        """ return html version """
+        return (f'<span class="incident">{hhmm(self.start_time)} '
+                f'{self.type.name}, {self.location}</span>')
+
+    def occur(self):
+        """ record a new incident """
+        if not all((self.start_time, self.location, self.severity),):
+            raise ValueError("Incident start_time, location or severity not "
+                             f"specified in {self}")
+        self.line = self.location.line
+        self.save()
+        log.warning("Time %s: %s", hhmm(self.start_time), self)

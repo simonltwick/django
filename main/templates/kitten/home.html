@@ -7,7 +7,7 @@
 <ul>
 {% if user.is_authenticated %}
 {% for team in teams %}
-<li><a href="{% url 'games' team.id %}">{{ team.name }}</a>
+<li><a href="{% url 'team' team.id %}">{{ team.name }}</a>
 {% endfor %}
 {% endif %}
 <p> </p>

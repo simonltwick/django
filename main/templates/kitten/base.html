@@ -14,40 +14,34 @@
 </head>
 
 <body>
-
-{% block content %}
+{% block banner %}
+<p><strong>🚂🚃🚃🚃🐱 KITTEN ON THE LINE &#x1f682;&#x1f683;🚃🚃&#x1f431;</strong></p>
 {% endblock %}
-<ul style="list-style-type: none">
 
-{% if game.id and team_id %}
-<li style="display: inline-block;">
-	<a href="{% url 'game_details' game.id team_id %}">Details</a></li>
-<li style="display: inline-block;">
-	<a 
-	{% if user.is_superuser %}
-	href="{% url 'admin:kitten_game_delete' game.id %}"
-	{% else %}
-	href="{% url 'game_delete' game.id team_id %}"
-	{% endif %}
-	>Delete</a></li>
+{% load breadcrumb %}
+<small>
+{% breadcrumb_url 'Home' 'home' %}
+{% if team_id %}
+> {% breadcrumb_url 'Team' 'team' team_id %}
+{% elif team.id %}
+> {% breadcrumb_url 'Team' 'team' team.id %}
 {% endif %}
 
-<li style="display: inline-block;"><a href="{% url 'home' %}">Home</a></li>
-
-{% if team.id %}
-<li style="display: inline-block;"><a href="{% url 'games' team.id %}">Games</a>
-</li>
-{% endif %}
+{% block breadcrumbs %}
+{% endblock %}
 
 {% if user.is_superuser %}
-<li style="display: inline-block;"><a href="{% url 'admin:index' %}">Admin</a>
+&nbsp;&nbsp;{% breadcrumb_url 'Admin' 'admin:index' %}
 {% endif %}
 
 {% if user.is_authenticated %}
-<li style="display: inline-block;"><a href="{% url 'logout' %}">Logout</a></li>
+&nbsp;&nbsp;{% breadcrumb_url 'Logout' 'logout' %}
 {% endif %}
+</small>
 
-</ul>
+{% block content %}
+{% endblock %}
+
 <p style="color: grey;"><small>&copy Simon Lambourn 2020</small></p>
 </body>
 </html>

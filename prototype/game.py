@@ -4,9 +4,9 @@ Created on 25 Apr 2020
 
 @author: simon
 '''
-from line import Line, Train
-from incident import GameIncidents
-from utils import list_to_str
+from .line import Line, Train
+from .incident import GameIncidents
+from .utils import list_to_str
 
 import logging
 import random

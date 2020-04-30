@@ -3,11 +3,12 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 
 from .models import Game, Team, GameTemplate, Line, LineLocation, Train, \
-    GameInterval
+    GameInterval, Incident
 from .forms import GameForm
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
+
 
 @login_required
 def index(request):
@@ -16,15 +17,11 @@ def index(request):
 
 
 @login_required
-def games(request, team_id=None):
+def team(request, team_id):
     """ list games available to this team """
-    if team_id is None:
-        games = Game.objects.all()
-        team = None
-    else:
-        team = get_object_or_404(Team, pk=team_id)
-        games = Game.objects.filter(teams__pk=team.pk)
-    return render(request, 'kitten/games.html', {'games': games, 'team': team})
+    team = get_object_or_404(Team, pk=team_id)
+    games = Game.objects.filter(teams__pk=team.pk)
+    return render(request, 'kitten/team.html', {'games': games, 'team': team})
 
 
 @login_required
@@ -84,18 +81,29 @@ def game_delete(request, game_id, team_id):
 
 @login_required
 def game_tick(request, game_id, team_id):
-    return game_details(request, game_id, team_id,
-                        tick_interval=GameInterval.TICK_SINGLE)
+    return game_operations(request, game_id, team_id,
+                           tick_interval=GameInterval.TICK_SINGLE)
 
 
 @login_required
 def game_stage(request, game_id, team_id):
-    return game_details(request, game_id, team_id,
-                        tick_interval=GameInterval.TICK_STAGE)
+    return game_operations(request, game_id, team_id,
+                           tick_interval=GameInterval.TICK_STAGE)
 
 
 @login_required
-def game_details(request, game_id, team_id, tick_interval=None):
+def game_incidents_clear(request, game_id, team_id):
+    if not Team.objects.filter(id=team_id, members=request.user).exists():
+        return HttpResponse('Unauthorised team', status=401)
+    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+        return HttpResponse('Unauthorized game', status=401)
+    log.info("Deleting incidents for game id %s", game_id)
+    Incident.objects.filter(line__game_id=game_id).delete()
+    return game_operations(request, game_id, team_id)
+
+
+@login_required
+def game_operations(request, game_id, team_id, tick_interval=None):
     if not Team.objects.filter(id=team_id, members=request.user).exists():
         return HttpResponse('Unauthorised team', status=401)
     if not Game.objects.filter(id=game_id, teams=team_id).exists():
@@ -106,17 +114,20 @@ def game_details(request, game_id, team_id, tick_interval=None):
         game.run(tick_interval)
     lines = Line.objects.filter(game=game, operator=team)
 
-    details = {line: [(trains_dir1, location, trains_dir2)
+    # details is {line([(trains_up, loc, trains_down)], [incidents])}
+    details = {line: ([(trains_dir1, location, trains_dir2)
                       for location, (trains_dir1, trains_dir2)
-                      in line.details().items()]
+                      in line.details().items()],
+                      line.incidents.all())
                for line in lines
                }
     lines_other_op = Line.objects.filter(game=game).exclude(
         operator=team).order_by('operator')
-    return render(request, 'kitten/game_details.html',
+    return render(request, 'kitten/game_operations.html',
                   {'game': game, 'team': team,
                    'details': details,
-                   'lines_other_op': lines_other_op})
+                   'lines_other_op': lines_other_op
+                   })
 
 
 @login_required

@@ -1,4 +1,10 @@
 {% extends 'kitten/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'Game' 'game' game.id team_id %}
+{% endblock %}
+
 {% block content %}
 <h1>{{ game.name }}</h1>
 
@@ -23,15 +29,22 @@
 
 </ul>
 
-<button class="btn btn-default">Add team</button>
-<button class="btn btn-default">Play</button>
 <h3>Game settings (common to all teams):</h3>
 <form method="POST" class="post-form"
 	action="{% url 'game' game.id team_id %}">
 {% csrf_token %}
     {{ form.as_p }}
+	<button class="btn btn-default">Add team</button>
     <p>Game level: {{game.get_level_display}}</p>
     <p>Network name: {{ game.network_name }}</p>
     <input type="submit" class="save btn btn-default" value="Save">
-</form>
+
+<input type="button" value="Play">
+<input type="button" class="btn"
+	{% if user.is_superuser %}
+		href="{% url 'admin:kitten_game_delete' game.id %}"
+	{% else %}
+		href="{% url 'game_delete' game.id team_id %}"
+	{% endif %}value="Delete">
 {% endblock %}
+</form>
