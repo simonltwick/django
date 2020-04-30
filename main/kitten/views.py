@@ -86,23 +86,6 @@ def game_tick(request, game_id, team_id):
 
 
 @login_required
-def game_stage(request, game_id, team_id):
-    return game_operations(request, game_id, team_id,
-                           tick_interval=GameInterval.TICK_STAGE)
-
-
-@login_required
-def game_incidents_clear(request, game_id, team_id):
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
-    if not Game.objects.filter(id=game_id, teams=team_id).exists():
-        return HttpResponse('Unauthorized game', status=401)
-    log.info("Deleting incidents for game id %s", game_id)
-    Incident.objects.filter(line__game_id=game_id).delete()
-    return game_operations(request, game_id, team_id)
-
-
-@login_required
 def game_operations(request, game_id, team_id, tick_interval=None):
     if not Team.objects.filter(id=team_id, members=request.user).exists():
         return HttpResponse('Unauthorised team', status=401)
@@ -128,6 +111,40 @@ def game_operations(request, game_id, team_id, tick_interval=None):
                    'details': details,
                    'lines_other_op': lines_other_op
                    })
+
+
+@login_required
+def game_stage(request, game_id, team_id):
+    return game_operations(request, game_id, team_id,
+                           tick_interval=GameInterval.TICK_STAGE)
+
+
+@login_required
+def incident(request, team_id, incident_id):
+    if not Team.objects.filter(id=team_id, members=request.user).exists():
+        return HttpResponse('Unauthorised team', status=401)
+    try:
+        incident = Incident.objects.get(id=incident_id,
+                                        line__game__teams=team_id)
+    except Incident.DoesNotExist:
+        return HttpResponse('Unauthorised team', status=401)
+    log.info("views.incident: incident.impacts.all=%s", incident.impacts.all())
+    return render(request, 'kitten/incident.html',
+                  {'game': incident.line.game,
+                   'team_id': team_id,
+                   'incident': incident,
+                   'response': incident.response})
+
+
+@login_required
+def game_incidents_clear(request, game_id, team_id):
+    if not Team.objects.filter(id=team_id, members=request.user).exists():
+        return HttpResponse('Unauthorised team', status=401)
+    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+        return HttpResponse('Unauthorized game', status=401)
+    log.info("Deleting incidents for game id %s", game_id)
+    Incident.objects.filter(line__game_id=game_id).delete()
+    return game_operations(request, game_id, team_id)
 
 
 @login_required

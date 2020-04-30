@@ -20,8 +20,10 @@ urlpatterns = [
         views.game_operations, name='game_operations'),
     url(r'^game/tick/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
         views.game_tick, name='game_tick'),
-    url(r'^game/clear_incidents/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
+    url(r'^game/incidents_clear/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
         views.game_incidents_clear, name='game_incidents_clear'),
+    url(r'^game/incident/(?P<team_id>[0-9]+)/(?P<incident_id>[0-9]+)',
+        views.incident, name='incident'),
     url(r'^team/join/?$', views.team_join, name='team_join'),
     url(r'^team/new/?$', views.team_new, name='team_new')
 ]

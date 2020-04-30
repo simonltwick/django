@@ -1,0 +1,82 @@
+{% extends 'kitten/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'Game' 'game' game.id team_id %}
+> {% breadcrumb_url 'Operations' 'game_operations' game.id team_id %}
+> {% breadcrumb_url 'Incident' 'incident' team_id incident.id %}
+{% endblock %}
+
+{% block content %}
+
+<h3>Incident Report: {{ game.current_date }}</h3>
+<p>Incident Type: {{ incident.type }}</p>
+<p>Location: {{ incident.location }}, {{ incident.line }}</p>
+<p>Reported: {{ incident.start_time }}</p>
+<p>Severity: {{ incident.severity|default:"Unknown" }}
+
+<p>Status:
+{% if incident.response %}
+{{incident.response}} commenced {{ incident.response_start_time }}.</p>
+<p>Estimated duration: {{ incident.response.duration }}
+{% else %}<em>Open</em>
+{% endif %}
+</p>
+<h4>Estimated Impact</h4>
+<ul>
+{% for impact in incident.impacts.all %}
+<li>{{ impact }}</li>
+{% empty %}
+(no incident impacts)
+{% endfor %}
+</ul>
+
+{% if incident.response %}
+<h5>Estimated recovery impacts</h5>
+
+<ul>
+{% for impact in response.impacts.all %}
+<li>{{ impact }}</li>
+{% empty %}
+(no response impacts)
+{% endfor %}
+</ul>
+
+{% else %}  <!-- list recovery options -->
+<h3>Recovery Options</h3>
+
+
+
+{% if incident.type.responses %}
+<table>
+<tr><th>Action</th>
+<th>Fix chance</th>
+<th>Estimated time</th>
+<th>Impact</th></tr>
+
+{% for response in incident.type.responses.all %}
+<tr>
+<td>{{ response.name }}</td>
+<td>{{ response.effectiveness_percent }}%</td>
+<td>{{ response.time_to_fix }}</td>
+<td>
+
+{% for impact in response.impacts.all %}
+{{impact}}<br>
+{% empty %}
+(minimal or no impact.)
+{% endfor %}  <!-- response.impacts -->
+
+</td></tr>
+{% endfor %}  <!-- responses -->
+
+</table>
+{% else %}
+<tr><td>(no options, bad luck - see Simon)</td><tr>
+{% endif %}  <!-- incident.type.responses -->
+
+
+{% endif %}  <!-- incident.response -->
+
+<p>Previous recovery action status: tbd</p>
+{% endblock %}

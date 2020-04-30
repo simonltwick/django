@@ -854,14 +854,15 @@ class Incident(models.Model):
     response = models.ForeignKey(Response, null=True, blank=True)
     # severity
     start_time = models.DateTimeField(null=True)
-    response_start_time = models.DateTimeField(null=True)
+    response_start_time = models.DateTimeField(null=True, blank=True)
     # exactly one of these location fields should be completed
-    location_line = models.ForeignKey(LineLocation, null=True,
+    location_line = models.ForeignKey(LineLocation, null=True, blank=True,
                                       related_name="incidents")
-    location_station = models.ForeignKey(Station, null=True,
+    location_station = models.ForeignKey(Station, null=True, blank=True,
                                          related_name="incidents")
-    location_train = models.ForeignKey(Train, null=True,
+    location_train = models.ForeignKey(Train, null=True, blank=True,
                                        related_name="incidents")
+    impacts = models.ManyToManyField(Impact)
 
     @property
     def location(self):
@@ -894,7 +895,12 @@ class Incident(models.Model):
 
     def html(self):
         """ return html version """
-        return (f'<span class="incident">{hhmm(self.start_time)} '
+        classes = 'incident'
+        if self.response is None:
+            classes += ' incident-open'
+        else:
+            classes += ' incident-responding'
+        return (f'<span class="{classes}">{hhmm(self.start_time)} '
                 f'{self.type.name}, {self.location}</span>')
 
     def occur(self):
@@ -904,4 +910,5 @@ class Incident(models.Model):
                              f"specified in {self}")
         self.line = self.location.line
         self.save()
+        self.impacts.add(*self.type.impacts.all())
         log.warning("Time %s: %s", hhmm(self.start_time), self)
