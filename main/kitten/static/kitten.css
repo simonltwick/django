@@ -37,20 +37,19 @@ div.location {
 	content: '\00a0';
 }
 
-.train-delayed::before {
+.train-delayed::before, .incident-responding::before {
 	background-color: orange;
-	content: '\00a0\00a0\00a0';
-	font-size: 20%;
+	content: '\00a0\00a0\00a0\00a0';
+	font-size: 15%;
 	border-radius: 50%;
 	/*width: 4px;
 	height: 4px; */
-	vertical-align: sub;
 }
 
-.train-blocked::before {
+.train-blocked::before, .incident-open::before {
 	background-color: red;
-	content: '\00a0\00a0\00a0';
-	font-size: 20%;
+	content: '\00a0\00a0\00a0\00a0';
+	font-size: 15%;
 	border-radius: 50%;
 	/*width: 4px;
 	height: 4px; */

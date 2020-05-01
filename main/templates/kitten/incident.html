@@ -25,24 +25,24 @@
 {% else %}
 	<em>Open</em>
 {% endif %}
+</p>
 
 <p>Severity: {{ incident.severity|default:"Unknown" }}
 <p>Reported: {{ incident.start_time }}</p>
-</p>
 
-<h4>Estimated Impact</h4>
+<h5>Estimated Impact</h5>
 <ul>
 {% for impact in incident.impacts.all %}
 <li>{{ impact }}</li>
 {% empty %}
-(no incident impacts)
+<li>(no incident impacts)</li>
 {% endfor %}
 </ul>
 
 {% if incident.response %}
-<h5>Estimated recovery impacts</h5>
-
 <ul>
+Estimated recovery impacts:
+
 {% for impact in response.impacts.all %}
 <li>{{ impact }}</li>
 {% empty %}
@@ -60,6 +60,7 @@
 {% endif %}
 <form method="post">
 {% csrf_token %}
+<input type="hidden" name="back-url" value="{{ back_url }}">
 <table>
 <tr><th>Action</th>
 <th>Fix chance</th>

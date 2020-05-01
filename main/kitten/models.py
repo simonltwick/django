@@ -127,6 +127,10 @@ class Response(models.Model):
     def fix_duration_hhmm(self):
         return hhmm(self.time_to_fix)
 
+    def worked(self):
+        """ return True in effectiveness_percent% of cases """
+        return random.random() * 100 < self.effectiveness_percent
+
 
 class IncidentFamily:
     LINE = 1
@@ -201,7 +205,7 @@ class Game(models.Model, GameLevel):
             game_round_duration=template.network.game_round_duration,
             current_time=datetime.datetime.combine(
                 datetime.date.today(), template.network.day_start_time),
-            incident_rate=template.incident_rate, 
+            incident_rate=template.incident_rate,
             **kwargs)
         game.teams.add(*teams)
         game.incident_types.add(template.network.incident_types)
@@ -231,9 +235,10 @@ class Game(models.Model, GameLevel):
 
     def tick(self, save=False):
         """ run the game for one tick of the clock """
+        # log.info("Game.Tick at %s", hhmm(self.current_time))
         self.sprinkle_incidents()
-        return
         for line in self.lines.all():
+            line.resolve_incidents()
             line.update_trains(self.current_time)
         self.current_time += self.tick_interval
         self.save()
@@ -383,7 +388,7 @@ class Line(models.Model):
     def __str__(self):
         return self.name
 
-    def display_punctuality(self):
+    def punctuality_display(self):
         if self.total_arrivals == 0:
             return '(no punctuality stats)'
         punctuality_percent = self.on_time_arrivals/self.total_arrivals*100
@@ -515,6 +520,11 @@ class Line(models.Model):
         if not delay:
             self.on_time_arrivals += 1
         self.save()
+
+    def resolve_incidents(self):
+        """ try to resolve incidents """
+        for incident in self.incidents.filter(response__isnull=False):
+            incident.try_close()
 
 
 class LocationType:
@@ -809,8 +819,8 @@ class Train(models.Model):
         if self.location.turnaround_percent == 0:
             return False
         rand = random.random() * 100
-        log.info("Considering turnaround for %s, random#=%d, chance %s%%",
-                 self, rand, self.location.turnaround_percent)
+        # log.info("Considering turnaround for %s, random#=%d, chance %s%%",
+        #          self, rand, self.location.turnaround_percent)
         if self.awaiting_turnaround or \
                 rand < self.location.turnaround_percent:
             return self.attempt_turnaround()
@@ -916,10 +926,39 @@ class Incident(models.Model):
         self.line = self.location.line
         self.save()
         self.impacts.add(*self.type.impacts.all())
-        log.warning("Time %s: %s", hhmm(self.start_time), self)
+        log.warning("%s: %s at %s", hhmm(self.start_time), self, self.location)
 
     def start_response(self, response_id):
         response = Response.objects.get(id=response_id)
         self.response = response
         self.response_start_time = self.line.game.current_time
         self.save()
+
+    def try_close(self):
+        """ try the response to see if we can close the incident """
+        assert self.response, f"trying to close {self} with no response set"
+        current_time = self.line.game.current_time
+        # log.info("%s: Considering times for %s: response_start=%s, fix_time=%s",
+        #          hhmm(current_time), self, self.response_start_time.time(),
+        #          self.response.time_to_fix)
+        # log.info("response end time=%s",
+        #          hhmm(self.response_start_time + self.response.time_to_fix))
+        if (self.response_start_time + self.response.time_to_fix >
+                current_time):
+            # log.info("%s: Resolution ongoing for %s at %s", hhmm(current_time),
+            #          self, self.location)
+            return  # not yet...
+
+        if not self.response.worked():  # based on fix chance
+            log.warning("%s: Resolution failed for %s at %s",
+                        hhmm(current_time), self, self.location)
+            self.previous_response_status = f"{self.response} failed to fix " \
+                f"at {hhmm(current_time)}"
+            self.response = None
+            self.save()
+            return
+
+        log.info("%s: Resolved %s at %s", hhmm(current_time),
+                 self, self.location)
+        self.delete()
+        # bye bye!

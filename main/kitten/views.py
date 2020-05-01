@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 
 from .models import Game, Team, GameTemplate, Line, LineLocation, Train, \
     GameInterval, Incident
@@ -129,20 +129,26 @@ def incident(request, team_id, incident_id):
     except Incident.DoesNotExist:
         return HttpResponse('Unauthorised team', status=401)
 
+    back_url = request.path  # save url to return to
     errors = None
     if request.method == "POST":
         # start new response
+        back_url = request.POST.get('back-url', '/')
         response_id = request.POST.get("option")
         if not response_id:
             errors = "You must choose a response"
         else:
             incident.start_response(response_id)
+            return HttpResponseRedirect(back_url)
+    else:
+        back_url = request.GET.get('back-url', None)
     return render(request, 'kitten/incident.html',
                   {'game': incident.line.game,
                    'team_id': team_id,
                    'incident': incident,
                    'response': incident.response,
-                   'errors': errors})
+                   'errors': errors,
+                   'back_url': back_url})
 
 
 @login_required
