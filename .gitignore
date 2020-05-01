@@ -7,6 +7,5 @@ main/.vscode
 main/__pycache__
 main/myvenv
 main/db.sqlite3
-main/static
 main/.DS_Store
 
