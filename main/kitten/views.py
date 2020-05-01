@@ -128,12 +128,21 @@ def incident(request, team_id, incident_id):
                                         line__game__teams=team_id)
     except Incident.DoesNotExist:
         return HttpResponse('Unauthorised team', status=401)
-    log.info("views.incident: incident.impacts.all=%s", incident.impacts.all())
+
+    errors = None
+    if request.method == "POST":
+        # start new response
+        response_id = request.POST.get("option")
+        if not response_id:
+            errors = "You must choose a response"
+        else:
+            incident.start_response(response_id)
     return render(request, 'kitten/incident.html',
                   {'game': incident.line.game,
                    'team_id': team_id,
                    'incident': incident,
-                   'response': incident.response})
+                   'response': incident.response,
+                   'errors': errors})
 
 
 @login_required

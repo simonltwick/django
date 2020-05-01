@@ -15,6 +15,10 @@ table {
 	border-style: none;
 }
 
+.errorlist {
+	color: red;
+}
+
 .station {
 	font-weight: bold;
 }

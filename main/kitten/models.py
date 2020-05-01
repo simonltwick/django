@@ -124,6 +124,9 @@ class Response(models.Model):
     def __str__(self):
         return self.name
 
+    def fix_duration_hhmm(self):
+        return hhmm(self.time_to_fix)
+
 
 class IncidentFamily:
     LINE = 1
@@ -845,7 +848,7 @@ class Station(models.Model):
     name = models.CharField(max_length=40)
 
     def __str__(self):
-        return f"{self.name} on {self.line}"
+        return f"{self.name}"
 
 
 class Incident(models.Model):
@@ -863,6 +866,8 @@ class Incident(models.Model):
     location_train = models.ForeignKey(Train, null=True, blank=True,
                                        related_name="incidents")
     impacts = models.ManyToManyField(Impact)
+    previous_response_status = models.CharField(null=True, blank=True,
+                                                max_length=60)
 
     @property
     def location(self):
@@ -912,3 +917,9 @@ class Incident(models.Model):
         self.save()
         self.impacts.add(*self.type.impacts.all())
         log.warning("Time %s: %s", hhmm(self.start_time), self)
+
+    def start_response(self, response_id):
+        response = Response.objects.get(id=response_id)
+        self.response = response
+        self.response_start_time = self.line.game.current_time
+        self.save()

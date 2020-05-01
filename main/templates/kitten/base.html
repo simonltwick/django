@@ -15,7 +15,10 @@
     type="text/css">
     <link rel="stylesheet" href="{% static 'kitten.css' %}" type="text/css">
 
-    <title>{% block title %}{% if game %}{{game.name}} - {% endif %}Kitten on the Line{% endblock %}</title>
+    <title>{% block title %}{% if game %}{{game.name}} -{% endif %}
+    	{% endblock %}
+    	Kitten on the Line
+    	</title>
 </head>
 
 <body>

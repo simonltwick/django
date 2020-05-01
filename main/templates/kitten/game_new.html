@@ -1,5 +1,9 @@
 {% extends 'kitten/base.html' %}
 <!-- initial dialog when only team is known -->
+
+{% block title %}New Game -
+{% endblock %}
+
 {% block content %}
 
 <h2>Setup new game for {{ team.name }}</h2>
@@ -7,7 +11,7 @@
 <form method="POST" class="post-form" action="{% url 'game_new' team.id %}">
  	{% csrf_token %}
 
-    <p class="important">{{ errors }}</p>
+    <p class="errorlist">{{ errors }}</p>
 
 	<p><label for="template">Select network and level for your game:</label>
 	<select id="template" name="template" required>
