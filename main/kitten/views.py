@@ -106,7 +106,7 @@ def game_operations(request, game_id, team_id, tick_interval=None):
                }
     lines_other_op = Line.objects.filter(game=game).exclude(
         operator=team).order_by('operator')
-    return render(request, 'kitten/game_operations.html',
+    return render(request, 'kitten/operations.html',
                   {'game': game, 'team': team,
                    'details': details,
                    'lines_other_op': lines_other_op

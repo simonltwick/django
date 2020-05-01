@@ -42,6 +42,11 @@
 &nbsp;&nbsp;{% breadcrumb_url 'Admin' 'admin:index' %}
 {% endif %}
 
+&nbsp;&nbsp;
+{% block help %}
+<a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/">Help</a> 
+{% endblock %}
+
 {% if user.is_authenticated %}
 &nbsp;&nbsp;{% breadcrumb_url 'Logout' 'logout' %}
 {% endif %}

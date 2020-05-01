@@ -19,6 +19,8 @@ urlpatterns = [
         views.game_operations, name='game_operations'),
     url(r'^game/operations/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
         views.game_operations, name='game_operations'),
+    url(r'^game/scheduling/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
+        views.game_scheduling, name='game_scheduling'),
     url(r'^game/tick/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
         views.game_tick, name='game_tick'),
     url(r'^game/incidents_clear/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
