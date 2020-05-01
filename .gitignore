@@ -8,4 +8,4 @@ main/__pycache__
 main/myvenv
 main/db.sqlite3
 main/.DS_Store
-
+main/settings.py
