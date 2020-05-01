@@ -1,0 +1,25 @@
+<!-- Scheduling centre -->
+{% extends 'kitten/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'Engineering' 'game_engineering' game.id team_id %}
+{% endblock %}
+
+{% block title %}
+Engineering -
+{% endblock %}
+
+{% block content %}
+<div style="color: grey;">
+<h3>Engineering Centre</h3>
+<p>The Engineering Centre is currently closed for maintenance.</p>
+<p>Use the Engineering Centre to optimise asset performance:</p>
+<ul>
+<li>Review reliability
+<li>Plan and make available new responses to incidents
+<li>Define new incident types
+<li>Plan maintenance of trains, track and stations
+</ul>
+</div>
+{% endblock %}

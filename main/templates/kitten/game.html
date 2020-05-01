@@ -10,21 +10,22 @@
 
 <p>Here are the details of your game.</p>
 <ul>
-<li>Scheduling Centre</li>
+<li><a href="{% url 'game_scheduling' game.id team_id %}">
+Scheduling Centre</a></li>
 
-<li><a href="{% url 'game_operations' game.id team_id %}">Operations Control Room</a>
-	</li>
+<li><a href="{% url 'game_operations' game.id team_id %}">
+Operations Control Room</a></li>
 
 {% if game.level >= 30 %}
-<li>HR dashboard </li>
+<li>HR Department</li>
 {% endif %}
 
 {% if game.level >= 40 %}
-<li>Engineering dashboard</li>
+<li>Engineering Department</li>
 {% endif %}
 
 {% if game.level >= 20 %}
-<li>Boardroom</li>
+<li><a href="{% url 'boardroom' game.id team_id %}">Boardroom</a></li>
 {% endif %}
 
 </ul>

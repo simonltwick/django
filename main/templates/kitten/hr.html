@@ -1,0 +1,25 @@
+<!-- Scheduling centre -->
+{% extends 'kitten/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'Human Resources' 'game_hr' game.id team_id %}
+{% endblock %}
+
+{% block title %}
+Human Resources -
+{% endblock %}
+
+{% block content %}
+<div style="color: grey;">
+<h3>Human Resources</h3>
+<p>Human Resources is currently closed for maintenance.</p>
+<p>Use the Human Resources department to plan and manage staff performance:</p>
+<ul>
+<li>Plan staff rosters for trains, station, and engineering
+<li>Set pay levels
+<li>Review staff morale, turnover, utilisation and skills
+<li>Implement training
+</ul>
+</div>
+{% endblock %}

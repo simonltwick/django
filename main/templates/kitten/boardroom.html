@@ -1,0 +1,24 @@
+<!-- Scheduling centre -->
+{% extends 'kitten/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'Boardroom' 'game_boardroom' game.id team_id %}
+{% endblock %}
+
+{% block title %}
+Board Room -
+{% endblock %}
+
+{% block content %}
+<div style="color: grey;">
+<h3>Board Room</h3>
+<p>The Board Room is currently closed for maintenance.</p>
+<p>Use the Board Room for strategic management of your team's performance:</p>
+<ul>
+<li>Review team performance overall
+<li>Review departmental performance
+<li>Bid for line franchises
+</ul>
+</div>
+{% endblock %}

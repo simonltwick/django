@@ -1,0 +1,25 @@
+<!-- Scheduling centre -->
+{% extends 'kitten/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'Scheduling' 'game_scheduling' game.id team_id %}
+{% endblock %}
+
+{% block title %}
+Scheduling -
+{% endblock %}
+
+{% block content %}
+<div style="color: grey;">
+<h3>Scheduling Centre</h3>
+<p>The Scheduling Centre is currently closed for maintenance.</p>
+<p>Use the Scheduling Centre to optimise train loading and passenger
+throughput:</p>
+<ul>
+<li>Set train turnaround points on the line
+<li>See passenger traffic forecasts
+<li>Set the number of trains to be scheduled during the day
+</ul>
+</div>
+{% endblock %}

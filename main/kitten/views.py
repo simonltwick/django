@@ -114,6 +114,50 @@ def game_operations(request, game_id, team_id, tick_interval=None):
 
 
 @login_required
+def game_scheduling(request, game_id, team_id):
+    if not Team.objects.filter(id=team_id, members=request.user).exists():
+        return HttpResponse('Unauthorised team', status=401)
+    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+        return HttpResponse('Unauthorized game', status=401)
+    game = get_object_or_404(Game, pk=game_id)
+    return render(request, 'kitten/scheduling.html',
+                  {'game': game, 'team_id': team_id})
+
+
+@login_required
+def game_boardroom(request, game_id, team_id):
+    if not Team.objects.filter(id=team_id, members=request.user).exists():
+        return HttpResponse('Unauthorised team', status=401)
+    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+        return HttpResponse('Unauthorized game', status=401)
+    game = get_object_or_404(Game, pk=game_id)
+    return render(request, 'kitten/boardroom.html',
+                  {'game': game, 'team_id': team_id})
+
+
+@login_required
+def game_hr(request, game_id, team_id):
+    if not Team.objects.filter(id=team_id, members=request.user).exists():
+        return HttpResponse('Unauthorised team', status=401)
+    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+        return HttpResponse('Unauthorized game', status=401)
+    game = get_object_or_404(Game, pk=game_id)
+    return render(request, 'kitten/hr.html',
+                  {'game': game, 'team_id': team_id})
+
+
+@login_required
+def game_engineering(request, game_id, team_id):
+    if not Team.objects.filter(id=team_id, members=request.user).exists():
+        return HttpResponse('Unauthorised team', status=401)
+    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+        return HttpResponse('Unauthorized game', status=401)
+    game = get_object_or_404(Game, pk=game_id)
+    return render(request, 'kitten/engineering.html',
+                  {'game': game, 'team_id': team_id})
+
+
+@login_required
 def game_stage(request, game_id, team_id):
     return game_operations(request, game_id, team_id,
                            tick_interval=GameInterval.TICK_STAGE)

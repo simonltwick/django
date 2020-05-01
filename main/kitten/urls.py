@@ -6,6 +6,7 @@ Created on 25 Apr 2020
 from django.conf.urls import url
 from . import views
 
+
 urlpatterns = [
     url(r'^$', views.index, name='home'),
     url(r'^team/(?P<team_id>[0-9]+)/?$', views.team, name='team'),
@@ -25,5 +26,11 @@ urlpatterns = [
     url(r'^game/incident/(?P<team_id>[0-9]+)/(?P<incident_id>[0-9]+)',
         views.incident, name='incident'),
     url(r'^team/join/?$', views.team_join, name='team_join'),
-    url(r'^team/new/?$', views.team_new, name='team_new')
+    url(r'^team/new/?$', views.team_new, name='team_new'),
+    url(r'game/boardroom/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
+        views.game_boardroom, name='game_boardroom'),
+    url(r'game/hr/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
+        views.game_hr, name='game_hr'),
+    url(r'game/engineering/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
+        views.game_engineering, name='game_engineering'),
 ]
