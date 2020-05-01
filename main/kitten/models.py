@@ -106,7 +106,8 @@ class GameTemplate(models.Model, GameLevel):
 class Impact(models.Model):
     name = models.CharField(max_length=40, default='?')
     blocking = models.BooleanField(default=False)
-    network = models.ForeignKey(Network, related_name='impacts')
+    network = models.ForeignKey(Network, related_name='impacts',
+                                on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
@@ -116,7 +117,7 @@ class Response(models.Model):
     name = models.CharField(max_length=40, default='?')
     developer_description = models.CharField(max_length=100, null=True,
                                              blank=True)
-    network = models.ForeignKey(Network, null=True)
+    network = models.ForeignKey(Network, null=True, on_delete=models.CASCADE)
     effectiveness_percent = models.PositiveSmallIntegerField(default=100)
     impacts = models.ManyToManyField(Impact)
     time_to_fix = models.DurationField(default=datetime.timedelta(0))
@@ -140,7 +141,8 @@ class IncidentFamily:
 
 
 class IncidentType(models.Model):
-    network = models.ForeignKey(Network, related_name='incident_types')
+    network = models.ForeignKey(Network, related_name='incident_types',
+                                on_delete=models.CASCADE)
     name = models.CharField(max_length=40, default='?')
     type = models.IntegerField(choices=IncidentFamily.CHOICES)
     description = models.CharField(max_length=100, null=True, blank=True)
@@ -466,15 +468,18 @@ class Line(models.Model):
         # ### HACK get start of line in 1st direction & turnaround a train ###
         # loc0=LineLocation.objects.get(position=0, direction=self.direction1)
         # trains_loc0 = Train.objects.filter(location=loc0).all()
-        # assert len(trains_loc0) == 3,f"Wrong number of trains at start, len={len(trains_loc0)}"
+        # assert len(trains_loc0) == 3,f"Wrong number of trains at start, " \
+        #    f"len={len(trains_loc0)}"
         # trains_loc0[0].turnaround(current_time)
         # trains_loc0b = Train.objects.filter(location=loc0).all()
-        # assert len(trains_loc0b) == 2,f"Move didn't happen, len={len(trains_loc0b)}"
+        # assert len(trains_loc0b) == 2,f"Move didn't happen, " \
+        #    f"len={len(trains_loc0b)}"
 
         self.turnaround_trains(current_time)
 
         # trains_loc0c = Train.objects.filter(location=loc0).all()
-        # assert len(trains_loc0c) == 3, f"Turnaround_trains didn't work, len={len(trains_loc0c)}"
+        # assert len(trains_loc0c) == 3, f"Turnaround_trains didn't work, " \
+        #    f"len={len(trains_loc0c)}"
         # log.info("Turnaround test worked")
 
         self.try_move_trains(current_time)
@@ -862,19 +867,24 @@ class Station(models.Model):
 
 
 class Incident(models.Model):
-    line = models.ForeignKey(Line, related_name='incidents')
-    type = models.ForeignKey(IncidentType)
-    response = models.ForeignKey(Response, null=True, blank=True)
+    line = models.ForeignKey(Line, related_name='incidents',
+                             on_delete=models.CASCADE)
+    type = models.ForeignKey(IncidentType, on_delete=models.CASCADE)
+    response = models.ForeignKey(Response, null=True, blank=True,
+                                 on_delete=models.SET_NULL)
     # severity
     start_time = models.DateTimeField(null=True)
     response_start_time = models.DateTimeField(null=True, blank=True)
     # exactly one of these location fields should be completed
     location_line = models.ForeignKey(LineLocation, null=True, blank=True,
-                                      related_name="incidents")
+                                      related_name="incidents",
+                                      on_delete=models.CASCADE)
     location_station = models.ForeignKey(Station, null=True, blank=True,
-                                         related_name="incidents")
+                                         related_name="incidents",
+                                         on_delete=models.CASCADE)
     location_train = models.ForeignKey(Train, null=True, blank=True,
-                                       related_name="incidents")
+                                       related_name="incidents",
+                                       on_delete=models.CASCADE)
     impacts = models.ManyToManyField(Impact)
     previous_response_status = models.CharField(null=True, blank=True,
                                                 max_length=60)
@@ -938,15 +948,17 @@ class Incident(models.Model):
         """ try the response to see if we can close the incident """
         assert self.response, f"trying to close {self} with no response set"
         current_time = self.line.game.current_time
-        # log.info("%s: Considering times for %s: response_start=%s, fix_time=%s",
+        # log.info("%s: Considering times for %s: response_start=%s, "
+        #          "fix_time=%s",
         #          hhmm(current_time), self, self.response_start_time.time(),
         #          self.response.time_to_fix)
         # log.info("response end time=%s",
         #          hhmm(self.response_start_time + self.response.time_to_fix))
         if (self.response_start_time + self.response.time_to_fix >
                 current_time):
-            # log.info("%s: Resolution ongoing for %s at %s", hhmm(current_time),
-            #          self, self.location)
+            # log.info(
+            #     "%s: Resolution ongoing for %s at %s", hhmm(current_time),
+            #     self, self.location)
             return  # not yet...
 
         if not self.response.worked():  # based on fix chance
