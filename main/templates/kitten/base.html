@@ -30,9 +30,9 @@
 <small>
 {% breadcrumb_url 'Home' 'home' %}
 {% if team_id %}
-> {% breadcrumb_url 'Team' 'team' team_id %}
+> {% breadcrumb_url 'Team' 'team_games' team_id %}
 {% elif team.id %}
-> {% breadcrumb_url 'Team' 'team' team.id %}
+> {% breadcrumb_url 'Team' 'team_games' team.id %}
 {% endif %}
 
 {% block breadcrumbs %}

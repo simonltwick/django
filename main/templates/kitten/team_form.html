@@ -1,0 +1,53 @@
+{% extends 'kitten/base.html' %}
+
+
+{% block title %}
+{% if team.name %}
+	{{ team.name }} details -
+{% else %}
+	New Team -
+{% endif %}
+{% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+{% if team %}
+> {% breadcrumb_url "Details" 'team' team.id %}
+{% else %}
+> {% breadcrumb_url "New Team" 'team' %}
+{% endif %}
+{% endblock %}
+
+
+{% block content %}
+
+{% if team.name %}
+	<h1>{{ team.name }} details</h1>
+{% else %}
+	<h1>New Team</h1>
+{% endif %}
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	{% if team %}
+	<p>Skill level: {{ team.get_level_display }}</p>
+	<p>Members:</p>
+	<ul>
+	{% for member in team.members.all %}
+		<li>{{ member.name }}</li>
+	{% empty %}
+	<li>No team members!</li>
+	{% endfor %}
+	</ul>
+	{% endif %}
+	{% if team %}
+	<p><a href="{% url 'team_games' team.id %}">Games</a>
+	&nbsp;&nbsp;<a href="{% url 'team_delete' team.id %}">Delete</a></p>
+	{% endif %}
+	<input type="submit" value="Save">
+</form>
+
+
+{% endblock %}

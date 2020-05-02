@@ -5,8 +5,9 @@
 
 {% block content %}
 
-{% if team %}
 <h1>{{ team.name }}</h1>
+<p>{{ team.description }}</p>
+<p><a href="{% url 'team' team.id %}">Update team details</a>
 <p>Skill level: {{ team.get_level_display }}</p>
 <h2>Members</h2>
 
@@ -31,12 +32,7 @@
 </ul>
 
 <ul>
-<li><a href="{% url 'game_new' team.id %}">New game</a>
+<li><a href="{% url 'game' team.id %}">New game</a>
 </ul>
 
-{% else %}
-<h2>No teams found</h2>
-<p>You aren't in any teams.  Please contact Simon to be added to a team</p>
-
-{% endif %}  # (team)
 {% endblock %}

@@ -1,10 +1,13 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse, HttpResponseRedirect
+from django.urls import reverse_lazy
+from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
 from .models import Game, Team, GameTemplate, Line, LineLocation, Train, \
     GameInterval, Incident
-from .forms import GameForm
+from .forms import GameForm, TeamForm
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -12,22 +15,57 @@ log.setLevel(logging.INFO)
 
 @login_required
 def index(request):
-    teams = Team.objects.all()
+    teams = request.user.teams.all()
     return render(request, 'kitten/home.html', {'teams': teams})
 
 
 @login_required
-def team(request, team_id):
+def team_games(request, team_id):
     """ list games available to this team """
     team = get_object_or_404(Team, pk=team_id)
     games = Game.objects.filter(teams__pk=team.pk)
-    return render(request, 'kitten/team.html', {'games': games, 'team': team})
+    return render(request, 'kitten/team_games.html',
+                  {'games': games, 'team': team})
+
+
+class TeamNew(LoginRequiredMixin, CreateView):
+    model = Team
+    fields = ('name', 'description')
+
+    def save(self, commit=True, **kwargs):
+        m = super(TeamNew, self).save(commit=False)
+        self.instance.members.add(self.request.user)
+        m.save()
+        return m
+
+
+class TeamUpdate(LoginRequiredMixin, UpdateView):
+    model = Team
+    fields = ('name', 'description')
+
+
+class TeamDelete(LoginRequiredMixin, DeleteView):
+    model = Team
+    fields = ('name', 'description', 'games')
+    success_url = reverse_lazy('home')
+
+
+@login_required
+def team_delete(request, team_id):
+    return HttpResponse("Join team net yet written. Please ask Simon")
+
+
+@login_required
+def team_join(request):
+    return HttpResponse("Join team net yet written. Please ask Simon")
 
 
 @login_required
 def game_new(request, team_id):
     """ start a new game.
     Prompt for game template and teams, then create game """
+    if not Team.objects.filter(id=team_id, members=request.user).exists():
+        return HttpResponse('Unauthorised team', status=401)
     if request.method == 'POST':
         # handle form here .. create the game and then go to edit game
         # to further customise
@@ -77,6 +115,12 @@ def game(request, game_id, team_id):
 @login_required
 def game_delete(request, game_id, team_id):
     return HttpResponse("Delete game not yet implemented.")
+
+
+@login_required
+def game_play(request, game_id, team_id):
+    return HttpResponse("Play game not yet implemented.  Go to Operations"
+                        "and press Tick to get an idea...")
 
 
 @login_required
@@ -204,13 +248,3 @@ def game_incidents_clear(request, game_id, team_id):
     log.info("Deleting incidents for game id %s", game_id)
     Incident.objects.filter(line__game_id=game_id).delete()
     return game_operations(request, game_id, team_id)
-
-
-@login_required
-def team_new(request):
-    return HttpResponse("New team not yet written. Please ask Simon")
-
-
-@login_required
-def team_join(request):
-    return HttpResponse("Join team net yet written. Please ask Simon")

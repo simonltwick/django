@@ -1,6 +1,7 @@
 import datetime
 from django.db import models
 from django.contrib.auth.models import User
+from django.urls import reverse
 from enum import IntEnum
 import logging
 import random
@@ -45,14 +46,17 @@ class GameLevel:
 
 class Team(models.Model, GameLevel):
     name = models.CharField(max_length=40, unique=True)
+    description = models.CharField(max_length=300, null=True, blank=True)
     members = models.ManyToManyField(User, related_name='teams')
-    owner = models.ForeignKey(User, on_delete=models.PROTECT,
-                              related_name='teams_owned')
-    level = models.IntegerField(choices=GameLevel.CHOICES)
+    level = models.IntegerField(choices=GameLevel.CHOICES,
+                                default=GameLevel.BASIC)
     # games = reverse FK
 
     def __str__(self):
         return self.name
+
+    def get_absolute_url(self):
+        return reverse('team', args=[str(self.id)])
 
 
 # ------ network and game templating classes
@@ -210,7 +214,7 @@ class Game(models.Model, GameLevel):
             incident_rate=template.incident_rate,
             **kwargs)
         game.teams.add(*teams)
-        game.incident_types.add(template.network.incident_types)
+        game.incident_types.add(*template.network.incident_types.all())
         line_templates = LineTemplate.objects.filter(network=template.network)
         operator = teams[0] if level <= GameLevel.BASIC else None
         for line_template in line_templates:

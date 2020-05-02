@@ -13,10 +13,11 @@
 <ul>
 {% if user.is_authenticated %}
 {% for team in teams %}
-<li><a href="{% url 'team' team.id %}">{{ team.name }}</a></li>
+<li><a href="{% url 'team_games' team.id %}">{{ team.name }}</a></li>
 {% endfor %}
 {% endif %}
 </ul><ul>
-<li><a href="{% url 'team_join' %}">Join a team</a>
+<li><a href="{% url 'team_join' %}">Join a team</a></li>
+<li><a href="{% url 'team' %}">New team</a></li>
 </ul>
 {% endblock%}

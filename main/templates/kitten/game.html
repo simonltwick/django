@@ -39,13 +39,8 @@ Operations Control Room</a></li>
     <p>Game level: {{game.get_level_display}}</p>
     <p>Network name: {{ game.network_name }}</p>
     <input type="submit" class="save btn btn-default" value="Save">
+<a class="button" href="{% url 'game_play' game.id team_id %}">Play</a>
+<a class="button" href="{% url 'game_delete' game.id team_id %}">Delete</a>
 
-<input type="button" value="Play">
-<input type="button" class="btn"
-	{% if user.is_superuser %}
-		href="{% url 'admin:kitten_game_delete' game.id %}"
-	{% else %}
-		href="{% url 'game_delete' game.id team_id %}"
-	{% endif %}value="Delete">
 {% endblock %}
 </form>
