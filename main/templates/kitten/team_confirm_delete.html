@@ -12,28 +12,31 @@ Confirm Delete for {{ team.name }} -
 {% block content %}
 
 <h1>Confirm delete for {{ team.name }}</h1>
-<h2>Are you sure?</h2>
-
-{% if team.games.exists %}
-<p class="errorlist">Deleting team {{ team.name }} will also delete
-{{ team.games.count }} saved games.</p>
-{% endif %}
-
-<form method="post">
-	{% csrf_token %}
-	{{ form.as_p }}
-	<p>Members:</p>
+	<p>This team will be deleted for all members:</p>
 	<ul>
 
 	{% for member in team.members.all %}
 
-		<li>{{ member.name }}</li>
+		<li>{{ member.username }}</li>
 
 	{% empty %}
 	<li>No team members!</li>
 	{% endfor %}
 
 	</ul>
+<h2>Are you sure?</h2>
+
+{% if team.games.exists %}
+<p class="errorlist">Deleting team {{ team.name }} will also delete
+these games:</p>
+{% for game in team.games.all %}
+<p>{{ game }}</p>
+{% endfor %}
+{% endif %}
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
 	<p><a class="btn" href="{% url 'home' %}">Cancel</a>
 	<input type="submit" value="Delete">
 </form>

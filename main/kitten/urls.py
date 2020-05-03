@@ -8,7 +8,7 @@ from . import views
 
 
 urlpatterns = [
-    url(r'^$', views.index, name='home'),
+    url(r'^$', views.home, name='home'),
 
     url(r'^team$', views.TeamNew.as_view(), name='team'),
     url(r'^team/(?P<pk>[0-9]+)$', views.TeamUpdate.as_view(),
@@ -19,7 +19,7 @@ urlpatterns = [
     url(r'^team/games/(?P<team_id>[0-9]+)/?$', views.team_games,
         name='team_games'),
 
-    url(r'^game/(?P<team_id>[0-9]+)$', views.game_new, name='game_new'),
+    url(r'^game/(?P<team_id>[0-9]+)$', views.game_new, name='game'),
     url(r'^game/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)$', views.game,
         name='game'),
     url(r'^game/delete/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',

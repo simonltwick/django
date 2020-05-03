@@ -1,20 +1,46 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, AccessMixin
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
-from .models import Game, Team, GameTemplate, Line, LineLocation, Train, \
+from .models import Game, Team, GameTemplate, Line, \
     GameInterval, Incident
-from .forms import GameForm, TeamForm
+from .forms import GameForm
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 
+class TeamAccessMixin(AccessMixin):
+    permission_denied_message = 'Unauthorised Team'
+
+    def handle_no_permission(self):
+        return HttpResponse(self.get_permission_denied_message())
+
+
+class IsTeamMemberMixin(TeamAccessMixin):
+    """Verify that the current user is a member of team_id.
+    Only works for ModelForms (update, delete) with model=Team """
+
+    def dispatch(self, request, *args, **kwargs):
+        team_id = kwargs.get('team_id', None) or kwargs.get('pk', None)
+        if request.user and team_id and is_team_member(request, team_id):
+            return super().dispatch(request, *args, **kwargs)
+        return self.handle_no_permission()
+
+
+def is_team_member(request, team_id):
+    return Team.objects.filter(id=team_id, members=request.user).exists()
+
+
+def game_has_team(team_id, game_id):
+    return Game.objects.filter(id=game_id, teams=team_id).exists()
+
+
 @login_required
-def index(request):
+def home(request):
     teams = request.user.teams.all()
     return render(request, 'kitten/home.html', {'teams': teams})
 
@@ -22,6 +48,8 @@ def index(request):
 @login_required
 def team_games(request, team_id):
     """ list games available to this team """
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
     team = get_object_or_404(Team, pk=team_id)
     games = Game.objects.filter(teams__pk=team.pk)
     return render(request, 'kitten/team_games.html',
@@ -32,27 +60,21 @@ class TeamNew(LoginRequiredMixin, CreateView):
     model = Team
     fields = ('name', 'description')
 
-    def save(self, commit=True, **kwargs):
-        m = super(TeamNew, self).save(commit=False)
-        self.instance.members.add(self.request.user)
-        m.save()
-        return m
+    def form_valid(self, form):
+        form.save()
+        form.instance.members.add(self.request.user)
+        return super().form_valid(form)
 
 
-class TeamUpdate(LoginRequiredMixin, UpdateView):
+class TeamUpdate(IsTeamMemberMixin, UpdateView):
     model = Team
     fields = ('name', 'description')
 
 
-class TeamDelete(LoginRequiredMixin, DeleteView):
+class TeamDelete(IsTeamMemberMixin, DeleteView):
     model = Team
     fields = ('name', 'description', 'games')
     success_url = reverse_lazy('home')
-
-
-@login_required
-def team_delete(request, team_id):
-    return HttpResponse("Join team net yet written. Please ask Simon")
 
 
 @login_required
@@ -64,8 +86,8 @@ def team_join(request):
 def game_new(request, team_id):
     """ start a new game.
     Prompt for game template and teams, then create game """
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
     if request.method == 'POST':
         # handle form here .. create the game and then go to edit game
         # to further customise
@@ -97,9 +119,9 @@ def game_new(request, team_id):
 @login_required
 def game(request, game_id, team_id):
     """ load a specific game by pk """
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
-    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
     game = get_object_or_404(Game, pk=game_id)
     if request.method == 'POST':  # handle incoming form
@@ -114,26 +136,38 @@ def game(request, game_id, team_id):
 
 @login_required
 def game_delete(request, game_id, team_id):
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
+        return HttpResponse('Unauthorized game', status=401)
     return HttpResponse("Delete game not yet implemented.")
 
 
 @login_required
 def game_play(request, game_id, team_id):
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
+        return HttpResponse('Unauthorized game', status=401)
     return HttpResponse("Play game not yet implemented.  Go to Operations"
                         "and press Tick to get an idea...")
 
 
 @login_required
 def game_tick(request, game_id, team_id):
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
+        return HttpResponse('Unauthorized game', status=401)
     return game_operations(request, game_id, team_id,
                            tick_interval=GameInterval.TICK_SINGLE)
 
 
 @login_required
 def game_operations(request, game_id, team_id, tick_interval=None):
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
-    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
     team = get_object_or_404(Team, pk=team_id)
     game = get_object_or_404(Game, pk=game_id)
@@ -159,9 +193,9 @@ def game_operations(request, game_id, team_id, tick_interval=None):
 
 @login_required
 def game_scheduling(request, game_id, team_id):
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
-    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
     game = get_object_or_404(Game, pk=game_id)
     return render(request, 'kitten/scheduling.html',
@@ -170,9 +204,9 @@ def game_scheduling(request, game_id, team_id):
 
 @login_required
 def game_boardroom(request, game_id, team_id):
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
-    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
     game = get_object_or_404(Game, pk=game_id)
     return render(request, 'kitten/boardroom.html',
@@ -181,9 +215,9 @@ def game_boardroom(request, game_id, team_id):
 
 @login_required
 def game_hr(request, game_id, team_id):
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
-    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
     game = get_object_or_404(Game, pk=game_id)
     return render(request, 'kitten/hr.html',
@@ -192,9 +226,9 @@ def game_hr(request, game_id, team_id):
 
 @login_required
 def game_engineering(request, game_id, team_id):
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
-    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
     game = get_object_or_404(Game, pk=game_id)
     return render(request, 'kitten/engineering.html',
@@ -209,8 +243,11 @@ def game_stage(request, game_id, team_id):
 
 @login_required
 def incident(request, team_id, incident_id):
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not Incident.objects.filter(
+            id=incident_id, incident__line__game__teams=team_id).exists():
+        return HttpResponse('Unauthorized game', status=401)
     try:
         incident = Incident.objects.get(id=incident_id,
                                         line__game__teams=team_id)
@@ -241,9 +278,9 @@ def incident(request, team_id, incident_id):
 
 @login_required
 def game_incidents_clear(request, game_id, team_id):
-    if not Team.objects.filter(id=team_id, members=request.user).exists():
-        return HttpResponse('Unauthorised team', status=401)
-    if not Game.objects.filter(id=game_id, teams=team_id).exists():
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
     log.info("Deleting incidents for game id %s", game_id)
     Incident.objects.filter(line__game_id=game_id).delete()

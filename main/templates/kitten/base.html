@@ -20,11 +20,13 @@
     	Kitten on the Line
     	</title>
 </head>
-
 <body>
+
+
 {% block banner %}
 <p><strong>🚂🚃🚃🚃🐱 KITTEN ON THE LINE &#x1f682;&#x1f683;🚃🚃&#x1f431;</strong></p>
 {% endblock %}
+
 
 {% load breadcrumb %}
 <small>
@@ -34,6 +36,7 @@
 {% elif team.id %}
 > {% breadcrumb_url 'Team' 'team_games' team.id %}
 {% endif %}
+
 
 {% block breadcrumbs %}
 {% endblock %}
@@ -47,10 +50,12 @@
 <a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/">Help</a> 
 {% endblock %}
 
+
 {% if user.is_authenticated %}
 &nbsp;&nbsp;{% breadcrumb_url 'Logout' 'logout' %}
 {% endif %}
 </small>
+
 
 {% block content %}
 {% endblock %}

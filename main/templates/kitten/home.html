@@ -9,6 +9,7 @@
 {% load static %}
 <h1>Welcome to Kitten on the Line</h1>
 <img src="{% static 'kitten-line-cropped.jpg' %}" alt="Kitten on the line">
+<p>Welcome, {{ request.user.username }}.</p>
 <h3>My teams</h3>
 <ul>
 {% if user.is_authenticated %}

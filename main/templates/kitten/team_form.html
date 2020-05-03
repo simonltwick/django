@@ -36,7 +36,7 @@
 	<p>Members:</p>
 	<ul>
 	{% for member in team.members.all %}
-		<li>{{ member.name }}</li>
+		<li>{{ member.username }}</li>
 	{% empty %}
 	<li>No team members!</li>
 	{% endfor %}
