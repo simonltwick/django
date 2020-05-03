@@ -11,14 +11,12 @@
 <p>Skill level: {{ team.get_level_display }}</p>
 <h2>Members</h2>
 
-<ul>
-{% for user in team.members.objects.all %}
-<li>{{ user }}</li>
+{% for user in team.members.all %}
+<p>{{ user }}</p>
 
 {% empty %}
 <p>No team members found!</p>
 {% endfor %}
-</ul>
 
 <h2>Saved Games</h2>
 <ul>

@@ -32,11 +32,12 @@ class TeamNew(LoginRequiredMixin, CreateView):
     model = Team
     fields = ('name', 'description')
 
-    def save(self, commit=True, **kwargs):
-        m = super(TeamNew, self).save(commit=False)
-        self.instance.members.add(self.request.user)
-        m.save()
-        return m
+    def form_valid(self, form):
+        form.save()
+        form.instance.members.add(self.request.user)
+        log.info("TeamNew.form_valid(): instance==%s, members=%s", form.instance,
+            form.instance.members.all())
+        return super().form_valid(form)
 
 
 class TeamUpdate(LoginRequiredMixin, UpdateView):
