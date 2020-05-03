@@ -17,8 +17,11 @@
 <li><a href="{% url 'team_games' team.id %}">{{ team.name }}</a></li>
 {% endfor %}
 {% endif %}
-</ul><ul>
-<li><a href="{% url 'team_join' %}">Join a team</a></li>
-<li><a href="{% url 'team' %}">New team</a></li>
+{% for invitation in request.user.invitations.all %}
+<li>Invitation to join {{ invitation.team.name }} from 
+	{{ invitation.invited_by }}
+	<a href="{% url 'invitation_accept' invitation.id %}">Accept</a></li>
+{% endfor %}
 </ul>
+<p><a href="{% url 'team' %}">New team</a></p>
 {% endblock%}

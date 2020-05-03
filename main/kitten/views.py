@@ -6,8 +6,8 @@ from django.urls import reverse_lazy
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
 from .models import Game, Team, GameTemplate, Line, \
-    GameInterval, Incident
-from .forms import GameForm
+    GameInterval, Incident, TeamInvitation
+from .forms import GameForm, TeamInvitationForm, InvitationAcceptanceForm
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -51,6 +51,7 @@ def team_games(request, team_id):
     if not is_team_member(request, team_id):
         return HttpResponse("Unauthorised team", status=401)
     team = get_object_or_404(Team, pk=team_id)
+    TeamInvitation.remove_expired()
     games = Game.objects.filter(teams__pk=team.pk)
     return render(request, 'kitten/team_games.html',
                   {'games': games, 'team': team})
@@ -78,8 +79,80 @@ class TeamDelete(IsTeamMemberMixin, DeleteView):
 
 
 @login_required
-def team_join(request):
-    return HttpResponse("Join team net yet written. Please ask Simon")
+def invitation_delete(request, team_id, invitation_id):
+
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not TeamInvitation.objects.filter(id=invitation_id,
+                                         team=team_id).exists:
+        return HttpResponse("Unauthorised invitation", status=401)
+    TeamInvitation.objects.filter(id=invitation_id).delete()
+    return TeamUpdate.as_view()(request, pk=team_id)
+
+
+@login_required
+def invitation_accept(request, invitation_id):
+    invitation = get_object_or_404(TeamInvitation, pk=invitation_id)
+    if invitation.invitee_username != request.user:
+        return HttpResponse("Unauthorised invitation", status=401)
+    if request.method == 'POST':
+        form = InvitationAcceptanceForm(request.POST)
+        if form.is_valid():
+            if form.cleaned_data['password'] == invitation.password:
+                invitation.accept(request.user)
+                return team_games(request, invitation.team.id)
+
+            invitation.failed_attempts += 1
+            if invitation.failed_attempts > invitation.MAX_PASSWORD_FAILURES:
+                log.error("Too many failed attempts for %s. Deleted.",
+                          invitation)
+                invitation.delete()
+                return HttpResponse(
+                    "Too many failed attempts. Please ask the team"
+                    " to re-issue the invitation.", status=429)
+
+            form.add_error('password', 'The password is incorrect.  Please'
+                            ' check and try again')
+            invitation.save()
+    else:
+        form = InvitationAcceptanceForm()
+    return render(request, 'kitten/invitation_accept.html',
+                  {'form': form,
+                   'invitation': invitation})
+
+
+@login_required
+def team_invitation_new(request, team_id):
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    team = get_object_or_404(Team, id=team_id)
+    if request.method == 'POST':
+        form = TeamInvitationForm(request.POST)
+        form.instance.team = team
+        if form.is_valid():
+            form.instance.invited_by = request.user
+            form.save()
+            return team_games(request, team_id)
+    else:
+        form = TeamInvitationForm(initial={"invited_by": request.user,
+                                           "team": team})
+    return render(request, 'kitten/team_invitation.html',
+                  {'form': form, 'team': team})
+
+
+@login_required
+def team_member_remove(request, team_id, user_id):
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    team = Team.objects.get(id=team_id)
+    if team.members.count() <= 1:
+        return HttpResponse("Cannot remove the only team member: delete team"
+                            " instead.", status=403)
+    if not Team.objects.filter(id=team_id, members=user_id).exists():
+        return HttpResponse(f"User is not a member of {team.name}.",
+                            status=400)
+    team.members.remove(user_id)
+    return TeamUpdate.as_view()(request, pk=team_id)
 
 
 @login_required

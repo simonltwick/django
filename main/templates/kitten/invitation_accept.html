@@ -1,0 +1,29 @@
+{% extends 'kitten/base.html' %}
+
+
+{% block title %}
+	Join Team -
+{% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Join Team" 'invitation_accept' invitation.id %}
+{% endblock %}
+
+
+{% block content %}
+<h1>Join team {{ invitation.team.name }}</h1>
+
+<p>{{ invatitation.invited_by }} has invited you to join
+{{ invitation.team.name }}.</p>
+<p>Enter the password to accept the invitation</p>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form }}
+	<input type="submit" value="Accept Invitation">
+</form>
+
+
+{% endblock %}

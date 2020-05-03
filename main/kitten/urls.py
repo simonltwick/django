@@ -15,9 +15,18 @@ urlpatterns = [
         name='team'),
     url(r'^team/delete/(?P<pk>[0-9]+)$', views.TeamDelete.as_view(),
         name='team_delete'),
-    url(r'^team/join/?$', views.team_join, name='team_join'),
     url(r'^team/games/(?P<team_id>[0-9]+)/?$', views.team_games,
         name='team_games'),
+
+    url(r'^team/invitation/new/(?P<team_id>[0-9]+)$',
+        views.team_invitation_new, name='team_invitation_new'),
+    url(r'^team/invitation/delete/(?P<team_id>[0-9]+)/'
+        r'(?P<invitation_id>[0-9]+)',
+        views.invitation_delete, name='invitation_delete'),
+    url(r'^team/invitation/accept/(?P<invitation_id>[0-9]+)',
+        views.invitation_accept, name='invitation_accept'),
+    url(r'^team/member/remove/(?P<team_id>[0-9]+)/(?P<user_id>[0-9]+)',
+        views.team_member_remove, name='team_member_remove'),
 
     url(r'^game/(?P<team_id>[0-9]+)$', views.game_new, name='game'),
     url(r'^game/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)$', views.game,

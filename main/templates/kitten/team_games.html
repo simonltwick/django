@@ -5,7 +5,7 @@
 
 {% block content %}
 
-<h1>{{ team.name }}</h1>
+<h1>Games Room - {{ team.name }}</h1>
 <p>{{ team.description }}</p>
 <p><a href="{% url 'team' team.id %}">Update team details</a>
 <p>Skill level: {{ team.get_level_display }}</p>
@@ -18,11 +18,23 @@
 <p>No team members found!</p>
 {% endfor %}
 
+<p>
+{% if team.invitations %}
+	{{ team.invitations.count }}
+	<a href="{% url 'team' team.id %}">
+{% else %}
+	No <a href="{% url 'team_invitation_new' team.id %}">
+{% endif %}
+	invitations</a> to join team
+</p>
+
 <h2>Saved Games</h2>
 <ul>
 {% for game in games %}
 
 <li><a href="{% url 'game' game.id team.id %}">{{ game }}</a>
+started {{ game.started }}, last played {{ game.last_played}}
+</li>
 
 {% empty %}
 <li>(no saved games)</li>

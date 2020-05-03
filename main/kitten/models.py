@@ -2,6 +2,7 @@ import datetime
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.utils import timezone
 from enum import IntEnum
 import logging
 import random
@@ -48,6 +49,9 @@ class Team(models.Model, GameLevel):
     name = models.CharField(max_length=40, unique=True)
     description = models.CharField(max_length=300, null=True, blank=True)
     members = models.ManyToManyField(User, related_name='teams')
+    invitees = models.ManyToManyField(
+        User, through='TeamInvitation',
+        through_fields=['team', 'invitee_username'])
     level = models.IntegerField(choices=GameLevel.CHOICES,
                                 default=GameLevel.BASIC)
     # games = reverse FK
@@ -57,6 +61,36 @@ class Team(models.Model, GameLevel):
 
     def get_absolute_url(self):
         return reverse('team', args=[str(self.id)])
+
+
+class TeamInvitation(models.Model):
+    EXPIRY_LIMIT = datetime.timedelta(days=14)
+    MAX_PASSWORD_FAILURES = 5
+    team = models.ForeignKey(Team, on_delete=models.CASCADE,
+                             related_name='invitations')
+    invitee_username = models.ForeignKey(User, on_delete=models.CASCADE,
+                                         related_name='invitations')
+    password = models.CharField(max_length=20)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    date = models.DateTimeField(auto_now_add=True)
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return (f"{self.team.name} invitation to "
+                f"{self.invitee_username.username}")
+
+    def accept(self, user: User):
+        self.team.members.add(user)
+        self.delete()
+
+    @classmethod
+    def remove_expired(cls):
+        """ expire (delete) invitation where expiry is > expiry_limit """
+        n, _d = cls.objects.filter(
+            date__lt=(timezone.now() - cls.EXPIRY_LIMIT)).delete()
+        # _d is a dict of number of objects deleted by object class
+        if n:
+            log.info("Expiring %d TeamInvitations", n)
 
 
 # ------ network and game templating classes
@@ -191,8 +225,7 @@ class Game(models.Model, GameLevel):
         unique_together = [['name', 'team']]
 
     def __str__(self):
-        return f"{self.name if self.name else ''} started {self.started}, "\
-            f"last played {self.last_played}"
+        return self.name if self.name else f'[untitled#{self.id}]'
 
     @classmethod
     def new_from_template(cls, template: GameTemplate, teams: List[Team],

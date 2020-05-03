@@ -36,9 +36,27 @@
 	<p>Members:</p>
 	<ul>
 	{% for member in team.members.all %}
-		<li>{{ member.username }}</li>
+
+		<li>{{ member.username }}
+		<a href="{% url 'team_member_remove' team.id user.id %}">
+		Remove</a></li>
+
 	{% empty %}
 	<li>No team members!</li>
+	{% endfor %}
+	</ul>
+	<p><a href="{% url 'team_invitation_new' team.id %}">Invitations</a>
+	to join this team:</p>
+	<ul>
+	{% for invitation in team.invitations.all %}
+	
+	<li>{{ invitation.invitee_username }} invited by
+		{{ invitation.invited_by }} on {{ invitation.date }}
+	    <a href="{% url 'invitation_delete' team.id invitation.id %}">Delete</a>
+	    </li>
+
+	{% empty %}
+	<li>(none)</li>
 	{% endfor %}
 	</ul>
 	{% endif %}
