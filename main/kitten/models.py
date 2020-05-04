@@ -394,6 +394,36 @@ class LineTemplate(models.Model):
         return f'{self.name} in {self.network}'
 
 
+class GameInvitation(models.Model):
+    EXPIRY_LIMIT = datetime.timedelta(days=14)
+    MAX_PASSWORD_FAILURES = 5
+    game = models.ForeignKey(Game, on_delete=models.CASCADE,
+                             related_name='invitations')
+    invited_team = models.ForeignKey(Team, on_delete=models.CASCADE,
+                                     related_name='game_invitations')
+    password = models.CharField(max_length=20)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    date = models.DateTimeField(auto_now_add=True)
+    inviting_team = models.ForeignKey(Team, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return (f"{self.game.name} invitation to "
+                f"{self.invited_team.name}")
+
+    def accept(self, team: Team):
+        self.game.teams.add(team)
+        self.delete()
+
+    @classmethod
+    def remove_expired(cls):
+        """ expire (delete) invitation where expiry is > expiry_limit """
+        n, _d = cls.objects.filter(
+            date__lt=(timezone.now() - cls.EXPIRY_LIMIT)).delete()
+        # _d is a dict of number of objects deleted by object class
+        if n:
+            log.info("Expiring %d %ss", n, cls.__name__)
+
+
 # ----- Line related models -----
 class Line(models.Model):
     # name, direction1, direction2, trains_dir1, trains_dir2, train_interval

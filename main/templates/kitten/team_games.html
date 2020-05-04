@@ -5,30 +5,31 @@
 
 {% block content %}
 
-<h1>Games Room - {{ team.name }}</h1>
+<h1>Team Base - {{ team.name }}</h1>
 <p>{{ team.description }}</p>
 <p><a href="{% url 'team' team.id %}">Update team details</a>
 <p>Skill level: {{ team.get_level_display }}</p>
 <h2>Members</h2>
 
-{% for user in team.members.all %}
-<p>{{ user }}</p>
+<ul>{% for user in team.members.all %}
+<li>{{ user }}</li>
 
 {% empty %}
-<p>No team members found!</p>
+<li>No team members found!</li>
 {% endfor %}
 
-<p>
-{% if team.invitations %}
+<li>
+{% if team.invitations.count %}
 	{{ team.invitations.count }}
 	<a href="{% url 'team' team.id %}">
 {% else %}
 	No <a href="{% url 'team_invitation_new' team.id %}">
 {% endif %}
-	invitations</a> to join team
-</p>
+	invitations</a> to join this team
+</li>
+</ul>
 
-<h2>Saved Games</h2>
+<h2>Games</h2>
 <ul>
 {% for game in games %}
 
@@ -40,6 +41,16 @@ started {{ game.started }}, last played {{ game.last_played}}
 <li>(no saved games)</li>
 {% endfor %}
 </ul>
+
+{% if team.game_invitations %}
+<ul>{% for invitation in team.game_invitations.all %}
+<li>Invitation to join
+	<a href="{% url 'game_invitation_accept' team.id invitation.id %}">
+	{{ invitation.game.name }}</a> from {{ invitation.inviting_team.name }}
+	</li>
+{% endfor %}</ul>
+{% endif %}
+
 
 <ul>
 <li><a href="{% url 'game' team.id %}">New game</a>

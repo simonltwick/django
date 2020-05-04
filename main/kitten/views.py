@@ -1,13 +1,15 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, AccessMixin
+from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseRedirect
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
 from .models import Game, Team, GameTemplate, Line, \
-    GameInterval, Incident, TeamInvitation
-from .forms import GameForm, TeamInvitationForm, InvitationAcceptanceForm
+    GameInterval, Incident, TeamInvitation, GameInvitation
+from .forms import GameForm, TeamInvitationForm, InvitationAcceptanceForm, \
+    GameInvitationForm, GameInvitationAcceptanceForm
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -42,6 +44,7 @@ def game_has_team(team_id, game_id):
 @login_required
 def home(request):
     teams = request.user.teams.all()
+    TeamInvitation.remove_expired()
     return render(request, 'kitten/home.html', {'teams': teams})
 
 
@@ -52,6 +55,7 @@ def team_games(request, team_id):
         return HttpResponse("Unauthorised team", status=401)
     team = get_object_or_404(Team, pk=team_id)
     TeamInvitation.remove_expired()
+    GameInvitation.remove_expired()
     games = Game.objects.filter(teams__pk=team.pk)
     return render(request, 'kitten/team_games.html',
                   {'games': games, 'team': team})
@@ -100,7 +104,8 @@ def invitation_accept(request, invitation_id):
         if form.is_valid():
             if form.cleaned_data['password'] == invitation.password:
                 invitation.accept(request.user)
-                return team_games(request, invitation.team.id)
+                return HttpResponseRedirect(reverse(
+                    'team_games', kwargs={'team_id': invitation.team.id}))
 
             invitation.failed_attempts += 1
             if invitation.failed_attempts > invitation.MAX_PASSWORD_FAILURES:
@@ -112,7 +117,7 @@ def invitation_accept(request, invitation_id):
                     " to re-issue the invitation.", status=429)
 
             form.add_error('password', 'The password is incorrect.  Please'
-                            ' check and try again')
+                           ' check and try again')
             invitation.save()
     else:
         form = InvitationAcceptanceForm()
@@ -152,6 +157,10 @@ def team_member_remove(request, team_id, user_id):
         return HttpResponse(f"User is not a member of {team.name}.",
                             status=400)
     team.members.remove(user_id)
+    log.info("team_member_remove: user_id=%s, request.user.id=%s",
+             user_id, request.user.id)
+    if user_id == str(request.user.id):  # removed yourself
+        return HttpResponseRedirect(reverse('home'))
     return TeamUpdate.as_view()(request, pk=team_id)
 
 
@@ -203,8 +212,89 @@ def game(request, game_id, team_id):
             game = form.save()
     else:
         form = GameForm(instance=game)
+    GameInvitation.remove_expired()
     return render(request, 'kitten/game.html',
                   {'form': form, 'game': game, "team_id": team_id})
+
+
+@login_required
+def game_invitation_new(request, game_id, team_id):
+    """ invite another team to join game """
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
+        return HttpResponse('Unauthorized game', status=401)
+    game_inst = get_object_or_404(Game, pk=game_id)
+    team = get_object_or_404(Team, pk=team_id)
+    if request.method == 'POST':
+        form = GameInvitationForm(request.POST)
+        form.instance.game = game_inst
+        form.instance.inviting_team = team
+        if form.is_valid():  # is_valid requires team and game to be set
+            form.save()
+            return HttpResponseRedirect(reverse(
+                'game', kwargs={'game_id': game_id, 'team_id': team_id}))
+    else:
+        form = GameInvitationForm(initial={"game": game_inst})
+    return render(request, 'kitten/game_invitation_new.html',
+                  {'form': form, 'team': team, 'game': game_inst})
+
+
+@login_required
+def game_invitation_accept(request, team_id, invitation_id):
+    log.info("game_invitation_accept(team_id=%d, invitation_id=%d",
+             team_id, invitation_id)
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    invitation = get_object_or_404(GameInvitation, pk=invitation_id,
+                                   invited_team=team_id)
+    if request.method == 'POST':
+        form = GameInvitationAcceptanceForm(request.POST)
+        if form.is_valid():
+            if form.cleaned_data['password'] == invitation.password:
+                invitation.accept(team_id)
+                return HttpResponseRedirect(reverse(
+                    'game', kwargs={'game_id': invitation.game.id,
+                                    'team_id': team_id}))
+
+            invitation.failed_attempts += 1
+            if invitation.failed_attempts > invitation.MAX_PASSWORD_FAILURES:
+                log.error("Too many failed attempts for %s. Deleted.",
+                          invitation)
+                invitation.delete()
+                return HttpResponse(
+                    "Too many failed attempts. Please ask the team"
+                    " to re-issue the invitation.", status=429)
+
+            form.add_error('password', 'The password is incorrect.  Please'
+                           ' check and try again')
+            invitation.save()
+    else:
+        form = GameInvitationAcceptanceForm()
+    return render(request, 'kitten/game_invitation_accept.html',
+                  {'form': form,
+                   'invitation': invitation,
+                   'team_id': team_id})
+
+
+@login_required
+def game_team_remove(request, game_id, team_id, remove_team_id):
+    if not Team.objects.filter(games=game_id, members=request.user).exists():
+        return HttpResponse('Unauthorized game', status=401)
+    game_inst = get_object_or_404(Game, id=game_id)
+    if not Game.objects.filter(id=game_id, teams=remove_team_id).exists():
+        return HttpResponse(f'Team is not a participant in {game_inst.name}',
+                            status=400)
+    if game_inst.teams.count() <= 1:
+        return HttpResponse("Cannot remove the only participant: delete game"
+                            " instead.", status=403)
+    game_inst.teams.remove(remove_team_id)
+    if team_id == remove_team_id:
+        return HttpResponseRedirect(
+            reverse('team_games', kwargs={'team_id': team_id}))
+    else:
+        return HttpResponseRedirect(reverse(
+                'game', kwargs={'game_id': game_id, 'team_id': team_id}))
 
 
 @login_required

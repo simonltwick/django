@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block content %}
-<h1>{{ game.name }}</h1>
+<h1>Game Suite - {{ game.name }}</h1>
 
 <p>Here are the details of your game.</p>
 <ul>
@@ -33,14 +33,40 @@ Operations Control Room</a></li>
 <h3>Game settings (common to all teams):</h3>
 <form method="POST" class="post-form"
 	action="{% url 'game' game.id team_id %}">
-{% csrf_token %}
-    {{ form.as_p }}
-	<button class="btn btn-default">Add team</button>
-    <p>Game level: {{game.get_level_display}}</p>
-    <p>Network name: {{ game.network_name }}</p>
-    <input type="submit" class="save btn btn-default" value="Save">
+	{% csrf_token %}
+    {{ form }}
+    <input type="submit" class="save btn btn-default" value="Update">
+</form>
+
+<p>Teams:</p>
+<ul>{% for participant in game.teams.all %}
+
+<li>{{ participant.name }}
+	<a href="{% url 'game_team_remove' game.id team_id participant.id %}">
+	Remove</a></li>
+
+{% empty %}
+<li>(no teams found!)</li>
+{% endfor %}
+
+{% if game.invitations %}
+{% for invitation in game.invitations.all %}
+
+<li>Invited: {{ invitation.invited_team.name }}
+</li>
+
+{% endfor %}
+{% endif %}
+
+<li><a class="btn btn-default"
+	href="{% url 'game_invitation_new' game.id team_id %}">Invite another team</a>
+	</li>
+</ul>
+
+   <p>Network name: {{ game.network_name }}. 
+   Game level: {{game.get_level_display}}</p>
 <a class="button" href="{% url 'game_play' game.id team_id %}">Play</a>
+&nbsp;&nbsp;
 <a class="button" href="{% url 'game_delete' game.id team_id %}">Delete</a>
 
 {% endblock %}
-</form>

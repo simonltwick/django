@@ -15,7 +15,7 @@ urlpatterns = [
         name='team'),
     url(r'^team/delete/(?P<pk>[0-9]+)$', views.TeamDelete.as_view(),
         name='team_delete'),
-    url(r'^team/games/(?P<team_id>[0-9]+)/?$', views.team_games,
+    url(r'^team/games/(?P<team_id>[0-9]+)$', views.team_games,
         name='team_games'),
 
     url(r'^team/invitation/new/(?P<team_id>[0-9]+)$',
@@ -33,8 +33,14 @@ urlpatterns = [
         name='game'),
     url(r'^game/delete/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
         views.game_delete, name='game_delete'),
-    url(r'^game/details/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
-        views.game_operations, name='game_operations'),
+    url(r'^game/invitation/new/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
+        views.game_invitation_new, name='game_invitation_new'),
+    url(r'^game/invitation/accept/(?P<team_id>[0-9]+)/'
+        r'(?P<invitation_id>[0-9]+)',
+        views.game_invitation_accept, name='game_invitation_accept'),
+    url(r'^game/team/remove/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)'
+        r'/(?P<remove_team_id>[0-9]+)',
+        views.game_team_remove, name='game_team_remove'),
     url(r'^game/play/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',
         views.game_play, name='game_play'),
     url(r'^game/operations/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)',

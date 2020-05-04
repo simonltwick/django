@@ -38,7 +38,7 @@
 	{% for member in team.members.all %}
 
 		<li>{{ member.username }}
-		<a href="{% url 'team_member_remove' team.id user.id %}">
+		<a href="{% url 'team_member_remove' team.id member.id %}">
 		Remove</a></li>
 
 	{% empty %}
