@@ -1,8 +1,10 @@
+from collections import defaultdict
 import datetime
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.functional import cached_property
 from enum import IntEnum
 import logging
 import random
@@ -204,6 +206,7 @@ class GameInterval(IntEnum):
 class Game(models.Model, GameLevel):
     INCIDENT_LIMIT = 1  # per place
     INCIDENT_SEVERITY_VARIATION = 0.5  # in range  +/- variation
+    INCIDENT_RATE = 50
     name = models.CharField(max_length=40)
     started = models.DateField(auto_now_add=True)
     last_played = models.DateField(auto_now=True)
@@ -211,8 +214,8 @@ class Game(models.Model, GameLevel):
     network_name = models.CharField(max_length=40)
     incident_types = models.ManyToManyField(IncidentType)
     incident_rate = models.PositiveSmallIntegerField(
-        default=100, help_text="average rate of incidents, with 100 generating"
-        "1 incident per tick of the clock")
+        default=INCIDENT_RATE, help_text="average rate of incidents, with 100"
+        " generating1 incident per tick of the clock")
     level = models.IntegerField(choices=GameLevel.CHOICES)
     day_start_time = models.TimeField(default=datetime.time(hour=6))
     day_end_time = models.TimeField(default=datetime.time(hour=22))
@@ -452,7 +455,6 @@ class Line(models.Model):
     # mapping? (line path)
     # stations fk
     # locations fk
-    # trains fk
 
     def __str__(self):
         return self.name
@@ -522,13 +524,42 @@ class Line(models.Model):
         return self._places[location_type]
 
     def details(self):
+        """ return a pair of dicts of locations along the line with trains,
+            one for dir1, and one for dir2 """
         """ return a dict of locations along the line with trains
         ... details of incidents to be added """
-        locations_dir1 = LineLocation.objects.filter(
-            line=self, direction=self.direction1).order_by('position')
-        return {location: (location.trains.all(),
-                           location.reverse().trains.all())
-                for location in locations_dir1}
+        trains_by_loc_dir1 = defaultdict(list)
+        trains_by_loc_dir2 = defaultdict(list)
+        for train in self._trains:
+            if train.direction_is_forward:
+                # use location_id to avoid DB calls
+                trains_by_loc_dir1[train.location_id].append(train)
+            else:
+                trains_by_loc_dir2[train.location_id].append(train)
+        return {location: (trains_by_loc_dir1[location.id],
+                           trains_by_loc_dir2[reverse_loc.id])
+                for location, reverse_loc in self._locations}
+
+    def locations_dir1(self):
+        """ return a list of 'forward' LineLocations, ordered by position """
+        return [fwd for fwd, _bwd in self._locations]
+
+    @cached_property
+    def _locations(self):
+        """ return a tuple of pairs (dir1, dir2) ordered by position """
+        locs = LineLocation.objects.filter(
+            line=self).order_by('position').all()
+        # loop over 2 at a time to get pairs in posn order: (forward, backward)
+        iter_locs = iter(locs)
+        pairs = tuple((l1, next(iter_locs))
+                      if l1.direction_is_forward
+                      else (next(iter_locs), l1)
+                      for l1 in iter_locs)
+        return pairs
+
+    @cached_property
+    def _trains(self):
+        return Train.objects.filter(location__line=self)
 
     def update_trains(self, current_time):
         # log.info("Line.update_trains(%s)", self)
@@ -663,6 +694,7 @@ class LineLocation(models.Model, LocationType):
         assert isinstance(line, Line)
         start_of_line = position == 0
         end_of_line = position == line_length-1
+        train_type = line.train_type
         if (start_of_line or end_of_line) and not is_forward:
             start_of_line, end_of_line = end_of_line, start_of_line
         if end_of_line:
@@ -674,7 +706,7 @@ class LineLocation(models.Model, LocationType):
 
         ll = LineLocation(
             name=template.name, type=template.type,
-            line=line, position=position,
+            line=line.id, position=position,
             transit_delay=template.transit_delay,
             turnaround_percent=turnaround_percent,
             direction=direction, direction_is_forward=is_forward,
@@ -683,10 +715,12 @@ class LineLocation(models.Model, LocationType):
         # create stations and trains in depots
         if ll.is_station() and ll.direction_is_forward:
             # apply calculated station name if not set
-            ss = Station(line=line, name=ll.name or ll.calculate_name())
+            ss = Station(line=line.id, name=ll.name or ll.calculate_name())
             ss.save()
         if ll.is_start_of_line:
-            ll.create_trains(line.trains_dir1 if ll.direction_is_forward
+            ll.create_trains(train_type,
+                             line.trains_dir1
+                             if ll.direction_is_forward
                              else line.trains_dir2)
         return ll
 
@@ -710,16 +744,18 @@ class LineLocation(models.Model, LocationType):
         else:  # Track
             try:
                 return f'Between {self.prev().display_name()} and' \
-                    f'{self.next().display_name()}'
+                    f'{self.next_loc.display_name()}'
             except self.DoesNotExist:  # not created yet
                 return f"Track{self.position}"
 
-    def create_trains(self, num_trains):
+    def create_trains(self, train_type, num_trains):
+        train_serial = self.line.num_trains
         for _i in range(num_trains):
-            self.line.num_trains += 1
-            train = Train(location=self, type=self.line.train_type,
-                          serial=self.line.num_trains)
-            train.save()
+            train_serial += 1
+            train = Train(location=self, type=train_type,
+                          serial=train_serial,
+                          direction_is_forward=self.direction_is_forward)
+        self.line.num_trains = train_serial
 
     def __str__(self):
         return f'{self.name}, {self.direction}'
@@ -744,7 +780,7 @@ class LineLocation(models.Model, LocationType):
         if self.is_depot():
             return ""
         turnaround = (self.turnaround_percent or
-                      self.reverse().turnaround_percent)
+                      self.reverse.turnaround_percent)
         if not turnaround:
             return ""
         char = "⮍" if self.turnaround_percent else "⮏"
@@ -760,7 +796,7 @@ class LineLocation(models.Model, LocationType):
     def is_depot(self):
         return self.type == LocationType.DEPOT
 
-    def next(self) -> Optional['LineLocation']:
+    def get_next(self) -> Optional['LineLocation']:
         """ return the next Linelocation in direction of travel, or None
         Raises LineLocation.DoesNotExist if next hasn't been created"""
         if self.is_end_of_line:
@@ -768,9 +804,11 @@ class LineLocation(models.Model, LocationType):
 
         increment = 1 if self.direction_is_forward else -1
         return LineLocation.objects.get(
-            line=self.line, position=self.position + increment,
+            line=self.line.id, position=self.position + increment,
             direction_is_forward=self.direction_is_forward)
+    next_loc = cached_property(get_next, name='next')
 
+    @cached_property
     def prev(self):
         """ return the previous LineLocation for direction of travel, or None.
         Raises LineLocation.DoesNotExist if prev hasn't been created """
@@ -782,10 +820,11 @@ class LineLocation(models.Model, LocationType):
             line=self.line, position=self.position + increment,
             direction_is_forward=self.direction_is_forward)
 
+    @cached_property
     def reverse(self) -> 'LineLocation':
         """ return the 'twin' location in the reverse direction """
         return LineLocation.objects.get(
-            line=self.line, position=self.position,
+            line=self.line_id, position=self.position,
             direction_is_forward=not self.direction_is_forward)
 
 
@@ -799,6 +838,8 @@ class Train(models.Model):
     awaiting_turnaround = models.BooleanField(default=False)
     blocked = models.BooleanField(default=False)
     delay = models.DurationField(default=datetime.timedelta(0))
+    # this is kept in step with LineLocation.direction_is_forward,(performance)
+    direction_is_forward = models.BooleanField(default=True)
 
     @property
     def line(self):
@@ -833,6 +874,7 @@ class Train(models.Model):
             self.location.line.report_puncuality(self.delay)
 
         self.location = new_location
+
         self.blocked = False
         # No need to update location of incidents - they move with the train
         self.save()
@@ -849,7 +891,7 @@ class Train(models.Model):
         if self.awaiting_turnaround:
             return  # already logged in turnaround_clear()
 
-        next_place = self.location.next()
+        next_place = self.location.next_loc
         """ consider transit_time.   If no last-train_time recorded, or we've
            waited transit_time since we arrived,
            (or the last train departed from a depot) we can move """
@@ -903,7 +945,7 @@ class Train(models.Model):
 
     def attempt_turnaround(self):
         """ the train is for turning.  Can it be done this time? """
-        if not self.location.reverse().trains.exists():
+        if not self.location.reverse.trains.exists():
             # log.info("%s will turnaround", self,)
             return True
         log.warning("%s turnaround is blocked (train on reverse track)", self)
@@ -915,13 +957,14 @@ class Train(models.Model):
 
     def turnaround(self, current_time):
         """ move the train to the reverse direction """
-        # log.info("%s -> %s (turnaround)", self, self.location.reverse())
+        # log.info("%s -> %s (turnaround)", self, self.location.reverse)
         self.awaiting_turnaround = False
-        reverse_loc = self.location.reverse()
+        reverse_loc = self.location.reverse
         if reverse_loc.trains.exists():
             # clear delays if there's already a train in the depot
             self.delay = datetime.timedelta(0)
-        self.move(self.location.reverse(), current_time)
+        self.direction_is_forward = reverse_loc.direction_is_forward
+        self.move(reverse_loc, current_time)
 
 
 class Station(models.Model):

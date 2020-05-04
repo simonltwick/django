@@ -33,6 +33,11 @@ class IsTeamMemberMixin(TeamAccessMixin):
         return self.handle_no_permission()
 
 
+def is_user_in_team_in_game(request, team_id, game_id):
+    return Team.objects.filter(id=team_id, members=request.user,
+                               games=game_id).exists()
+
+
 def is_team_member(request, team_id):
     return Team.objects.filter(id=team_id, members=request.user).exists()
 
@@ -328,15 +333,16 @@ def game_tick(request, game_id, team_id):
 
 @login_required
 def game_operations(request, game_id, team_id, tick_interval=None):
-    if not is_team_member(request, team_id):
-        return HttpResponse("Unauthorised team", status=401)
-    if not game_has_team(team_id, game_id):
-        return HttpResponse('Unauthorized game', status=401)
+    if not is_user_in_team_in_game(request, team_id, game_id):
+        if not is_team_member(request, team_id):
+            return HttpResponse("Unauthorised team", status=401)
+        if not game_has_team(team_id, game_id):
+            return HttpResponse('Unauthorized game', status=401)
     team = get_object_or_404(Team, pk=team_id)
     game = get_object_or_404(Game, pk=game_id)
     if tick_interval is not None:
         game.run(tick_interval)
-    lines = Line.objects.filter(game=game, operator=team)
+    lines = Line.objects.filter(game=game_id, operator=team_id)
 
     # details is {line([(trains_up, loc, trains_down)], [incidents])}
     details = {line: ([(trains_dir1, location, trains_dir2)
@@ -409,7 +415,7 @@ def incident(request, team_id, incident_id):
     if not is_team_member(request, team_id):
         return HttpResponse("Unauthorised team", status=401)
     if not Incident.objects.filter(
-            id=incident_id, incident__line__game__teams=team_id).exists():
+            id=incident_id, line__game__teams=team_id).exists():
         return HttpResponse('Unauthorized game', status=401)
     try:
         incident = Incident.objects.get(id=incident_id,
