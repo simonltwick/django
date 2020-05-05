@@ -8,7 +8,7 @@ from django.utils.functional import cached_property
 from enum import IntEnum
 import logging
 import random
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
@@ -278,10 +278,10 @@ class Game(models.Model, GameLevel):
     def tick(self, save=False):
         """ run the game for one tick of the clock """
         # log.info("Game.Tick at %s", hhmm(self.current_time))
-        self.sprinkle_incidents()
+        # self.sprinkle_incidents()
         for line in self.lines.all():
             line.resolve_incidents()
-            line.update_trains(self.current_time)
+            # line.update_trains(self.current_time)
         self.current_time += self.tick_interval
         self.save()
         # sprinkle_incidents
@@ -320,24 +320,20 @@ class Game(models.Model, GameLevel):
                 return False  # already has an incident
         return True
 
-    def incident_type_likelihoods(self):
+    @cached_property
+    def incident_type_likelihoods(self) -> Tuple[
+            List[IncidentType], List[int]]:
         """ return (list(IncidentTypes), list(incident_type_percent_chance))
         """
-        try:
-            return self._incident_type_likelihoods
-        except AttributeError:
-            pass  # first time: calculate it
         pairs = ((incident_type, incident_type.likelihood)
                  for incident_type in self.incident_types.all())
         # and transpose into a pair of lists
-        self._incident_type_likelihoods: Tuple[
-            List[IncidentType], List[int]] = tuple(zip(*pairs))
-        return self._incident_type_likelihoods
+        return tuple(zip(*pairs))
 
     def random_incident(self):
         """ return a random incident based on all incidentType likelihoods
         The incident doesn't have a start time or place specified yet """
-        incident_types, weights = self.incident_type_likelihoods()
+        incident_types, weights = self.incident_type_likelihoods
         if not incident_types or not sum(weights):
             return None
         incident_type = random.choices(incident_types, weights, k=1)[0]
@@ -346,21 +342,21 @@ class Game(models.Model, GameLevel):
     def random_place(self, place_type):
         """ find a place at random.  Place type could be station, line or train
         """
-        try:
-            return random.choice(self._places[place_type])
-        except AttributeError:
-            pass
-        self._places = {IncidentFamily.LINE: [],
-                        IncidentFamily.STATION: [],
-                        IncidentFamily.TRAIN: []
-                        }
+        return random.choice(self.places[place_type])
+
+    @cached_property
+    def places(self):
+        places = {IncidentFamily.LINE: [],
+                  IncidentFamily.STATION: [],
+                  IncidentFamily.TRAIN: []
+                  }
         for line in self.lines.all():
-            for k in self._places:
-                self._places[k].extend(line.places(k))
+            for place_type, place_list in line.places.items():
+                places[place_type].extend(place_list)
         # log.info("Places for %s:", self)
         # for k, v in self._places.items():
         #     log.info('%s: [%s]', k, ', '.join(str(e) for e in v))
-        return random.choice(self._places[place_type])
+        return places
 
     def generate_incidents(self):
         """ yield a random number of new incidents up to twice the average
@@ -453,22 +449,37 @@ class Line(models.Model):
     # line style / colour
     # train icon
     # mapping? (line path)
-    # stations fk
-    # locations fk
 
-    def __str__(self):
-        return self.name
+    @cached_property
+    def line_locations(self):
+        """ return a list of line locations, ordered by position """
+        return LineLocation.objects.filter(
+            line=self).order_by('position').all()
 
-    def punctuality_display(self):
-        if self.total_arrivals == 0:
-            return '(no punctuality stats)'
-        punctuality_percent = self.on_time_arrivals/self.total_arrivals*100
-        s = f"{punctuality_percent:0.1f}% punctuality."
-        if self.total_arrivals != self.on_time_arrivals:
-            av_delay = self.total_delay / (
-                self.total_arrivals - self.on_time_arrivals)
-            s += f" Average delay={hhmm(av_delay)}."
-        return s
+    @cached_property
+    def trains(self):
+        return Train.objects.filter(location__line=self).all()
+
+    @cached_property
+    def stations(self):
+        return Station.objects.filter(line=self).all()
+
+    @property  # cached_property with append/pop functions
+    def incidents(self):
+        try:
+            return self._incidents
+        except AttributeError:
+            self._incidents = [incident
+                               for incident in
+                               Incident.objects.filter(line=self).all()]
+        return self._incidents
+
+    def report_incident(self, incident: 'Incident'):
+        self.incidents.append(incident)
+
+    def close_incident(self, incident: 'Incident',
+                       _closure_time: datetime.datetime):
+        self._incidents.pop(incident)
 
     @classmethod
     def new_from_template(cls, template: LineTemplate, game: Game,
@@ -487,7 +498,8 @@ class Line(models.Model):
 
     def create_locations(self, template: LineTemplate):
         """ create LineLocations from PlaceTemplates
-        LineLocations in turn create Stations and Trains """
+        LineLocations in turn create Stations and Trains
+        called from Line.new_from template."""
         places = [p for p in template.places.order_by('position').all()]
         line_length = len(places)
 
@@ -504,62 +516,61 @@ class Line(models.Model):
             for line_location in lls:
                 if line_location.update_name():
                     line_location.save()
-
-    def places(self, location_type):
-        try:
-            return self._places[location_type]
-        except AttributeError:
-            pass
-
-        self._places = {
-            IncidentFamily.LINE: LineLocation.objects.filter(line=self).all(),
-            IncidentFamily.STATION: Station.objects.filter(line=self).all(),
-            }
-        self._places[IncidentFamily.TRAIN] = [
-            train for lineloc in self._places[IncidentFamily.LINE]
-            for train in lineloc.trains.all()]
-        # log.info("Places for %s:", self)
-        # for k, v in self._places.items():
-        #     log.info('%s: [%s]', k, ', '.join(str(e) for e in v))
-        return self._places[location_type]
+            self._line_locations.extend(lls)
 
     def details(self):
         """ return a pair of dicts of locations along the line with trains,
             one for dir1, and one for dir2 """
         """ return a dict of locations along the line with trains
         ... details of incidents to be added """
-        trains_by_loc_dir1 = defaultdict(list)
-        trains_by_loc_dir2 = defaultdict(list)
-        for train in self._trains:
-            if train.direction_is_forward:
-                # use location_id to avoid DB calls
-                trains_by_loc_dir1[train.location_id].append(train)
-            else:
-                trains_by_loc_dir2[train.location_id].append(train)
-        return {location: (trains_by_loc_dir1[location.id],
-                           trains_by_loc_dir2[reverse_loc.id])
-                for location, reverse_loc in self._locations}
+        trains_by_loc = self.trains_by_loc()
+        return {location: (trains_by_loc[location.id],
+                           trains_by_loc[reverse_loc.id])
+                for location, reverse_loc in self.location_pairs()}
+
+    def trains_by_loc(self) -> Dict[int, List['Train']]:
+        """ return a dict of trains by loc.id
+        Use location_id to avoid DB calls """
+        trains_by_loc = defaultdict(list)
+        for train in self.trains:
+            trains_by_loc[train.location_id].append(train)
+        return trains_by_loc
 
     def locations_dir1(self):
         """ return a list of 'forward' LineLocations, ordered by position """
-        return [fwd for fwd, _bwd in self._locations]
+        return [fwd for fwd, _bwd in self.location_pairs]
 
-    @cached_property
-    def _locations(self):
+    def location_pairs(self):
         """ return a tuple of pairs (dir1, dir2) ordered by position """
-        locs = LineLocation.objects.filter(
-            line=self).order_by('position').all()
         # loop over 2 at a time to get pairs in posn order: (forward, backward)
-        iter_locs = iter(locs)
+        iter_locs = iter(self.line_locations)
         pairs = tuple((l1, next(iter_locs))
                       if l1.direction_is_forward
                       else (next(iter_locs), l1)
                       for l1 in iter_locs)
         return pairs
 
-    @cached_property
-    def _trains(self):
-        return Train.objects.filter(location__line=self)
+    @property
+    def places(self):
+        """ returns a dict of places """
+        return {IncidentFamily.LINE: self.line_locations,
+                IncidentFamily.STATION: self.stations,
+                IncidentFamily.TRAIN: self.trains
+                }
+
+    def __str__(self):
+        return self.name
+
+    def punctuality_display(self):
+        if self.total_arrivals == 0:
+            return '(no punctuality stats)'
+        punctuality_percent = self.on_time_arrivals/self.total_arrivals*100
+        s = f"{punctuality_percent:0.1f}% punctuality."
+        if self.total_arrivals != self.on_time_arrivals:
+            av_delay = self.total_delay / (
+                self.total_arrivals - self.on_time_arrivals)
+            s += f" Average delay={hhmm(av_delay)}."
+        return s
 
     def update_trains(self, current_time):
         # log.info("Line.update_trains(%s)", self)
@@ -616,7 +627,7 @@ class Line(models.Model):
         for train in trains_direction1:
             train.try_move(current_time)
 
-    def report_puncuality(self, delay: datetime.timedelta):
+    def report_punctuality(self, delay: datetime.timedelta):
         """ record train arrival punctuality """
         self.total_arrivals += 1
         self.total_delay += delay
@@ -626,8 +637,9 @@ class Line(models.Model):
 
     def resolve_incidents(self):
         """ try to resolve incidents """
-        for incident in self.incidents.filter(response__isnull=False):
-            incident.try_close()
+        for incident in self.incidents:
+            if incident.response_id:
+                incident.try_close()
 
 
 class LocationType:
@@ -667,8 +679,7 @@ class PlaceTemplate(models.Model, LocationType):
 
 class LineLocation(models.Model, LocationType):
     """ a place on the line: a station, a depot or a line  """
-    line = models.ForeignKey(Line, on_delete=models.CASCADE, null=True,
-                             related_name='locations')
+    line = models.ForeignKey(Line, on_delete=models.CASCADE, null=True)
     name = models.CharField(max_length=40, default='', blank=True)
     type = models.IntegerField(choices=LocationType.CHOICES,
                                default=LocationType.DEPOT)
@@ -968,8 +979,7 @@ class Train(models.Model):
 
 
 class Station(models.Model):
-    line = models.ForeignKey(Line, related_name='stations',
-                             on_delete=models.CASCADE)
+    line = models.ForeignKey(Line, on_delete=models.CASCADE)
     name = models.CharField(max_length=40)
 
     def __str__(self):
@@ -977,8 +987,7 @@ class Station(models.Model):
 
 
 class Incident(models.Model):
-    line = models.ForeignKey(Line, related_name='incidents',
-                             on_delete=models.CASCADE)
+    line = models.ForeignKey(Line, on_delete=models.CASCADE)
     type = models.ForeignKey(IncidentType, on_delete=models.CASCADE)
     response = models.ForeignKey(Response, null=True, blank=True,
                                  on_delete=models.SET_NULL)
@@ -1044,6 +1053,7 @@ class Incident(models.Model):
             raise ValueError("Incident start_time, location or severity not "
                              f"specified in {self}")
         self.line = self.location.line
+        self.line.report_incident(self)
         self.save()
         self.impacts.add(*self.type.impacts.all())
         log.warning("%s: %s at %s", hhmm(self.start_time), self, self.location)
@@ -1079,8 +1089,11 @@ class Incident(models.Model):
             self.response = None
             self.save()
             return
+        self.resolve(current_time)
 
+    def resolve(self, current_time):
         log.info("%s: Resolved %s at %s", hhmm(current_time),
                  self, self.location)
+        self.line.close_incident(self, current_time)
         self.delete()
         # bye bye!
