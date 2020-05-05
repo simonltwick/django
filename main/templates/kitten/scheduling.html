@@ -3,8 +3,8 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Game' 'game' game.id team_id %}
-> {% breadcrumb_url 'Scheduling' 'game_scheduling' game.id team_id %}
+> {% breadcrumb_url 'Game' 'game' team_id game.id %}
+> {% breadcrumb_url 'Scheduling' 'game_scheduling' team_id game.id %}
 {% endblock %}
 
 {% block title %}

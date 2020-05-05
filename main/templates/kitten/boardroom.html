@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Boardroom' 'game_boardroom' game.id team_id %}
+> {% breadcrumb_url 'Boardroom' 'game_boardroom' team_id game.id %}
 {% endblock %}
 
 {% block title %}

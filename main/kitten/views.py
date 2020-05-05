@@ -114,8 +114,8 @@ def invitation_accept(request, invitation_id):
 
             invitation.failed_attempts += 1
             if invitation.failed_attempts > invitation.MAX_PASSWORD_FAILURES:
-                log.error("Too many failed attempts for %s. Deleted.",
-                          invitation)
+                log.error("Too many failed attempts for %s. Invitation "
+                          "deleted.", invitation)
                 invitation.delete()
                 return HttpResponse(
                     "Too many failed attempts. Please ask the team"
@@ -318,7 +318,7 @@ def game_play(request, game_id, team_id):
     if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
     return HttpResponse("Play game not yet implemented.  Go to Operations"
-                        "and press Tick to get an idea...")
+                        " and press Tick to get an idea...")
 
 
 @login_required
@@ -327,8 +327,10 @@ def game_tick(request, game_id, team_id):
         return HttpResponse("Unauthorised team", status=401)
     if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
-    return game_operations(request, game_id, team_id,
-                           tick_interval=GameInterval.TICK_SINGLE)
+    game = get_object_or_404(Game, pk=game_id)
+    game.run(GameInterval.TICK_SINGLE)
+    return HttpResponseRedirect(reverse(
+        'game_operations', kwargs={'team_id': team_id, 'game_id': game_id}))
 
 
 @login_required
@@ -348,7 +350,7 @@ def game_operations(request, game_id, team_id, tick_interval=None):
     details = {line: ([(trains_dir1, location, trains_dir2)
                       for location, (trains_dir1, trains_dir2)
                       in line.details().items()],
-                      line.incidents.all())
+                      line.incidents)
                for line in lines
                }
     lines_other_op = Line.objects.filter(game=game).exclude(
@@ -411,7 +413,7 @@ def game_stage(request, game_id, team_id):
 
 
 @login_required
-def incident(request, team_id, incident_id):
+def incident(request, team_id, game_id, incident_id):
     if not is_team_member(request, team_id):
         return HttpResponse("Unauthorised team", status=401)
     if not Incident.objects.filter(
@@ -423,26 +425,22 @@ def incident(request, team_id, incident_id):
     except Incident.DoesNotExist:
         return HttpResponse('Unauthorised team', status=401)
 
-    back_url = request.path  # save url to return to
     errors = None
     if request.method == "POST":
         # start new response
-        back_url = request.POST.get('back-url', '/')
         response_id = request.POST.get("option")
         if not response_id:
             errors = "You must choose a response"
         else:
             incident.start_response(response_id)
-            return HttpResponseRedirect(back_url)
-    else:
-        back_url = request.GET.get('back-url', None)
+            return HttpResponseRedirect(reverse(
+                'game', kwargs={'team_id': team_id, 'game_id': game_id}))
     return render(request, 'kitten/incident.html',
                   {'game': incident.line.game,
                    'team_id': team_id,
                    'incident': incident,
                    'response': incident.response,
-                   'errors': errors,
-                   'back_url': back_url})
+                   'errors': errors})
 
 
 @login_required

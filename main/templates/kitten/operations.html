@@ -7,8 +7,8 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Game' 'game' game.id team.id %}
-> {% breadcrumb_url 'Operations' 'game_operations' game.id team.id %}
+> {% breadcrumb_url 'Game' 'game' team.id game.id %}
+> {% breadcrumb_url 'Operations' 'game_operations' team.id game.id %}
 {% endblock %}
 
 
@@ -55,7 +55,7 @@
 <h4>Incident status</h4><small>
 {% for incident in details.1 %}  <!-- details.1 is incidents -->
 
-<a href="{% url 'incident' team.id incident.id %}?back-url={% url 'game_operations' game.id team.id %}"
+<a href="{% url 'incident' team.id game.id incident.id %}"
 	>{{ incident.html|safe }}</a><br>
 
 {% empty %}
@@ -71,8 +71,8 @@ No incidents to report.
 <p>(No lines for {{ team.name }}.)</p>
 {% endfor %}  <!-- lines -->
 
-<a href="{% url 'game_tick' game.id team.id %}">Tick</a>
-<a href="{% url 'game_incidents_clear' game.id team.id %}">Clear Incidents</a>
+<a href="{% url 'game_tick' team.id game.id %}">Tick</a>&nbsp;&nbsp;
+<a href="{% url 'game_incidents_clear' team.id game.id %}">Clear Incidents</a>
 
 {% if lines_other_op %}
 

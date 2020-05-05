@@ -2,7 +2,7 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Game' 'game' game.id team_id %}
+> {% breadcrumb_url 'Game' 'game' team_id game.id %}
 {% endblock %}
 
 {% block content %}
@@ -10,29 +10,30 @@
 
 <p>Here are the details of your game.</p>
 <ul>
-<li><a href="{% url 'game_scheduling' game.id team_id %}">
+<li><a href="{% url 'game_scheduling' team_id game.id %}">
 Scheduling Centre</a></li>
 
-<li><a href="{% url 'game_operations' game.id team_id %}">
+<li><a href="{% url 'game_operations' team_id game.id %}">
 Operations Control Room</a></li>
 
 {% if game.level >= 30 %}
-<li>HR Department</li>
+<li><a href="{% url 'game_hr' team_id game.id %}">HR Department</a></li>
 {% endif %}
 
 {% if game.level >= 40 %}
-<li>Engineering Department</li>
+<li><a href="{% url 'game_engineering' team_id game.id %}">
+Engineering Department</a></li>
 {% endif %}
 
 {% if game.level >= 20 %}
-<li><a href="{% url 'boardroom' game.id team_id %}">Boardroom</a></li>
+<li><a href="{% url 'boardroom' team_id game.id %}">Boardroom</a></li>
 {% endif %}
 
 </ul>
 
 <h3>Game settings (common to all teams):</h3>
 <form method="POST" class="post-form"
-	action="{% url 'game' game.id team_id %}">
+	action="{% url 'game' team_id game.id %}">
 	{% csrf_token %}
     {{ form }}
     <input type="submit" class="save btn btn-default" value="Update">
@@ -42,7 +43,7 @@ Operations Control Room</a></li>
 <ul>{% for participant in game.teams.all %}
 
 <li>{{ participant.name }}
-	<a href="{% url 'game_team_remove' game.id team_id participant.id %}">
+	<a href="{% url 'game_team_remove' team_id game.id participant.id %}">
 	Remove</a></li>
 
 {% empty %}
@@ -59,14 +60,14 @@ Operations Control Room</a></li>
 {% endif %}
 
 <li><a class="btn btn-default"
-	href="{% url 'game_invitation_new' game.id team_id %}">Invite another team</a>
+	href="{% url 'game_invitation_new' team_id game.id %}">Invite another team</a>
 	</li>
 </ul>
 
    <p>Network name: {{ game.network_name }}. 
    Game level: {{game.get_level_display}}</p>
-<a class="button" href="{% url 'game_play' game.id team_id %}">Play</a>
+<a class="button" href="{% url 'game_play' team_id game.id %}">Play</a>
 &nbsp;&nbsp;
-<a class="button" href="{% url 'game_delete' game.id team_id %}">Delete</a>
+<a class="button" href="{% url 'game_delete' team_id game.id %}">Delete</a>
 
 {% endblock %}

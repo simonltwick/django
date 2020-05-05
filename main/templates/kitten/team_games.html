@@ -33,7 +33,7 @@
 <ul>
 {% for game in games %}
 
-<li><a href="{% url 'game' game.id team.id %}">{{ game }}</a>
+<li><a href="{% url 'game' team.id game.id %}">{{ game }}</a>
 started {{ game.started }}, last played {{ game.last_played}}
 </li>
 

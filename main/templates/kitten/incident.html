@@ -5,9 +5,9 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Game' 'game' game.id team_id %}
-> {% breadcrumb_url 'Operations' 'game_operations' game.id team_id %}
-> {% breadcrumb_url 'Incident' 'incident' team_id incident.id %}
+> {% breadcrumb_url 'Game' 'game' team_id game.id %}
+> {% breadcrumb_url 'Operations' 'game_operations' team_id game.id %}
+> {% breadcrumb_url 'Incident' 'incident' team_id game.id incident.id %}
 {% endblock %}
 
 {% block content %}
@@ -60,7 +60,6 @@ Estimated recovery impacts:
 {% endif %}
 <form method="post">
 {% csrf_token %}
-<input type="hidden" name="back-url" value="{{ back_url }}">
 <table>
 <tr><th>Action</th>
 <th>Fix chance</th>
