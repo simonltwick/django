@@ -280,7 +280,7 @@ class Game(models.Model, GameLevel):
         # log.info("Game.Tick at %s", hhmm(self.current_time))
         # self.sprinkle_incidents()
         for line in self.lines.all():
-            line.resolve_incidents()
+            line.try_resolve_incidents()
             # line.update_trains(self.current_time)
         self.current_time += self.tick_interval
         self.save()
@@ -479,7 +479,13 @@ class Line(models.Model):
 
     def close_incident(self, incident: 'Incident',
                        _closure_time: datetime.datetime):
-        self._incidents.pop(incident)
+        self.incidents.remove(incident)
+
+    def try_resolve_incidents(self):
+        """ try to resolve incidents """
+        for incident in self.incidents:
+            if incident.response_id:
+                incident.try_close(self)
 
     @classmethod
     def new_from_template(cls, template: LineTemplate, game: Game,
@@ -634,12 +640,6 @@ class Line(models.Model):
         if not delay:
             self.on_time_arrivals += 1
         self.save()
-
-    def resolve_incidents(self):
-        """ try to resolve incidents """
-        for incident in self.incidents:
-            if incident.response_id:
-                incident.try_close()
 
 
 class LocationType:
@@ -1062,38 +1062,42 @@ class Incident(models.Model):
         response = Response.objects.get(id=response_id)
         self.response = response
         self.response_start_time = self.line.game.current_time
+        self.time_to_fix   # cache it, maybe save a DB call later
         self.save()
 
-    def try_close(self):
+    @cached_property
+    def time_to_fix(self):
+        return self.response.time_to_fix
+
+    def try_close(self, line):
         """ try the response to see if we can close the incident """
-        assert self.response, f"trying to close {self} with no response set"
+        if not self.response_id:
+            return
         current_time = self.line.game.current_time
         # log.info("%s: Considering times for %s: response_start=%s, "
-        #          "fix_time=%s",
-        #          hhmm(current_time), self, self.response_start_time.time(),
-        #          self.response.time_to_fix)
+        #          "fix_time=%s", hhmm(current_time), self,
+        #          self.response_start_time.time(), self.time_to_fix)
         # log.info("response end time=%s",
         #          hhmm(self.response_start_time + self.response.time_to_fix))
-        if (self.response_start_time + self.response.time_to_fix >
-                current_time):
-            # log.info(
-            #     "%s: Resolution ongoing for %s at %s", hhmm(current_time),
-            #     self, self.location)
+        if (self.response_start_time + self.time_to_fix > current_time):
+            # log.info("%s: Resolution ongoing for %s at %s",
+            #          hhmm(current_time), self, self.location)
             return  # not yet...
 
-        if not self.response.worked():  # based on fix chance
-            log.warning("%s: Resolution failed for %s at %s",
-                        hhmm(current_time), self, self.location)
-            self.previous_response_status = f"{self.response} failed to fix " \
-                f"at {hhmm(current_time)}"
-            self.response = None
-            self.save()
+        if self.response.worked():  # based on fix chance
+            self.resolve(line, current_time)
             return
-        self.resolve(current_time)
+        log.warning("%s: Resolution failed for %s at %s",
+                    hhmm(current_time), self, self.location)
+        self.previous_response_status = f"{self.response} failed to fix " \
+            f"at {hhmm(current_time)}"
+        self.response = None
+        self.save()
+        return
 
-    def resolve(self, current_time):
+    def resolve(self, line, current_time):
         log.info("%s: Resolved %s at %s", hhmm(current_time),
                  self, self.location)
-        self.line.close_incident(self, current_time)
+        line.close_incident(self, current_time)
         self.delete()
         # bye bye!

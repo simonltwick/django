@@ -433,8 +433,9 @@ def incident(request, team_id, game_id, incident_id):
             errors = "You must choose a response"
         else:
             incident.start_response(response_id)
-            return HttpResponseRedirect(reverse(
-                'game', kwargs={'team_id': team_id, 'game_id': game_id}))
+            return HttpResponseRedirect(
+                reverse('game_operations',
+                        kwargs={'team_id': team_id, 'game_id': game_id}))
     return render(request, 'kitten/incident.html',
                   {'game': incident.line.game,
                    'team_id': team_id,
