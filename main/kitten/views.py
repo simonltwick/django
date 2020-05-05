@@ -416,14 +416,11 @@ def game_stage(request, game_id, team_id):
 def incident(request, team_id, game_id, incident_id):
     if not is_team_member(request, team_id):
         return HttpResponse("Unauthorised team", status=401)
-    if not Incident.objects.filter(
-            id=incident_id, line__game__teams=team_id).exists():
-        return HttpResponse('Unauthorized game', status=401)
     try:
-        incident = Incident.objects.get(id=incident_id,
-                                        line__game__teams=team_id)
+        game = Game.objects.get(id=game_id, teams=team_id)
     except Incident.DoesNotExist:
-        return HttpResponse('Unauthorised team', status=401)
+        return HttpResponse('Unauthorised game', status=401)
+    incident = get_object_or_404(Incident, id=incident_id, line__game=game)
 
     errors = None
     if request.method == "POST":
@@ -437,7 +434,7 @@ def incident(request, team_id, game_id, incident_id):
                 reverse('game_operations',
                         kwargs={'team_id': team_id, 'game_id': game_id}))
     return render(request, 'kitten/incident.html',
-                  {'game': incident.line.game,
+                  {'game': game,
                    'team_id': team_id,
                    'incident': incident,
                    'response': incident.response,

@@ -215,7 +215,7 @@ class Game(models.Model, GameLevel):
     incident_types = models.ManyToManyField(IncidentType)
     incident_rate = models.PositiveSmallIntegerField(
         default=INCIDENT_RATE, help_text="average rate of incidents, with 100"
-        " generating1 incident per tick of the clock")
+        " generating 1 incident per tick of the clock")
     level = models.IntegerField(choices=GameLevel.CHOICES)
     day_start_time = models.TimeField(default=datetime.time(hour=6))
     day_end_time = models.TimeField(default=datetime.time(hour=22))
@@ -278,13 +278,12 @@ class Game(models.Model, GameLevel):
     def tick(self, save=False):
         """ run the game for one tick of the clock """
         # log.info("Game.Tick at %s", hhmm(self.current_time))
-        # self.sprinkle_incidents()
+        self.sprinkle_incidents()
         for line in self.lines.all():
             line.try_resolve_incidents()
-            # line.update_trains(self.current_time)
+            line.update_trains(self.current_time)
         self.current_time += self.tick_interval
         self.save()
-        # sprinkle_incidents
         # update scoreboard
 
     # ----- incident generation ------
@@ -522,7 +521,6 @@ class Line(models.Model):
             for line_location in lls:
                 if line_location.update_name():
                     line_location.save()
-            self._line_locations.extend(lls)
 
     def details(self):
         """ return a pair of dicts of locations along the line with trains,
@@ -580,23 +578,8 @@ class Line(models.Model):
 
     def update_trains(self, current_time):
         # log.info("Line.update_trains(%s)", self)
-        # ### HACK get start of line in 1st direction & turnaround a train ###
-        # loc0=LineLocation.objects.get(position=0, direction=self.direction1)
-        # trains_loc0 = Train.objects.filter(location=loc0).all()
-        # assert len(trains_loc0) == 3,f"Wrong number of trains at start, " \
-        #    f"len={len(trains_loc0)}"
-        # trains_loc0[0].turnaround(current_time)
-        # trains_loc0b = Train.objects.filter(location=loc0).all()
-        # assert len(trains_loc0b) == 2,f"Move didn't happen, " \
-        #    f"len={len(trains_loc0b)}"
 
         self.turnaround_trains(current_time)
-
-        # trains_loc0c = Train.objects.filter(location=loc0).all()
-        # assert len(trains_loc0c) == 3, f"Turnaround_trains didn't work, " \
-        #    f"len={len(trains_loc0c)}"
-        # log.info("Turnaround test worked")
-
         self.try_move_trains(current_time)
 
     def turnaround_trains(self, current_time):
@@ -607,8 +590,7 @@ class Line(models.Model):
         # on a line - it would create a deadlock
 
         # create a list of trains which can turnaround first
-        trains_on_line = Train.objects.filter(location__line=self).all()
-        trains_to_turnaround = [train for train in trains_on_line
+        trains_to_turnaround = [train for train in self.trains
                                 if train.will_turnaround()]
 
         # and then turnaround, to prevent double turnarounds
@@ -625,13 +607,18 @@ class Line(models.Model):
         for train in trains_direction1:
             # this results in trying ALL trains in a depot...
             train.try_move(current_time)
+            if train.location.is_start_of_line:
+                # can only move 1 train from depot per tick
+                break
 
-        trains_direction1 = Train.objects.filter(
+        trains_direction2 = Train.objects.filter(
             location__line=self,
             location__direction_is_forward=False).order_by(
                 'location__position').all()
-        for train in trains_direction1:
+        for train in trains_direction2:
             train.try_move(current_time)
+            if train.location.is_start_of_line:
+                break  # as above, move max 1 train from depot
 
     def report_punctuality(self, delay: datetime.timedelta):
         """ record train arrival punctuality """
@@ -717,21 +704,22 @@ class LineLocation(models.Model, LocationType):
 
         ll = LineLocation(
             name=template.name, type=template.type,
-            line=line.id, position=position,
+            line=line, position=position,
             transit_delay=template.transit_delay,
             turnaround_percent=turnaround_percent,
             direction=direction, direction_is_forward=is_forward,
             is_start_of_line=start_of_line, is_end_of_line=end_of_line)
-        ll.save()
         # create stations and trains in depots
         if ll.is_station() and ll.direction_is_forward:
             # apply calculated station name if not set
-            ss = Station(line=line.id, name=ll.name or ll.calculate_name())
+            ss = Station(line=line, name=ll.name or ll.calculate_name())
             ss.save()
-        if ll.is_start_of_line:
+        ll.save()
+        if start_of_line:
+            log.info("calling ll.create_trains for %s", ll)
             ll.create_trains(train_type,
                              line.trains_dir1
-                             if ll.direction_is_forward
+                             if is_forward
                              else line.trains_dir2)
         return ll
 
@@ -766,6 +754,7 @@ class LineLocation(models.Model, LocationType):
             train = Train(location=self, type=train_type,
                           serial=train_serial,
                           direction_is_forward=self.direction_is_forward)
+            train.save()
         self.line.num_trains = train_serial
 
     def __str__(self):
@@ -882,7 +871,7 @@ class Train(models.Model):
         self.location.save()
 
         if new_location.is_station():
-            self.location.line.report_puncuality(self.delay)
+            self.location.line.report_punctuality(self.delay)
 
         self.location = new_location
 
@@ -1015,8 +1004,8 @@ class Incident(models.Model):
         except AttributeError:
             pass
         self._location = (
-            self.location_line if self.location_line is not None else
-            self.location_train if self.location_train is not None else
+            self.location_line if self.location_line_id is not None else
+            self.location_train if self.location_train_id is not None else
             self.location_station)
         if self._location is None:
             raise ValueError(f"Incident %s location not set")
@@ -1040,7 +1029,7 @@ class Incident(models.Model):
     def html(self):
         """ return html version """
         classes = 'incident'
-        if self.response is None:
+        if self.response.id is None:
             classes += ' incident-open'
         else:
             classes += ' incident-responding'

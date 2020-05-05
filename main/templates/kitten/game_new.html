@@ -1,14 +1,23 @@
 {% extends 'kitten/base.html' %}
 <!-- initial dialog when only team is known -->
 
-{% block title %}New Game -
+
+{% block title %}
+New Game -
 {% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'New Game' 'game' team.id %}
+{% endblock %}
+
 
 {% block content %}
 
 <h2>Setup new game for {{ team.name }}</h2>
 
-<form method="POST" class="post-form" action="{% url 'game_new' team.id %}">
+<form method="POST" class="post-form">
  	{% csrf_token %}
 
     <p class="errorlist">{{ errors }}</p>
