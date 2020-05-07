@@ -1,15 +1,17 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, AccessMixin
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
-from .models import Game, Team, GameTemplate, Line, \
-    GameInterval, Incident, TeamInvitation, GameInvitation
+from .models import Game, Team, GameTemplate, Line, Network, \
+    GameInterval, Incident, TeamInvitation, GameInvitation, LineTemplate, \
+    GameTemplate
 from .forms import GameForm, TeamInvitationForm, InvitationAcceptanceForm, \
-    GameInvitationForm, GameInvitationAcceptanceForm
+    GameInvitationForm, GameInvitationAcceptanceForm, NewGameForm, \
+    LineTemplateForm
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -84,6 +86,101 @@ class TeamUpdate(IsTeamMemberMixin, UpdateView):
 class TeamDelete(IsTeamMemberMixin, DeleteView):
     model = Team
     fields = ('name', 'description', 'games')
+    success_url = reverse_lazy('home')
+
+
+# TODO: validate that request.user owns this network / linetemplate / gametemp.
+class NetworkNew(LoginRequiredMixin, CreateView):
+    model = Network
+    fields = ('name', 'description', 'day_start_time', 'day_end_time',
+              'game_round_duration')
+
+    def form_valid(self, form):
+        obj = form.save(commit=False)
+        obj.owner = self.request.user
+        return super(NetworkNew, self).form_valid(form)
+
+
+class NetworkUpdate(LoginRequiredMixin, UpdateView):
+    model = Network
+    fields = ('name', 'description', 'day_start_time', 'day_end_time',
+              'game_round_duration')
+
+
+class NetworkDelete(LoginRequiredMixin, DeleteView):
+    model = Network
+    success_url = reverse_lazy('home')
+
+
+@login_required
+def linetemplate(request, network_id, linetemplate_id=None):
+    if not Network.objects.filter(
+            owner=request.user, pk=network_id).exists():
+        return HttpResponse("Unauthorised network.", status=401)
+
+    if linetemplate_id is not None:
+        linetemplate = get_object_or_404(LineTemplate, pk=linetemplate_id)
+    if request.method == 'POST':
+        if network_id != request.POST.get('network_id'):
+            return HttpResponse("Invalid network.", status=401)
+
+        if linetemplate_id is not None:
+            if linetemplate_id != request.POST.get('linetemplate_id'):
+                return HttpResponse("Invalid line template.", status=401)
+
+            form = LineTemplateForm(request.POST, instance=linetemplate)
+            if not LineTemplate.objects.filter(
+                    pk=linetemplate_id, network_id=network_id).exists():
+                return HttpResponse("Unauthorised line location.", status=401)
+
+        else:  # linetemplate_id is None: new LineTemplate
+            form = LineTemplateForm(request.POST)
+            linetemplate = None
+        if form.is_valid():
+            form.instance.network_id = network_id
+            form.save()
+
+        else:  # get (for update) with linetemplate_id
+            if linetemplate.network_id != network_id:
+                return HttpResponse("Invalid network.", status=401)
+            form = LineTemplateForm(instance=linetemplate)
+
+    else:  # no linetemplate id - new linelocation
+        assert linetemplate_id, "GET request with no linetemplate_id"
+        form = LineTemplateForm(instance=linetemplate)
+
+    return render(request, 'kitten/linetemplate_form.html',
+                  context={'form': form, 'network_id': network_id,
+                           'linetemplate': linetemplate})
+
+
+class LineTemplateDelete(LoginRequiredMixin, DeleteView):
+    model = LineTemplate
+    success_url = reverse_lazy('home')
+
+
+def linelocation(request, linetemplate_id, linelocation_id=None):
+    """ handle a linelocation request """
+    return HttpResponse("Not yet written.")
+
+
+class GameTemplateNew(LoginRequiredMixin, CreateView):
+    model = GameTemplate
+    fields = ('level', 'incident_rate')
+
+    def form_valid(self, form):
+        obj = form.save(commit=False)
+        obj.network_id = self.kwargs('network_id')
+        return super(GameTemplateNew, self).form_valid(form)
+
+
+class GameTemplateUpdate(LoginRequiredMixin, UpdateView):
+    model = GameTemplate
+    fields = ('level', 'incident_rate')
+
+
+class GameTemplateDelete(LoginRequiredMixin, DeleteView):
+    model = GameTemplate
     success_url = reverse_lazy('home')
 
 
@@ -175,32 +272,30 @@ def game_new(request, team_id):
     Prompt for game template and teams, then create game """
     if not is_team_member(request, team_id):
         return HttpResponse("Unauthorised team", status=401)
+    team = Team.objects.get(pk=team_id)
     if request.method == 'POST':
         # handle form here .. create the game and then go to edit game
         # to further customise
-        selected_template = request.POST.get('template')
-        name = request.POST.get('name')
-        if selected_template == "NONE":
-            errors = "ERROR: You must select a network to base your game upon"
-        elif selected_template is None:
-            errors = "template field not included in POST data"
-        else:
-            errors = f"You selected {selected_template}"
-            template = get_object_or_404(GameTemplate, pk=selected_template)
-            team = get_object_or_404(Team, pk=team_id)
-            game = Game.new_from_template(teams=[team], template=template,
+        form = NewGameForm(request.POST)
+        form.fields['game_template'].queryset = GameTemplate.objects.filter(
+            level__lte=team.level)
+        if form.is_valid():
+            game_template = form.cleaned_data.get('game_template', None)
+            name = form.cleaned_data['name']
+            game = Game.new_from_template(teams=[team], template=game_template,
                                           name=name)
             game.save()
             form = GameForm(instance=game)
-            return render(request, 'kitten/game.html',
-                          {'form': form, 'game': game, 'team_id': team.id})
+            return HttpResponseRedirect(reverse(
+                'game', kwargs={'game_id': game.id, 'team_id': team.id}))
+
     else:  # initial call with only team_id
-        errors = ""
-    team = get_object_or_404(Team, pk=team_id)
-    game_templates = GameTemplate.objects.filter(level__lte=team.level)
+        form = NewGameForm()
+        form.fields['game_template'].queryset = GameTemplate.objects.filter(
+            level__lte=team.level)
     return render(request, 'kitten/game_new.html',
-                  {'team': team, 'templates': game_templates,
-                   'errors': errors})
+                  {'form': form,
+                   'team': team})
 
 
 @login_required
@@ -403,6 +498,17 @@ def game_engineering(request, game_id, team_id):
         return HttpResponse('Unauthorized game', status=401)
     game = get_object_or_404(Game, pk=game_id)
     return render(request, 'kitten/engineering.html',
+                  {'game': game, 'team_id': team_id})
+
+
+@login_required
+def game_marketing(request, game_id, team_id):
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
+        return HttpResponse('Unauthorized game', status=401)
+    game = get_object_or_404(Game, pk=game_id)
+    return render(request, 'kitten/marketing.html',
                   {'game': game, 'team_id': team_id})
 
 

@@ -1,0 +1,33 @@
+{% extends 'kitten/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ network.name }} -
+{% endblock %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Network" 'network' network.id %}
+> {% breadcrumb_url "Delete" 'network_delete' network.id %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ network.name }}</h1>
+	<p class="errormsg">This network, all its levels, lines and locations;
+	incidents, responses and impacts will be deleted:</p>
+	<ul>{% for line in network.lines.all %}
+
+		<li>{{ line.name }} ({{ line.locations.count }} locations)</li>
+
+	{% endfor %}</ul>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p><a class="button" href="{% url 'home' %}">Cancel</a>
+	<input type="submit" class="btn btn-danger" value="Delete">
+</form>
+
+
+{% endblock %}

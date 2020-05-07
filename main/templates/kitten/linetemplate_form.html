@@ -1,0 +1,64 @@
+{% extends 'kitten/base.html' %}
+
+
+{% block title %}
+{% if linetemplate %}
+	{{ linetemplate }} details -
+{% else %}
+	New Line Template -
+{% endif %}
+{% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Network" 'network' network_id %}
+{% if linetemplate %}
+> {% breadcrumb_url "Line Template" 'linetemplate' linetemplate.id %}
+{% else %}
+> {% breadcrumb_url "New Line Template" 'linetemplate' network_id %}
+{% endif %}
+{% endblock %}
+
+
+{% block content %}
+
+{% if linetemplate %}
+	<h1>{{ linetemplate }}</h1>
+{% else %}
+	<h1>New Line Template</h1>
+{% endif %}
+
+<form method="post"
+	action="{% url 'linetemplate' network_id linetemplate.id %}">
+	{% csrf_token %}
+	<input type="hidden" name="network_id" value="{{ network_id }}">
+	<input type="hidden" name="linelocation_id" value="{{ linelocation.id }}">
+	{{ form.as_p }}
+	<p>First, enter the details of your line and save it.  Then, you can add
+	line locations, and playable levels</p>
+	<input type="submit" value="Save">
+</form>
+
+{% if linetemplate %}
+	<p>Line Locations:</p><!-- line teamplates in the network -->
+	<ul>
+	{% for loc in linetemplate.network.places.all %}
+	
+		<li><a href="{% url 'linelocation' linetemplate.id loc.id %}">{{ line.name }}</a>
+		&nbsp;&nbsp;
+		<a href="{% url 'linelocation_delete' loc.id %}">Remove</a>
+		</li>
+	
+		{% empty %}
+		<li class="errormsg">You must add one or more line locations to the line
+		</li>
+
+	{% endfor %}
+	</ul>
+	<p><a href="{% url 'linelocation' linetemplate.id %}">Add line location
+	</a></p>
+
+{% endif %} <!-- linetemplate -->
+
+{% endblock %}

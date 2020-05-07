@@ -1,7 +1,9 @@
 from collections import defaultdict
 import datetime
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -36,7 +38,7 @@ def escape(s):
 
 
 # TODO: change IntegerFields to PositiveIntegerFields for validation
-class GameLevel:
+class GameLevel:  # Mixin for Game, handling game level validation
     BASIC = 10
     INTERMEDIATE = 20
     ADVANCED = 30
@@ -45,6 +47,19 @@ class GameLevel:
                (INTERMEDIATE, 'Intermediate'),
                (ADVANCED, 'Advanced'),
                (EXPERT, 'Expert'))
+    # Thresholds for game behaviour
+    INCIDENTS_CAN_BLOCK = 25
+
+    def has_multiple_teams(self):
+        return self.level > self.BASIC
+
+    def has_blocking_incidents(self):
+        return self.level >= self.INCIDENTS_CAN_BLOCK
+
+    def has_line_turnarounds_available(self):
+        return self.level >= self.INTERMEDIATE
+
+    has_scheduling_centre_available = has_line_turnarounds_available
 
 
 class Team(models.Model, GameLevel):
@@ -102,17 +117,17 @@ class Network(models.Model):
     # logo
     TICK_STAGE = datetime.timedelta(minutes=30)
     TICK_SINGLE = datetime.timedelta(seconds=60)
-    name = models.CharField(max_length=40)
+    name = models.CharField(max_length=40, unique=True)
     description = models.CharField(max_length=300)
     created = models.DateField(auto_now_add=True)
     last_updated = models.DateField(auto_now=True)
     owner = models.ForeignKey(User, on_delete=models.PROTECT,
-                              null=True)
+                              null=True, related_name='networks')
     day_start_time = models.TimeField(default=datetime.time(hour=6))
     day_end_time = models.TimeField(default=datetime.time(hour=22))
     game_round_duration = models.DurationField(default=TICK_STAGE)
     # lines = reverse FK (to LineTemplate)
-    # game templates= reverse FK
+    # levels = reverse FK (to GameTemplate)
     # incident_types= reverse FK
     # response_types= reverse FK
     # response_options= reverse FK
@@ -125,6 +140,16 @@ class Network(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_absolute_url(self):
+        return reverse('network', args=[str(self.id)])
+
+    def clean(self):
+        # Networks must have at least one LineTemplate.
+        # BUT can't add Lines until network has been saved!
+        return
+        if not self.lines.exists():
+            raise ValidationError('Networks must have at least one line')
 
 
 class GameTemplate(models.Model, GameLevel):
@@ -143,14 +168,56 @@ class GameTemplate(models.Model, GameLevel):
 
 
 # ----- Incident Types and responses -----
+class ImpactType:
+    """ ** Not yet implemented: Impacts not in
+        ** Gamelevel.IMPACTS[Gamelevel.LEVEL] are ignored
+    Also, blockages are ignored unless Gamelevel allows adding turnarounds """
+    LINE = 10
+    PASSENGER = 20
+    STATION = 25
+    STAFF = 30
+    COST = 40
+    CHOICES = ((LINE, 'Line'),
+               (PASSENGER, 'Passenger'),
+               (STATION, 'Station'),
+               (STAFF, 'Staff'),
+               (COST, 'Cost'))
+
+
+class ImpactNow:
+    """ a summable class to represent a numeric impact """
+    def __init__(self, impact_type: int, blocking: bool=False, amount: int=0):
+        self.type = impact_type
+        self.blocking = blocking
+        self.amount = amount
+
+    def __add__(self, other):
+        if self.type != other.type:
+            raise TypeError(f"cannot add mixed types({self.type} + "
+                            f"{other.type}) of ImpactNow")
+        return ImpactNow(self.blocking or other.blocking,
+                         self.amount + other.amount)
+
+
 class Impact(models.Model):
     name = models.CharField(max_length=40, default='?')
+    type = models.PositiveSmallIntegerField(choices=ImpactType.CHOICES,
+                                            default=ImpactType.LINE)
     blocking = models.BooleanField(default=False)
+    one_time_amount = models.IntegerField(default=0)
+    recurring_amount = models.IntegerField(default=0)
     network = models.ForeignKey(Network, related_name='impacts',
                                 on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
+
+    def impact_now(self, one_time: bool) -> ImpactNow:
+        """ return the impact at the current time period.  Uses the
+        one-time amount if one_time is true """
+        return ImpactNow(self.type, self.blocking,
+                         self.one_time_amount if one_time
+                         else self.recurring_amount)
 
 
 class Response(models.Model):
@@ -211,7 +278,9 @@ class Game(models.Model, GameLevel):
     started = models.DateField(auto_now_add=True)
     last_played = models.DateField(auto_now=True)
     teams = models.ManyToManyField(Team, related_name='games')
-    network_name = models.CharField(max_length=40)
+    network_name = models.CharField(max_length=40, help_text="""A network is a
+     predefined collection of lines, trains and incident types to base your
+     game upon""")
     incident_types = models.ManyToManyField(IncidentType)
     incident_rate = models.PositiveSmallIntegerField(
         default=INCIDENT_RATE, help_text="average rate of incidents, with 100"
@@ -239,9 +308,8 @@ class Game(models.Model, GameLevel):
         Trains from LineTemplates
         Only one team is required to start a game"""
         network_name = template.network.name
-        level = template.level
         game = Game.objects.create(
-            network_name=network_name, level=level,
+            network_name=network_name, level=template.level,
             day_start_time=template.network.day_start_time,
             day_end_time=template.network.day_end_time,
             game_round_duration=template.network.game_round_duration,
@@ -252,7 +320,7 @@ class Game(models.Model, GameLevel):
         game.teams.add(*teams)
         game.incident_types.add(*template.network.incident_types.all())
         line_templates = LineTemplate.objects.filter(network=template.network)
-        operator = teams[0] if level <= GameLevel.BASIC else None
+        operator = teams[0] if game.has_multiple_teams() else None
         for line_template in line_templates:
             Line.new_from_template(template=line_template, game=game,
                                    operator=operator)
@@ -281,7 +349,7 @@ class Game(models.Model, GameLevel):
         self.sprinkle_incidents()
         for line in self.lines.all():
             line.try_resolve_incidents()
-            line.update_trains(self.current_time)
+            line.update_trains(self)
         self.current_time += self.tick_interval
         self.save()
         # update scoreboard
@@ -576,11 +644,11 @@ class Line(models.Model):
             s += f" Average delay={hhmm(av_delay)}."
         return s
 
-    def update_trains(self, current_time):
+    def update_trains(self, game):
         # log.info("Line.update_trains(%s)", self)
 
-        self.turnaround_trains(current_time)
-        self.try_move_trains(current_time)
+        self.turnaround_trains(game.current_time)
+        self.try_move_trains(game)
 
     def turnaround_trains(self, current_time):
         """train turnaround at depots and where turnaround specified
@@ -597,7 +665,7 @@ class Line(models.Model):
         for train in trains_to_turnaround:
             train.turnaround(current_time)
 
-    def try_move_trains(self, current_time):
+    def try_move_trains(self, game):
         # move trains: run through places in reverse order
         trains_direction1 = Train.objects.filter(
             location__line=self,
@@ -606,7 +674,7 @@ class Line(models.Model):
         # handle trains in reverse order, from end of line to start
         for train in trains_direction1:
             # this results in trying ALL trains in a depot...
-            train.try_move(current_time)
+            train.try_move(game)
             if train.location.is_start_of_line:
                 # can only move 1 train from depot per tick
                 break
@@ -616,7 +684,7 @@ class Line(models.Model):
             location__direction_is_forward=False).order_by(
                 'location__position').all()
         for train in trains_direction2:
-            train.try_move(current_time)
+            train.try_move(game)
             if train.location.is_start_of_line:
                 break  # as above, move max 1 train from depot
 
@@ -879,7 +947,7 @@ class Train(models.Model):
         # No need to update location of incidents - they move with the train
         self.save()
 
-    def try_move(self, current_time):
+    def try_move(self, game):
         """ move if possible, i.e. not at end of line, or line blocked, or
         counting down delay
         If blocked, add to line delays """
@@ -891,14 +959,13 @@ class Train(models.Model):
         if self.awaiting_turnaround:
             return  # already logged in turnaround_clear()
 
-        next_place = self.location.next_loc
         """ consider transit_time.   If no last-train_time recorded, or we've
            waited transit_time since we arrived,
            (or the last train departed from a depot) we can move """
-
+        incident_delay = self.calculate_incident_delay(game)
         if self.location.last_train_time is not None and (
-            current_time < self.location.last_train_time + (
-                self.location.transit_delay *
+            game.current_time < self.location.last_train_time + (
+                (self.location.transit_delay + incident_delay) *
                 self.location.line.game.tick_interval)):
             # log.info("%s in transit at %s "
             #          "(last train=%s, transit_delay=%s)",
@@ -913,6 +980,7 @@ class Train(models.Model):
         #          hhmm(self.location.last_train_time),
         #          hhmm(self.location.transit_delay *
         #               self.location.line.game.tick_interval))
+        next_place = self.location.next_loc
         if next_place.trains.exists() and not next_place.is_depot():
             log.warning("%s is blocked (train ahead)", self)
             self.blocked = True
@@ -920,7 +988,20 @@ class Train(models.Model):
             self.save()
             return False
 
-        self.move(next_place, current_time)
+        self.move(next_place, game.current_time)
+
+    def calculate_incident_delay(self, game) -> ImpactNow:
+        """ return the incident (blockage, delay) for this train at this time
+        Delays or blockages can be due to linelocation or train incidents """
+        current_time = game.current_time
+        query = Q(location_line_id=self.location_id) | Q(location_train=self)
+        incidents = Incident.objects.filter(query).all()
+        impacts = sum((incident.impact_now(ImpactType.LINE, current_time)
+                      for incident in incidents), ImpactNow(),)
+        if impacts.blocking and game.has_blocking_incidents():
+            return impacts.amount + 1
+        else:
+            return impacts.amount
 
     def will_turnaround(self):
         """ assess moving train to opposite direction on line -> True if OK
@@ -979,7 +1060,8 @@ class Incident(models.Model):
     line = models.ForeignKey(Line, on_delete=models.CASCADE)
     type = models.ForeignKey(IncidentType, on_delete=models.CASCADE)
     response = models.ForeignKey(Response, null=True, blank=True,
-                                 on_delete=models.SET_NULL)
+                                 on_delete=models.SET_NULL,
+                                 related_name='active_incidents')
     # severity
     start_time = models.DateTimeField(null=True)
     response_start_time = models.DateTimeField(null=True, blank=True)
@@ -1090,3 +1172,21 @@ class Incident(models.Model):
         line.close_incident(self, current_time)
         self.delete()
         # bye bye!
+
+    def impact_now(self, impact_type, current_time) -> ImpactNow:
+        """ return the impact of this incident at the current time, as a tuple
+        (blocking, delay).  If the time is current_time, then delay will be
+        the initial delay, otherwise, the ongoing delay.
+        The impact is the sum of the incident impact and any response impact"""
+        filtered_impacts = self.impacts.filter(type=impact_type).all()
+        is_initial_impact = current_time == self.start_time
+        impact_now = sum(filtered_impacts.impact_now(is_initial_impact),
+                         ImpactNow(type=impact_type))
+        if self.response:
+            filtered_response_impacts = self.response.impacts.filter(
+                type=impact_type).all()
+            is_initial_impact = current_time == self.response_start_time
+            impact_now = sum(
+                filtered_response_impacts.impact_now(is_initial_impact),
+                impact_now)
+        return impact_now

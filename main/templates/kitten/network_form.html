@@ -1,0 +1,75 @@
+{% extends 'kitten/base.html' %}
+
+
+{% block title %}
+{% if network.name %}
+	{{ network.name }} details -
+{% else %}
+	New Network -
+{% endif %}
+{% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+{% if network %}
+> {% breadcrumb_url "Network" 'network' network.id %}
+{% else %}
+> {% breadcrumb_url "New Network" 'network_new' %}
+{% endif %}
+{% endblock %}
+
+
+{% block content %}
+
+{% if network.name %}
+	<h1>{{ network.name }} details</h1>
+{% else %}
+	<h1>New Network</h1>
+{% endif %}
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p>First, enter the details of your network and save it.  Then, you can add
+	line templates, line locations, and playable levels, so the network can be
+	used in games.</p>
+	<input type="submit" value="Save">
+</form>
+
+{% if network %}
+	<p>Line Templates:</p><!-- line teamplates in the network -->
+	<ul>
+	{% for line in network.lines.all %}
+
+		<li><a href="{% url 'linetemplate' network.id line.id %}">
+		{{ line.name }}</a>&nbsp;&nbsp;
+		<a href="{% url 'linetemplate_delete' line.id %}">Remove</a>
+		</li>
+
+	{% empty %}
+	<li class="errormsg">You must add one or more lines to the network</li>
+	{% endfor %}
+	</ul>
+	<p><a href="{% url 'linetemplate' network.id %}">Add line</a>
+	</p>
+	
+	<p>Playable levels</p><!-- game teamplates in the network -->
+	<ul>{% for level in network.levels.all %}  <!-- GameTemplates -->
+
+		<li><a href="{% url 'gametemplate' level.id %}">
+		{{ level.get_level_display }}</a>&nbsp;&nbsp;
+		<a href="{% url 'gametemplate_delete' level.id %}">Remove</a>
+		</li>
+
+		{% empty %}
+		<li class="errormsg">You must add one or more playable levels to the
+		network</li>
+
+	{% endfor %}</ul>
+	<p><a href="{% url 'gametemplate_new' network.id %}">Add level</a>
+
+{% endif %} <!-- network -->
+
+
+{% endblock %}

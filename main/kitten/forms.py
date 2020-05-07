@@ -1,7 +1,9 @@
 from django import forms
+from django.forms import modelformset_factory
 import logging
 
-from .models import Game, TeamInvitation, Team, GameInvitation, User
+from .models import Game, TeamInvitation, Team, GameInvitation, User, \
+    Network, Line, LineTemplate, LineLocation
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -12,6 +14,18 @@ class GameForm(forms.ModelForm):
     class Meta:
         model = Game
         fields = ('name',)
+
+
+class NewGameForm(forms.ModelForm):
+
+    class Meta:
+        model = Game
+        fields = ('name',)
+
+    game_template = forms.ModelChoiceField(
+        queryset=None, empty_label='-- select a game template --',
+        help_text='The template provides a pre-defined set of lines, stations,'
+        ' trains and incidents to base the game upon.')
 
 
 class TeamInvitationForm(forms.ModelForm):
@@ -75,3 +89,15 @@ class GameInvitationAcceptanceForm(forms.ModelForm):
     class Meta:
         model = GameInvitation
         fields = ('password',)
+
+
+class LineTemplateForm(forms.ModelForm):
+
+    class Meta:
+        model = LineTemplate
+        fields = ('name', 'direction1', 'direction2', 'trains_dir1',
+                  'trains_dir2', 'train_interval', 'train_type')
+
+
+LineLocationFormSet = modelformset_factory(LineLocation,
+                                           fields=("name",))
