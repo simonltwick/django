@@ -10,24 +10,32 @@
 
 <p>Here are the details of your game.</p>
 <ul>
-<li><a href="{% url 'game_scheduling' team_id game.id %}">
-Scheduling Centre</a></li>
+
+<li><a href="{% url 'game_boardroom' team_id game.id %}">Boardroom</a>
+{% if game.level < 20 %}(not accessible at your team skill level){% endif %}
+</li>
 
 <li><a href="{% url 'game_operations' team_id game.id %}">
 Operations Control Room</a></li>
 
-{% if game.level >= 30 %}
-<li><a href="{% url 'game_hr' team_id game.id %}">HR Department</a></li>
-{% endif %}
+<li><a href="{% url 'game_scheduling' team_id game.id %}">
+Scheduling Centre</a>
+{% if game.level < 20 %}(not accessible at your team skill level){% endif %}
+</li>
 
-{% if game.level >= 40 %}
+<li><a href="{% url 'game_hr' team_id game.id %}">HR Department</a>
+{% if game.level < 30 %}(not accessible at your team skill level){% endif %}
+</li>
+
+<li><a href="{% url 'game_marketing' team_id game.id %}">
+Marketing Department</a>
+{% if game.level < 30 %}(not accessible at your team skill level){% endif %}
+</li>
+
 <li><a href="{% url 'game_engineering' team_id game.id %}">
-Engineering Department</a></li>
-{% endif %}
-
-{% if game.level >= 20 %}
-<li><a href="{% url 'boardroom' team_id game.id %}">Boardroom</a></li>
-{% endif %}
+Engineering Department</a>
+{% if game.level < 40 %}(not accessible at your team skill level){% endif %}
+</li>
 
 </ul>
 
