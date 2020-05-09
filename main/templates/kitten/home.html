@@ -24,4 +24,20 @@
 {% endfor %}
 </ul>
 <p><a href="{% url 'team' %}">New team</a></p>
+
+{% if request.user.networks %}
+<h3>My networks</h3>
+<ul>
+{% for network in request.user.networks.all %}
+
+	<li><a href="{% url 'network' network.id %}">{{ network.name }}</a>
+	&nbsp;&nbsp;<a href="{% url 'network_delete' network.id %}">Delete</a></li>
+
+{% endfor %}
+</ul>
+{% endif %}
+{% if user.is_superuser %}
+<p><a href="{% url 'network_new' %}">New network</a>
+{% endif %}
+
 {% endblock%}

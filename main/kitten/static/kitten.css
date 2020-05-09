@@ -17,13 +17,18 @@ table {
 	border-style: none;
 }
 
-.errorlist {
+.errorlist, .errormsg {
 	color: red;
 }
 
 .station {
 	font-weight: bold;
 }
+
+div.masthead {
+	background-color: gold;
+}
+
 
 div.location {
 	justify-content: space-between;
