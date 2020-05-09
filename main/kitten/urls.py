@@ -86,5 +86,4 @@ urlpatterns = [
     url(r'linetemplate/(?P<linetemplate_id>[0-9]+)/linelocation/'
         r'(?P<linelocation_id>[0-9]+)',
         views.linelocation, name='linelocation'),
-
 ]

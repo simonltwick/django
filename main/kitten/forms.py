@@ -3,7 +3,7 @@ from django.forms import modelformset_factory
 import logging
 
 from .models import Game, TeamInvitation, Team, GameInvitation, User, \
-    Network, Line, LineTemplate, LineLocation
+    Network, Line, LineTemplate, PlaceTemplate
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -99,5 +99,7 @@ class LineTemplateForm(forms.ModelForm):
                   'trains_dir2', 'train_interval', 'train_type')
 
 
-LineLocationFormSet = modelformset_factory(LineLocation,
-                                           fields=("name",))
+PlaceTemplateFormSet = modelformset_factory(
+    PlaceTemplate, fields=("name", 'type', 'transit_delay',
+                           'turnaround_percent_direction1',
+                           'turnaround_percent_direction2'))

@@ -8,10 +8,10 @@ from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
 from .models import Game, Team, GameTemplate, Line, Network, \
     GameInterval, Incident, TeamInvitation, GameInvitation, LineTemplate, \
-    GameTemplate
+    GameTemplate, PlaceTemplate
 from .forms import GameForm, TeamInvitationForm, InvitationAcceptanceForm, \
     GameInvitationForm, GameInvitationAcceptanceForm, NewGameForm, \
-    LineTemplateForm
+    LineTemplateForm, PlaceTemplateFormSet
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -120,43 +120,70 @@ def linetemplate(request, network_id, linetemplate_id=None):
 
     if linetemplate_id is not None:
         linetemplate = get_object_or_404(LineTemplate, pk=linetemplate_id)
+    else:
+        linetemplate = None
+
+    # 4 options: Post or Get with/without existing line template
     if request.method == 'POST':
         if network_id != request.POST.get('network_id'):
             return HttpResponse("Invalid network.", status=401)
 
-        if linetemplate_id is not None:
+        if linetemplate_id is None:
+            # linetemplate_id is None: returning a new LineTemplate
+            form = LineTemplateForm(request.POST)
+            formset = PlaceTemplateFormSet(request.POST)
+            if form.is_valid():
+                form.instance.network_id = network_id
+                linetemplate = form.save(commit=False)  # get id assigned
+
+        else:  # returning an existing linetemplate
             if linetemplate_id != request.POST.get('linetemplate_id'):
+                log.error("views.linetemplate(network_id=%r, linetemplate_id"
+                          "=%r) retrieved POST[linetemplate_id]=%r",
+                          network_id, linetemplate_id,
+                          request.POST.get('linetemplate_id'))
                 return HttpResponse("Invalid line template.", status=401)
 
             form = LineTemplateForm(request.POST, instance=linetemplate)
-            if not LineTemplate.objects.filter(
-                    pk=linetemplate_id, network_id=network_id).exists():
-                return HttpResponse("Unauthorised line location.", status=401)
+            formset = PlaceTemplateFormSet(request.POST)
 
-        else:  # linetemplate_id is None: new LineTemplate
-            form = LineTemplateForm(request.POST)
-            linetemplate = None
-        if form.is_valid():
-            form.instance.network_id = network_id
+        if form.is_valid() and formset.is_valid():
             form.save()
+            for pos, place_form in enumerate(formset):
+                place_form.instance.line_id = linetemplate.id
+                place_form.instance.position = pos
+            if len(formset):
+                # ensure turnaround at end of line
+                formset[0].instance.turnaround_percent_direction1 = 100
+                formset[-1].instance.turnaround_percent_direction2 = 100
+                formset.save()
 
-        else:  # get (for update) with linetemplate_id
-            if linetemplate.network_id != network_id:
-                return HttpResponse("Invalid network.", status=401)
-            form = LineTemplateForm(instance=linetemplate)
-
-    else:  # no linetemplate id - new linelocation
-        assert linetemplate_id, "GET request with no linetemplate_id"
+    elif linetemplate_id is None:
+        # Get with no linetemplate id - new linelocation
+        form = LineTemplateForm()
+        formset = PlaceTemplateFormSet(queryset=PlaceTemplate.objects.none())
+    else:  # get (for update) with linetemplate_id
+        if linetemplate.network_id != int(network_id):
+            log.error("views.linetemplate(network_id=%r, linetemplate_id=%s)"
+                      "retrieved linetemplate.network_id=%r", network_id,
+                      linetemplate_id, linetemplate.network_id)
+            return HttpResponse("Invalid network.", status=401)
         form = LineTemplateForm(instance=linetemplate)
+        formset = PlaceTemplateFormSet(
+            queryset=PlaceTemplate.objects.filter(line=linetemplate))
 
     return render(request, 'kitten/linetemplate_form.html',
-                  context={'form': form, 'network_id': network_id,
+                  context={'form': form, 'formset': formset,
+                           'network_id': network_id,
                            'linetemplate': linetemplate})
 
 
 class LineTemplateDelete(LoginRequiredMixin, DeleteView):
     model = LineTemplate
-    success_url = reverse_lazy('home')
+
+    def get_success_url(self):
+        return reverse_lazy('network',
+                            kwargs={'pk': self.object.network.id})
 
 
 def linelocation(request, linetemplate_id, linelocation_id=None):

@@ -14,7 +14,7 @@
 {% load breadcrumb %}
 > {% breadcrumb_url "Network" 'network' network_id %}
 {% if linetemplate %}
-> {% breadcrumb_url "Line Template" 'linetemplate' linetemplate.id %}
+> {% breadcrumb_url "Line Template" 'linetemplate' network_id linetemplate.id %}
 {% else %}
 > {% breadcrumb_url "New Line Template" 'linetemplate' network_id %}
 {% endif %}
@@ -30,35 +30,23 @@
 {% endif %}
 
 <form method="post"
-	action="{% url 'linetemplate' network_id linetemplate.id %}">
+    {% if linetemplate %}
+	action="{% url 'linetemplate' network_id linetemplate.id %}"
+	{% else %}
+	action="{% url 'linetemplate' network_id %}"
+	{% endif %}
+	>
 	{% csrf_token %}
 	<input type="hidden" name="network_id" value="{{ network_id }}">
-	<input type="hidden" name="linelocation_id" value="{{ linelocation.id }}">
+	<input type="hidden" name="linetemplate_id" value="{{ linetemplate.id }}">
 	{{ form.as_p }}
 	<p>First, enter the details of your line and save it.  Then, you can add
 	line locations, and playable levels</p>
-	<input type="submit" value="Save">
+
+	<h3>Line Locations:</h3><!-- line teamplates in the network -->
+	{{ formset }}
+	<p><input type="submit" value="Save"></p>
 </form>
 
-{% if linetemplate %}
-	<p>Line Locations:</p><!-- line teamplates in the network -->
-	<ul>
-	{% for loc in linetemplate.network.places.all %}
-	
-		<li><a href="{% url 'linelocation' linetemplate.id loc.id %}">{{ line.name }}</a>
-		&nbsp;&nbsp;
-		<a href="{% url 'linelocation_delete' loc.id %}">Remove</a>
-		</li>
-	
-		{% empty %}
-		<li class="errormsg">You must add one or more line locations to the line
-		</li>
-
-	{% endfor %}
-	</ul>
-	<p><a href="{% url 'linelocation' linetemplate.id %}">Add line location
-	</a></p>
-
-{% endif %} <!-- linetemplate -->
 
 {% endblock %}
