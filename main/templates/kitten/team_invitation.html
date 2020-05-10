@@ -2,7 +2,7 @@
 
 
 {% block title %}
-	Invite Members
+	Invite Team Members -
 {% endblock %}
 
 
@@ -17,11 +17,13 @@
 
 <form method="post">
 	{% csrf_token %}
-	{{ form.as_p }}
+	<table class="table">
+	{{ form }}
+	</table>
 	<p>The person you invite will see the invitation next time they visit, and
 	must enter the password to accept the invitation.</p>
 	<p>The invitation will expire in 14 days.</p>
-	<input type="submit" value="Invite">
+	<input class= "btn btn-primary" type="submit" value="Invite">
 </form>
 
 
