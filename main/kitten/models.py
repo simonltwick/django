@@ -3,10 +3,12 @@ import datetime
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django.core.validators import MaxValueValidator
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django import forms
 from enum import IntEnum
 import logging
 import random
@@ -715,14 +717,15 @@ class PlaceTemplate(models.Model, LocationType):
     line = models.ForeignKey(LineTemplate, related_name='places',
                              on_delete=models.CASCADE)
     transit_delay = models.IntegerField(
-        default=1, help_text='Wait time at stations or depots')
+        default=1, help_text='time to travel along lines; wait time at '
+        'stations or depots')
     turnaround_percent_direction1 = models.PositiveSmallIntegerField(
-        default=0)
+        default=0, validators=[MaxValueValidator(100)])
     turnaround_percent_direction2 = models.PositiveSmallIntegerField(
-        default=0)
+        default=0, validators=[MaxValueValidator(100)])
 
     class Meta:
-        unique_together = (('line', 'position'))
+        ordering = ('position',)
 
     def display_type(self):
         return (self.name if self.name else

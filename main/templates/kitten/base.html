@@ -2,6 +2,8 @@
 <html lang="en">
 {% load static %}
 <head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/png" sizes="32x32"
 	href="{% static 'favicon-32x32.png' %}">
@@ -13,8 +15,12 @@
     ref: https://www.w3.org/StyleSheets/Core/Overview.html 
     <link rel="stylesheet" href="https://www.w3.org/StyleSheets/Core/Steely"
     type="text/css"> -->
-    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
-    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+    	integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu"
+    	crossorigin="anonymous">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap-theme.min.css"
+    	integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ"
+    	crossorigin="anonymous">
     <link rel="stylesheet" href="{% static 'kitten.css' %}" type="text/css">
 
     <title>{% block title %}{% if game %}{{game.name}} -{% endif %}
@@ -29,35 +35,36 @@
 <p><strong>🚂🚃🚃🚃🐱 KITTEN ON THE LINE &#x1f682;&#x1f683;🚃🚃&#x1f431;</strong></p>
 {% endblock %}
 
-
 {% load breadcrumb %}
+<nav>
 <small>
-{% breadcrumb_url 'Home' 'home' %}
+<ol class="breadcrumb">
+<li>{% breadcrumb_url 'Home' 'home' %}</li>
 {% if team_id %}
-> {% breadcrumb_url 'Team' 'team_games' team_id %}
+<li>{% breadcrumb_url 'Team' 'team_games' team_id %}
 {% elif team.id %}
-> {% breadcrumb_url 'Team' 'team_games' team.id %}
+<li>{% breadcrumb_url 'Team' 'team_games' team.id %}
 {% endif %}
-
-
 {% block breadcrumbs %}
 {% endblock %}
-
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
 {% if user.is_superuser %}
-&nbsp;&nbsp;{% breadcrumb_url 'Admin' 'admin:index' %}
+<li>{% breadcrumb_url 'Admin' 'admin:index' %}</li>
 {% endif %}
 
-&nbsp;&nbsp;
+
 {% block help %}
-<a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/" target="_blank">
-Help</a> 
+<li><a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/" target="_blank">
+Help</a></li> 
 {% endblock %}
 
 
 {% if user.is_authenticated %}
-&nbsp;&nbsp;{% breadcrumb_url 'Logout' 'logout' %}
+<li>{% breadcrumb_url 'Logout' 'logout' %}</li>
 {% endif %}
+</ol>
 </small>
+</nav>
 </div>
 
 

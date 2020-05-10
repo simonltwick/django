@@ -15,6 +15,7 @@ admin.site.register(Impact)
 admin.site.register(IncidentType)
 admin.site.register(Response)
 admin.site.register(TeamInvitation)
+admin.site.register(PlaceTemplate)
 
 
 """class UserInline(admin.TabularInline):

@@ -147,21 +147,45 @@ def linetemplate(request, network_id, linetemplate_id=None):
             form = LineTemplateForm(request.POST, instance=linetemplate)
             formset = PlaceTemplateFormSet(request.POST)
 
+        formset.is_valid()  # force clean of data, prior to validating order
+        positions = []
+        for place_form in formset:
+            if place_form.cleaned_data:
+                try:
+                    pos = int(place_form.cleaned_data['ORDER'])
+                except (ValueError, TypeError):
+                    place_form.add_error('ORDER', 'Order must be a number')
+                    continue
+                if pos in positions:
+                    place_form.add_error('ORDER', 'Duplicate value for Order')
+                else:
+                    positions.append(pos)
+
         if form.is_valid() and formset.is_valid():
             form.save()
-            for pos, place_form in enumerate(formset):
-                place_form.instance.line_id = linetemplate.id
-                place_form.instance.position = pos
+            for place_form in formset:
+                if place_form.cleaned_data:  # keyerror if blank form
+                    place_form.instance.line_id = linetemplate.id
+                    place_form.instance.position = place_form.cleaned_data[
+                        'ORDER']
             if len(formset):
-                # ensure turnaround at end of line
-                formset[0].instance.turnaround_percent_direction1 = 100
-                formset[-1].instance.turnaround_percent_direction2 = 100
-                formset.save()
+                # decided not to ensure turnaround at end of line, confusing
+                # to user: leave it to Line.new_from_template
+                r = formset.save()
+            next_url = request.GET.get('next', None)
+            if next_url:
+                return HttpResponseRedirect(next_url)
+                # refresh formset to action deletions & reordering
+            formset = PlaceTemplateFormSet(
+                queryset=PlaceTemplate.objects.filter(line=linetemplate))
 
     elif linetemplate_id is None:
         # Get with no linetemplate id - new linelocation
         form = LineTemplateForm()
-        formset = PlaceTemplateFormSet(queryset=PlaceTemplate.objects.none())
+        formset = PlaceTemplateFormSet(
+            queryset=PlaceTemplate.objects.none(),
+            initial=[{'name': f"Depot{i}", 'type': PlaceTemplate.DEPOT}
+                     for i in range(1, 3)])
     else:  # get (for update) with linetemplate_id
         if linetemplate.network_id != int(network_id):
             log.error("views.linetemplate(network_id=%r, linetemplate_id=%s)"

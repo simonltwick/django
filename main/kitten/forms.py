@@ -100,6 +100,16 @@ class LineTemplateForm(forms.ModelForm):
 
 
 PlaceTemplateFormSet = modelformset_factory(
-    PlaceTemplate, fields=("name", 'type', 'transit_delay',
-                           'turnaround_percent_direction1',
-                           'turnaround_percent_direction2'))
+    PlaceTemplate,
+    fields=("name", 'type', 'transit_delay',
+            'turnaround_percent_direction1', 'turnaround_percent_direction2'),
+    min_num=3, validate_min=True,
+    can_order=True, can_delete=True,
+    widgets={
+        'turnaround_percent_direction1': forms.NumberInput(
+            attrs={'class': 'small-int'}),
+        'turnaround_percent_direction2': forms.NumberInput(
+            attrs={'class': 'small-int'}),
+        'transit_delay': forms.NumberInput(attrs={'class': 'small-int'}),
+        'ORDER': forms.NumberInput(attrs={'class': 'small-int'})
+        })
