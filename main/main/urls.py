@@ -24,9 +24,7 @@ from django.contrib.auth import views as auth_views
 urlpatterns = [
     url(r'^admin/', admin.site.urls, name='admin'),
     url(r'^kitten/', include('kitten.urls'), name='kitten'),
-    url(r'^kittenontheline/', include('kitten.urls')),
     url(r'^$', RedirectView.as_view(url='kitten/', permanent=False)),
-    url(r'^kotl/?$', RedirectView.as_view(url='/kitten/', permanent=False)),
     url(r'^accounts/login/$', auth_views.LoginView.as_view()),
     url('^', include('django.contrib.auth.urls')),
     # static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

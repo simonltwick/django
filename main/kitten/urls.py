@@ -77,9 +77,12 @@ urlpatterns = [
         views.LineTemplateDelete.as_view(), name='linetemplate_delete'),
 
     url(r'network/(?P<network_id>[0-9]+)/gametemplate/new',
-        views.GameTemplateNew.as_view(), name='gametemplate_new'),
-    url(r'gametemplate/(?P<pk>[0-9]+)', views.GameTemplateUpdate.as_view(),
+        views.GameTemplateNew.as_view(), name='gametemplate'),
+    url(r'network/(?P<network_id>[0-9]+)/gametemplate/(?P<pk>[0-9]+)',
+        views.GameTemplateUpdate.as_view(),
         name='gametemplate'),
+    url(r'gametemplate/(?P<pk>[0-9]+)/delete',
+        views.GameTemplateDelete.as_view(), name='gametemplate_delete'),
 
     url(r'linetemplate/(?P<linetemplate_id>[0-9]+)/linelocation/new',
         views.linelocation, name='linelocation'),

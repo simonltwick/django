@@ -159,14 +159,18 @@ class GameTemplate(models.Model, GameLevel):
                                 on_delete=models.CASCADE)
     level = models.IntegerField(choices=GameLevel.CHOICES)
     incident_rate = models.PositiveSmallIntegerField(
-        default=100, help_text="average rate of incidents, with 100 generating"
-        "1 incident per tick of the clock")
+        default=50, help_text="average rate of incidents, with 100 generating"
+        " 1 incident per tick of the clock, across the network")
 
     class Meta:
         unique_together = (('network', 'level'))
 
     def __str__(self):
-        return f'{self.get_level_display()} game on {self.network}'
+        return f'{self.get_level_display()} game template on {self.network}'
+
+    def get_absolute_url(self):
+        return reverse('gametemplate', kwargs={'network_id': self.network_id,
+                                                'pk': self.id})
 
 
 # ----- Incident Types and responses -----
@@ -447,11 +451,20 @@ class LineTemplate(models.Model):
     network = models.ForeignKey(Network, related_name='lines',
                                 on_delete=models.CASCADE)
     name = models.CharField(max_length=40, default='')
-    direction1 = models.CharField(max_length=20, default='Up')
-    direction2 = models.CharField(max_length=20, default='Down')
-    trains_dir1 = models.IntegerField(default=3)
-    trains_dir2 = models.IntegerField(default=3)
-    train_interval = models.IntegerField(default=10)
+    direction1 = models.CharField(max_length=20, default='Up',
+                                  help_text="for example, Westbound, "
+                                  "Northbound, Clockwise")
+    direction2 = models.CharField(max_length=20, default='Down',
+                                  help_text="for the opposite direction")
+    trains_dir1 = models.IntegerField(default=3,
+                                      verbose_name="Number of trains starting"
+                                      " in direction1")
+    trains_dir2 = models.IntegerField(default=3,
+                                      verbose_name="Number of trains starting"
+                                      " in direction2")
+    train_interval = models.IntegerField(default=10,
+                                         verbose_name="Interval between trains"
+                                         " starting")
     train_type = models.CharField(max_length=20, default='Train')
     # line style / colour
     # train icon

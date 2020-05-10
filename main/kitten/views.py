@@ -219,20 +219,57 @@ class GameTemplateNew(LoginRequiredMixin, CreateView):
     model = GameTemplate
     fields = ('level', 'incident_rate')
 
+    def dispatch(self, request, *args, **kwargs):
+        if not Network.objects.filter(pk=kwargs['network_id'],
+                                      owner=request.user).exists():
+            return HttpResponse("Unauthorised network", status=401)
+        if 'gametemplate_id' in kwargs:
+            if not Network.objects.filter(games=kwargs['gametemplate_id'],
+                                          pk=kwargs['network_id']).exists():
+                return HttpResponse("Unauthorised game template", status=401)
+        return super(CreateView, self).dispatch(request, *args, *kwargs)
+
     def form_valid(self, form):
         obj = form.save(commit=False)
-        obj.network_id = self.kwargs('network_id')
+        obj.network_id = self.kwargs['network_id']
         return super(GameTemplateNew, self).form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['network_id'] = self.kwargs['network_id']
+        return context
 
 
 class GameTemplateUpdate(LoginRequiredMixin, UpdateView):
     model = GameTemplate
     fields = ('level', 'incident_rate')
 
+    def dispatch(self, request, *args, **kwargs):
+        if not Network.objects.filter(pk=kwargs['network_id'],
+                                      owner=request.user).exists():
+            return HttpResponse("Unauthorised network", status=401)
+        if 'gametemplate_id' in kwargs:
+            if not Network.objects.filter(games=kwargs['gametemplate_id'],
+                                          pk=kwargs['network_id']).exists():
+                return HttpResponse("Unauthorised game template", status=401)
+        return super(UpdateView, self).dispatch(request, *args, *kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['network_id'] = self.kwargs['network_id']
+        return context
+
+    def get_success_url(self):
+        return reverse('network',
+                       kwargs={'pk': self.object.network_id})
+
 
 class GameTemplateDelete(LoginRequiredMixin, DeleteView):
     model = GameTemplate
-    success_url = reverse_lazy('home')
+
+    def get_success_url(self):
+        return reverse_lazy('network',
+                            kwargs={'pk': self.object.network.id})
 
 
 @login_required
