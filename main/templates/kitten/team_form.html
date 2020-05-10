@@ -29,11 +29,12 @@
 {% endif %}
 
 <form method="post">
+<table class="table">
 	{% csrf_token %}
-	{{ form.as_p }}
+	{{ form }}
 	{% if team %}
-	<p>Skill level: {{ team.get_level_display }}</p>
-	<p>Members:</p>
+	<tr><th>Skill level:</th><td>{{ team.get_level_display }}</td></tr>
+	<tr><th>Members:</th><td>
 	<ul>
 	{% for member in team.members.all %}
 
@@ -44,9 +45,8 @@
 	{% empty %}
 	<li>No team members!</li>
 	{% endfor %}
-	</ul>
-	<p><a href="{% url 'team_invitation_new' team.id %}">Invitations</a>
-	to join this team:</p>
+	</ul></td></tr>
+	<tr><th>Invitations	to join this team:</th><td>
 	<ul>
 	{% for invitation in team.invitations.all %}
 	
@@ -59,12 +59,17 @@
 	<li>(none)</li>
 	{% endfor %}
 	</ul>
-	{% endif %}
+	<a href="{% url 'team_invitation_new' team.id %}">New invitation</a>
+	</td></tr>
+	{% endif %} <!-- if team -->
+</table>
+	<p>
 	{% if team %}
-	<p><a href="{% url 'team_games' team.id %}">Games</a>
-	&nbsp;&nbsp;<a href="{% url 'team_delete' team.id %}">Delete</a></p>
+	<a href="{% url 'team_games' team.id %}">Games</a>
+	</p><p>
+	<a class="btn btn-danger" href="{% url 'team_delete' team.id %}">Delete</a>
 	{% endif %}
-	<input type="submit" value="Save">
+	<input class="btn btn-primary" type="submit" value="Save"></p>
 </form>
 
 
