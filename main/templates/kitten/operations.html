@@ -19,7 +19,8 @@
 <h4>{{ line.name }}</h4>
 
 <table class="no-border">
-<tr><td class="no-border">
+<tbody class="no-border">
+<tr class="no-border"><td class="border">
 {% if details.0 %}  <!-- details.0 are place details -->
 <h4>Train status</h4>
 <table>
@@ -50,7 +51,7 @@
 {% endfor %}  <!-- line locations -->
 </table>
 
-</td><td class="no-border">
+</td><td class=border>
 
 <h4>Incident status</h4><small>
 {% for incident in details.1 %}  <!-- details.1 is incidents -->
@@ -62,7 +63,7 @@
 No incidents to report.
 
 {% endfor %}
-</small></td></tr></table>
+</small></td></tr></tbody></table>
 
 <p>{{ line.punctuality_display }}</p>
 {% endif %} <!-- places -->
