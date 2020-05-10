@@ -12,7 +12,7 @@ Confirm Delete for {{ team.name }} -
 {% block content %}
 
 <h1>Confirm delete for {{ team.name }}</h1>
-	<p>This team will be deleted for all members:</p>
+	<p class="errormsg">This team will be deleted for all members:</p>
 	<ul>
 
 	{% for member in team.members.all %}
@@ -37,7 +37,7 @@ these games:</p>
 <form method="post">
 	{% csrf_token %}
 	{{ form.as_p }}
-	<p><a class="btn" href="{% url 'home' %}">Cancel</a>
+	<p><a class="btn btn-default" href="{% url 'home' %}">Cancel</a>
 	<input type="submit" class="btn btn-danger" value="Delete">
 </form>
 
