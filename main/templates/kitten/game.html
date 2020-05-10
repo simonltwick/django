@@ -6,9 +6,9 @@
 {% endblock %}
 
 {% block content %}
-<h1>Game Suite - {{ game.name }}</h1>
+<h1>Gaming Suite - {{ game.name }}</h1>
 
-<p>Here are the details of your game.</p>
+<p>Here are the areas of your game.</p>
 <ul>
 
 <li><a href="{% url 'game_boardroom' team_id game.id %}">Boardroom</a>
@@ -36,18 +36,25 @@ Marketing Department</a>
 Engineering Department</a>
 {% if game.level < 40 %}(not accessible at your team skill level){% endif %}
 </li>
-
 </ul>
 
+<p><a class="btn btn-danger" href="{% url 'game_delete' team_id game.id %}">
+Delete</a>
+<a class="btn btn-success" href="{% url 'game_play' team_id game.id %}">Play!
+</a></p>
+
 <h3>Game settings (common to all teams):</h3>
+<table class="table">
 <form method="POST" class="post-form"
 	action="{% url 'game' team_id game.id %}">
 	{% csrf_token %}
     {{ form }}
-    <input type="submit" class="save btn btn-default" value="Update">
+    <tr><td></td>
+    <td><input type="submit" class="btn btn-default" value="Update"></td></tr>
 </form>
 
-<p>Teams:</p>
+<tr><th>Teams:</th>
+<td>
 <ul>{% for participant in game.teams.all %}
 
 <li>{{ participant.name }}
@@ -61,21 +68,20 @@ Engineering Department</a>
 {% if game.invitations %}
 {% for invitation in game.invitations.all %}
 
-<li>Invited: {{ invitation.invited_team.name }}
-</li>
+<li>Invited: {{ invitation.invited_team.name }}</li>
 
 {% endfor %}
 {% endif %}
-
-<li><a class="btn btn-default"
-	href="{% url 'game_invitation_new' team_id game.id %}">Invite another team</a>
-	</li>
 </ul>
 
-   <p>Network name: {{ game.network_name }}. 
-   Game level: {{game.get_level_display}}</p>
-<a class="button" href="{% url 'game_play' team_id game.id %}">Play</a>
-&nbsp;&nbsp;
-<a class="button" href="{% url 'game_delete' team_id game.id %}">Delete</a>
+<p><a class="btn btn-default"
+	href="{% url 'game_invitation_new' team_id game.id %}">
+	Invite another team</a>
+	</p>
+</td></tr>
+<tr><th>Network name:</th><td>{{ game.network_name }}</td></tr>
+<tr><th>Game level:</th><td>{{game.get_level_display}}</td></tr>
+</table>
+
 
 {% endblock %}
