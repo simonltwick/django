@@ -70,3 +70,29 @@ div.location {
 .small-int {  /* input fields */
 	width: 6ch;
 }
+
+/* Style the list */
+ul.kitten-breadcrumb {
+  padding: 10px 16px;
+  list-style: none;
+}
+
+/* Display list items side by side */
+ul.kitten-breadcrumb li {
+  display: inline;
+  font-size: 14px;
+}
+
+/* Add a slash symbol (/) before/behind each list item */
+ul.kitten-breadcrumb li+li:before {
+  padding: 8px;
+  color: black;
+  content: "/\00a0";
+}
+
+/* Add a color on mouse-over */
+ul.kitten-breadcrumb li a:hover {
+  color: #01447e;
+  text-decoration: underline;
+}
+
