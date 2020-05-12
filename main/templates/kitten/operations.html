@@ -17,15 +17,14 @@
 <h2>Line Status on {{ game.current_time|date:"D, g:i a" }}</h2>
 {% for line, details in details.items %}
 <h4>{{ line.name }}</h4>
-
-<table class="no-border">
-<tbody class="no-border">
-<tr class="no-border"><td class="border">
+<div class="row">
+<div class="col">
 {% if details.0 %}  <!-- details.0 are place details -->
 <h4>Train status</h4>
-<table>
+<table class="table table-striped">
+<thead class="thead-dark">
 <tr><th>{{ line.direction1 }}</th><th>Location</th>
-<th>{{ line.direction2 }}</th></tr>
+<th>{{ line.direction2 }}</th></tr></thead>
 {% for trains_dir1, location, trains_dir2 in details.0 %}
 
 <tr>
@@ -50,12 +49,12 @@
 
 {% endfor %}  <!-- line locations -->
 </table>
+</div>  <!-- end of col for line status -->
+<div class="col">
 
-</td><td class=border>
 
 <h4>Incident status</h4><small>
 {% for incident in details.1 %}  <!-- details.1 is incidents -->
-
 <a href="{% url 'incident' team.id game.id incident.id %}"
 	>{{ incident.html|safe }}</a><br>
 
@@ -63,7 +62,9 @@
 No incidents to report.
 
 {% endfor %}
-</small></td></tr></tbody></table>
+</small>
+</div> <!-- end of col for incidents -->
+</div> <!-- end of row -->
 
 <p>{{ line.punctuality_display }}</p>
 {% endif %} <!-- places -->
@@ -73,6 +74,12 @@ No incidents to report.
 {% endfor %}  <!-- lines -->
 
 <a href="{% url 'game_tick' team.id game.id %}">Tick</a>&nbsp;&nbsp;
+<a href="{% url 'game_debug' team.id game.id 1 %}">Debug 1(add an incident)
+</a>&nbsp;&nbsp;
+<a href="{% url 'game_debug' team.id game.id 2 %}">Debug 2(clear incidents)
+</a>&nbsp;&nbsp;
+<a href="{% url 'game_debug' team.id game.id 3 %}">Debug 3(update trains)
+</a>&nbsp;&nbsp;
 <a href="{% url 'game_incidents_clear' team.id game.id %}">Clear Incidents</a>
 
 {% if lines_other_op %}

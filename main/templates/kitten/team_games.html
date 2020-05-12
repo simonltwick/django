@@ -15,7 +15,8 @@
 <h1>Team Base - {{ team.name }}</h1>
 <p>{{ team.description }}</p>
 <p>Skill level: {{ team.get_level_display }}</p>
-<p><a class="btn btn-default" href="{% url 'team' team.id %}">Update team details</a>
+<p><a class="btn btn-secondary" href="{% url 'team' team.id %}">
+Update team details</a>
 <h2>Members</h2>
 
 <ul>{% for user in team.members.all %}
@@ -35,7 +36,7 @@
 	 to join this team have been sent.
 </li>
 </ul>
-<p><a class="btn btn-default" href="{% url 'team_invitation_new' team.id %}">
+<p><a class="btn btn-secondary" href="{% url 'team_invitation_new' team.id %}">
 Invite new members</a></p>
 <h2>Games</h2>
 <ul>
@@ -60,6 +61,6 @@ started {{ game.started }}, last played {{ game.last_played}}
 {% endif %}
 
 
-<p><a class="btn btn-default" href="{% url 'game' team.id %}">New game</a></p>
+<p><a class="btn btn-success" href="{% url 'game' team.id %}">New game</a></p>
 
 {% endblock %}

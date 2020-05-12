@@ -50,7 +50,7 @@ Delete</a>
 	{% csrf_token %}
     {{ form }}
     <tr><td></td>
-    <td><input type="submit" class="btn btn-default" value="Update"></td></tr>
+    <td><input type="submit" class="btn btn-secondary" value="Update"></td></tr>
 </form>
 
 <tr><th>Teams:</th>
@@ -74,7 +74,7 @@ Delete</a>
 {% endif %}
 </ul>
 
-<p><a class="btn btn-default"
+<p><a class="btn btn-secondary"
 	href="{% url 'game_invitation_new' team_id game.id %}">
 	Invite another team</a>
 	</p>

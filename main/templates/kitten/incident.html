@@ -96,4 +96,6 @@ Estimated recovery impacts:
 
 <p>Previous recovery action status:
 	{{ incident.previous_response_status|default:"n/a" }}</p>
+<a href="{% url 'incident_debug' team_id game.id incident.id 1%}">
+debug 1 (incident impacts)</a>
 {% endblock %}

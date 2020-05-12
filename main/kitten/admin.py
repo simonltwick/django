@@ -10,7 +10,6 @@ admin.site.register(Team)
 admin.site.register(LineLocation)
 admin.site.register(Station)
 admin.site.register(Train)
-admin.site.register(Incident)
 admin.site.register(Impact)
 admin.site.register(IncidentType)
 admin.site.register(Response)
@@ -25,6 +24,11 @@ admin.site.register(PlaceTemplate)
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
     inlines = [UserInline]"""
+
+
+@admin.register(Incident)
+class IncidentAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'line', 'location', 'start_time')
 
 
 class LineTemplateInline(admin.TabularInline):

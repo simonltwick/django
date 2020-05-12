@@ -199,10 +199,14 @@ class ImpactNow:
 
     def __add__(self, other):
         if self.type != other.type:
-            raise TypeError(f"cannot add mixed types({self.type} + "
-                            f"{other.type}) of ImpactNow")
-        return ImpactNow(self.blocking or other.blocking,
+            raise TypeError(f"cannot add mixed ImpactNow types({self.type} + "
+                            f"{other.type})")
+        return ImpactNow(self.type, self.blocking or other.blocking,
                          self.amount + other.amount)
+
+    def __str__(self):
+        return (f"ImpactNow(type {self.type}, blocking {self.blocking}, "
+                f"amount {self.amount})")
 
 
 class Impact(models.Model):
@@ -309,10 +313,12 @@ class Game(models.Model, GameLevel):
     def new_from_template(cls, template: GameTemplate, teams: List[Team],
                           **kwargs):
         """ make a new game from GameTemplate, including
+        IncidentTypes from Network
         Lines from game_template.line.line_templates
         LineLocations and Tracks from line_templates.place_templates
         Trains from LineTemplates
         Only one team is required to start a game"""
+        # TODO: creation & linking of IncidentType to Network & Game
         network_name = template.network.name
         game = Game.objects.create(
             network_name=network_name, level=template.level,
@@ -326,7 +332,7 @@ class Game(models.Model, GameLevel):
         game.teams.add(*teams)
         game.incident_types.add(*template.network.incident_types.all())
         line_templates = LineTemplate.objects.filter(network=template.network)
-        operator = teams[0] if game.has_multiple_teams() else None
+        operator = teams[0] if game.level <= GameLevel.BASIC else None
         for line_template in line_templates:
             Line.new_from_template(template=line_template, game=game,
                                    operator=operator)
@@ -360,29 +366,49 @@ class Game(models.Model, GameLevel):
         self.save()
         # update scoreboard
 
+    def debug(self, code):
+        """ various debug codes """
+        line = self.lines.all()[0]
+        # log.info("Debug code %s", code)
+        if code == 1:
+            # generate and place a single incident
+            incident = self.random_incident()
+            if incident is not None:
+                self.place_incident(incident)
+            else:
+                log.warning("game.random_incident() returned None.")
+        elif code == 2:
+            line.try_resolve_incidents()
+        elif code == 3:
+            line.update_trains(self)
+        else:
+            raise ValueError(f"Unrecognised debug code: {code}")
+
     # ----- incident generation ------
     def sprinkle_incidents(self):
         """ generate a random number of incidents at random locations """
         for incident in self.generate_incidents():
             if incident is None:  # if no incident types defined
                 return
+            self.place_incident(incident)
 
-            for _i in range(10):  # try 10 times for an incident-free place
-                incident.location = self.random_place(
-                    incident.type.type)
-                if self.can_place_incident(incident):
-                    break
-            else:
-                log.warning("Unable to find available location for incident: "
-                            f"discarding it")
-                return
+    def place_incident(self, incident):
+        for _i in range(10):  # try 10 times for an incident-free place
+            incident.location = self.random_place(
+                incident.type.type)
+            if self.can_place_incident(incident):
+                break
+        else:
+            log.warning("Unable to find available location for incident: "
+                        f"discarding it")
+            return
 
-            # severity in range 0.5-1.5
-            # TODO: make incident variability (more) customisable
-            incident.severity = 0.5 + random.uniform(
-                1-self.INCIDENT_SEVERITY_VARIATION,
-                1+self.INCIDENT_SEVERITY_VARIATION)
-            incident.occur()
+        # severity in range 0.5-1.5
+        # TODO: make incident variability (more) customisable
+        incident.severity = 0.5 + random.uniform(
+            1-self.INCIDENT_SEVERITY_VARIATION,
+            1+self.INCIDENT_SEVERITY_VARIATION)
+        incident.occur()
 
     def can_place_incident(self, incident):
         """ update the incident location so it knows it has an incident
@@ -398,9 +424,12 @@ class Game(models.Model, GameLevel):
             List[IncidentType], List[int]]:
         """ return (list(IncidentTypes), list(incident_type_percent_chance))
         """
+        log.debug("game.incident_types=%s", self.incident_types.all())
         pairs = ((incident_type, incident_type.likelihood)
                  for incident_type in self.incident_types.all())
         # and transpose into a pair of lists
+        pairs = list(pairs)
+        log.info("incident_type_likelihoods: pairs=%s", pairs)
         return tuple(zip(*pairs))
 
     def random_incident(self):
@@ -1013,7 +1042,7 @@ class Train(models.Model):
         query = Q(location_line_id=self.location_id) | Q(location_train=self)
         incidents = Incident.objects.filter(query).all()
         impacts = sum((incident.impact_now(ImpactType.LINE, current_time)
-                      for incident in incidents), ImpactNow(),)
+                      for incident in incidents), ImpactNow(ImpactType.LINE),)
         if impacts.blocking and game.has_blocking_incidents():
             return impacts.amount + 1
         else:
@@ -1127,7 +1156,7 @@ class Incident(models.Model):
     def html(self):
         """ return html version """
         classes = 'incident'
-        if self.response.id is None:
+        if self.response_id is None:
             classes += ' incident-open'
         else:
             classes += ' incident-responding'
@@ -1144,6 +1173,7 @@ class Incident(models.Model):
         self.save()
         self.impacts.add(*self.type.impacts.all())
         log.warning("%s: %s at %s", hhmm(self.start_time), self, self.location)
+        log.info("Incident impacts: %s", self.impacts.all())
 
     def start_response(self, response_id):
         response = Response.objects.get(id=response_id)
@@ -1196,13 +1226,16 @@ class Incident(models.Model):
         The impact is the sum of the incident impact and any response impact"""
         filtered_impacts = self.impacts.filter(type=impact_type).all()
         is_initial_impact = current_time == self.start_time
-        impact_now = sum(filtered_impacts.impact_now(is_initial_impact),
-                         ImpactNow(type=impact_type))
+        impact_now = sum((impact.impact_now(is_initial_impact)
+                          for impact in filtered_impacts),
+                         ImpactNow(impact_type))
         if self.response:
             filtered_response_impacts = self.response.impacts.filter(
                 type=impact_type).all()
             is_initial_impact = current_time == self.response_start_time
             impact_now = sum(
-                filtered_response_impacts.impact_now(is_initial_impact),
+                (impact.impact_now(is_initial_impact)
+                 for impact in
+                 filtered_response_impacts.impact_now(is_initial_impact)),
                 impact_now)
         return impact_now

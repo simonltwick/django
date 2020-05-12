@@ -52,7 +52,10 @@ urlpatterns = [
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/incidents/clear',
         views.game_incidents_clear, name='game_incidents_clear'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/incident'
-        r'/(?P<incident_id>[0-9]+)', views.incident, name='incident'),
+        r'/(?P<incident_id>[0-9]+)$', views.incident, name='incident'),
+    url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/incident'
+        r'/(?P<incident_id>[0-9]+)/debug/(?P<code>[0-9]+)',
+        views.incident_debug, name='incident_debug'),
     url(r'team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/boardroom',
         views.game_boardroom, name='game_boardroom'),
     url(r'team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/marketing',
@@ -61,6 +64,8 @@ urlpatterns = [
         views.game_hr, name='game_hr'),
     url(r'team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/engineering',
         views.game_engineering, name='game_engineering'),
+    url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/debug/'
+        '(?P<code>[0-9]+)', views.game_debug, name='game_debug'),
 
     url(r'network/new', views.NetworkNew.as_view(), name='network_new'),
     url(r'network/(?P<pk>[0-9]+)$', views.NetworkUpdate.as_view(),

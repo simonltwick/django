@@ -406,6 +406,21 @@ def game(request, game_id, team_id):
 
 
 @login_required
+def game_debug(request, game_id, team_id, code):
+    """ various debug options for game """
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
+        return HttpResponse('Unauthorized game', status=401)
+    # log.info("game.debug(%r)", code)
+    code = int(code)
+    game = get_object_or_404(Game, pk=game_id)
+    game.debug(code)
+    return HttpResponseRedirect(reverse(
+        'game_operations', kwargs={'team_id': team_id, 'game_id': game_id}))
+
+
+@login_required
 def game_invitation_new(request, game_id, team_id):
     """ invite another team to join game """
     if not is_team_member(request, team_id):
@@ -612,7 +627,7 @@ def incident(request, team_id, game_id, incident_id):
         return HttpResponse("Unauthorised team", status=401)
     try:
         game = Game.objects.get(id=game_id, teams=team_id)
-    except Incident.DoesNotExist:
+    except Game.DoesNotExist:
         return HttpResponse('Unauthorised game', status=401)
     incident = get_object_or_404(Incident, id=incident_id, line__game=game)
 
@@ -633,6 +648,38 @@ def incident(request, team_id, game_id, incident_id):
                    'incident': incident,
                    'response': incident.response,
                    'errors': errors})
+
+
+@login_required
+def incident_debug(request, team_id, game_id, incident_id, code):
+    """ various debug actions for an incident """
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    try:
+        game = Game.objects.get(id=game_id, teams=team_id)
+    except Game.DoesNotExist:
+        return HttpResponse('Unauthorised game', status=401)
+    incident = get_object_or_404(Incident, id=incident_id, line__game=game)
+
+    log.info("incident_debug(code=%r)", code)
+    code = int(code)
+    if code == 1:
+        impacts = [(impact.name,
+                    impact.impact_now(game.current_time))
+                   for impact in incident.impacts.all()]
+        impacts = [(name, str(impact)) for name, impact in impacts]
+        log.info("incident.impacts=%s", impacts)
+        impact_types = {impact.type for impact in incident.impacts.all()}
+        impacts_by_type = [
+            (impact_type, incident.impact_now(impact_type, game.current_time))
+            for impact_type in impact_types]
+        impacts_by_type = [(t, str(impact)) for t, impact in impacts_by_type]
+        log.info("incident.impact_now()=%s", impacts_by_type)
+    else:
+        raise ValueError(f"incident_debug: invalid code {code!r}")
+    return HttpResponseRedirect(reverse(
+        'incident', kwargs={'team_id': team_id, 'game_id': game_id,
+                            'incident_id': incident_id}))
 
 
 @login_required
