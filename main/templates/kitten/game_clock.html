@@ -1,0 +1,17 @@
+{# panel for inclusion in other game pages. expects game, GamePlayStatus and next_url to be set #}
+<div class="card">
+  <div class="card-header">
+    Network time: {{ game.current_time|date:"D, g:i a" }}
+  </div>
+  <div class="card-body">
+    Status: {{ game.get_play_status_display }}.&nbsp;&nbsp;
+
+    {% if game.play_status == GamePlayStatus.RUNNING %}
+      <a href="{% url 'game_pause' team_id game.id %}?next={{ next_url }}"
+      class="btn btn-warning">Pause</a>
+    {% else %}
+      <a href="{% url 'game_play' team_id game.id %}?next={{ next_url }}"
+      class="btn btn-success">Play</a>
+    {% endif %}
+  </div>
+</div>

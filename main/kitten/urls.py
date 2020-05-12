@@ -43,6 +43,8 @@ urlpatterns = [
         views.game_team_remove, name='game_team_remove'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/play',
         views.game_play, name='game_play'),
+    url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/pause',
+        views.game_pause, name='game_pause'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/operations',
         views.game_operations, name='game_operations'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/scheduling',
@@ -51,6 +53,7 @@ urlpatterns = [
         views.game_tick, name='game_tick'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/incidents/clear',
         views.game_incidents_clear, name='game_incidents_clear'),
+
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/incident'
         r'/(?P<incident_id>[0-9]+)$', views.incident, name='incident'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/incident'

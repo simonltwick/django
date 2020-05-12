@@ -1,5 +1,4 @@
 {% extends 'kitten/base.html' %}
-
 {% block breadcrumbs %}
 {% load breadcrumb %}
 > {% breadcrumb_url 'Game' 'game' team_id game.id %}
@@ -7,6 +6,15 @@
 
 {% block content %}
 <h1>Gaming Suite - {{ game.name }}</h1>
+
+<div class="row container">
+
+<div class="col-sm-4">
+<!-- game clock & status display -->
+{% url 'game' team_id game.id as next_url%}
+{% include 'kitten/game_clock.html' %}
+</div>
+<div class="col-sm-8">
 
 <p>Here are the areas of your game.</p>
 <ul>
@@ -38,10 +46,9 @@ Engineering Department</a>
 </li>
 </ul>
 
-<p><a class="btn btn-danger" href="{% url 'game_delete' team_id game.id %}">
-Delete</a>
-<a class="btn btn-success" href="{% url 'game_play' team_id game.id %}">Play!
-</a></p>
+</div>
+
+</div>
 
 <h3>Game settings (common to all teams):</h3>
 <table class="table">
@@ -81,7 +88,9 @@ Delete</a>
 </td></tr>
 <tr><th>Network name:</th><td>{{ game.network_name }}</td></tr>
 <tr><th>Game level:</th><td>{{game.get_level_display}}</td></tr>
+<tr><th>Delete game:</th><td><a class="btn btn-danger"
+  href="{% url 'game_delete' team_id game.id %}">
+Delete Game</a>
+</td></tr>
 </table>
-
-
 {% endblock %}

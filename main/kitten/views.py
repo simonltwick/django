@@ -8,7 +8,7 @@ from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
 from .models import Game, Team, GameTemplate, Line, Network, \
     GameInterval, Incident, TeamInvitation, GameInvitation, LineTemplate, \
-    GameTemplate, PlaceTemplate
+    GameTemplate, PlaceTemplate, GamePlayStatus
 from .forms import GameForm, TeamInvitationForm, InvitationAcceptanceForm, \
     GameInvitationForm, GameInvitationAcceptanceForm, NewGameForm, \
     LineTemplateForm, PlaceTemplateFormSet
@@ -402,7 +402,8 @@ def game(request, game_id, team_id):
         form = GameForm(instance=game)
     GameInvitation.remove_expired()
     return render(request, 'kitten/game.html',
-                  {'form': form, 'game': game, "team_id": team_id})
+                  {'form': form, 'game': game, "team_id": team_id,
+                   'GamePlayStatus': GamePlayStatus})
 
 
 @login_required
@@ -515,8 +516,28 @@ def game_play(request, game_id, team_id):
         return HttpResponse("Unauthorised team", status=401)
     if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=401)
+    game = get_object_or_404(Game, pk=game_id)
+    game.play_status = GamePlayStatus.RUNNING
+    game.save()
+    if 'next' in request.GET:
+        return HttpResponseRedirect(request.GET['next'])
     return HttpResponse("Play game not yet implemented.  Go to Operations"
                         " and press Tick to get an idea...")
+
+
+@login_required
+def game_pause(request, game_id, team_id):
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=401)
+    if not game_has_team(team_id, game_id):
+        return HttpResponse('Unauthorized game', status=401)
+    game = get_object_or_404(Game, pk=game_id)
+    game.play_status = GamePlayStatus.PAUSED
+    game.save()
+    if 'next' in request.GET:
+        return HttpResponseRedirect(request.GET['next'])
+    return HttpResponse("Play/pause game not yet implemented.  Go to "
+                        "Operations and press Tick to get an idea...")
 
 
 @login_required

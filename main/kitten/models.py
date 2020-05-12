@@ -118,7 +118,7 @@ class Network(models.Model):
     # font
     # logo
     TICK_STAGE = datetime.timedelta(minutes=30)
-    TICK_SINGLE = datetime.timedelta(seconds=60)
+    TICK_SINGLE = datetime.timedelta(minutes=5)
     name = models.CharField(max_length=40, unique=True)
     description = models.CharField(max_length=300)
     created = models.DateField(auto_now_add=True)
@@ -128,6 +128,7 @@ class Network(models.Model):
     day_start_time = models.TimeField(default=datetime.time(hour=6))
     day_end_time = models.TimeField(default=datetime.time(hour=22))
     game_round_duration = models.DurationField(default=TICK_STAGE)
+    game_tick_interval = models.DurationField(default=TICK_SINGLE)
     # lines = reverse FK (to LineTemplate)
     # levels = reverse FK (to GameTemplate)
     # incident_types= reverse FK
@@ -147,6 +148,10 @@ class Network(models.Model):
         return reverse('network', args=[str(self.id)])
 
     def clean(self):
+        # game_round_duration must be a multiple of tick_interval
+        if self.game_round_duration % self.game_tick_interval:
+            raise ValidationError("Game round duration must be a multiple of"
+                                  "game tick interval.")
         # Networks must have at least one LineTemplate.
         # BUT can't add Lines until network has been saved!
         return
@@ -280,6 +285,16 @@ class GameInterval(IntEnum):
     MAX_TICKS_PER_ROUND = 20
 
 
+class GamePlayStatus:
+    BETWEEN_DAYS = 0
+    BETWEEN_STAGES = 1
+    PAUSED = 2
+    RUNNING = 3
+    CHOICES = ((BETWEEN_DAYS, 'Between days'),
+               (BETWEEN_STAGES, 'Between stages'),
+               (PAUSED, 'Paused'), (RUNNING, 'Running'))
+
+
 class Game(models.Model, GameLevel):
     INCIDENT_LIMIT = 1  # per place
     INCIDENT_SEVERITY_VARIATION = 0.5  # in range  +/- variation
@@ -302,6 +317,8 @@ class Game(models.Model, GameLevel):
     game_round_duration = models.DurationField(default=Network.TICK_STAGE)
     tick_interval = models.DurationField(default=Network.TICK_SINGLE)
     delay = models.PositiveIntegerField(default=0)
+    play_status = models.PositiveSmallIntegerField(
+        choices=GamePlayStatus.CHOICES, default=GamePlayStatus.BETWEEN_DAYS)
 
     class meta:
         unique_together = [['name', 'team']]
@@ -319,19 +336,22 @@ class Game(models.Model, GameLevel):
         Trains from LineTemplates
         Only one team is required to start a game"""
         # TODO: creation & linking of IncidentType to Network & Game
-        network_name = template.network.name
+        network = template.network
+        network_name = network.name
         game = Game.objects.create(
-            network_name=network_name, level=template.level,
-            day_start_time=template.network.day_start_time,
-            day_end_time=template.network.day_end_time,
-            game_round_duration=template.network.game_round_duration,
+            day_start_time=network.day_start_time,
+            day_end_time=network.day_end_time,
+            game_round_duration=network.game_round_duration,
+            tick_interval=network.game_tick_interval,
             current_time=datetime.datetime.combine(
-                datetime.date.today(), template.network.day_start_time),
+                datetime.date.today(), network.day_start_time),
+            network_name=network_name,
+            level=template.level,
             incident_rate=template.incident_rate,
             **kwargs)
         game.teams.add(*teams)
-        game.incident_types.add(*template.network.incident_types.all())
-        line_templates = LineTemplate.objects.filter(network=template.network)
+        game.incident_types.add(*network.incident_types.all())
+        line_templates = LineTemplate.objects.filter(network=network)
         operator = teams[0] if game.level <= GameLevel.BASIC else None
         for line_template in line_templates:
             Line.new_from_template(template=line_template, game=game,
@@ -399,8 +419,8 @@ class Game(models.Model, GameLevel):
             if self.can_place_incident(incident):
                 break
         else:
-            log.warning("Unable to find available location for incident: "
-                        f"discarding it")
+            log.warning("Unable to find available location for %s: "
+                        f"discarding it", incident)
             return
 
         # severity in range 0.5-1.5
@@ -414,6 +434,9 @@ class Game(models.Model, GameLevel):
         """ update the incident location so it knows it has an incident
         Return False if there is already an incident there
         Currently only limits number of Incidents on Trains"""
+        if incident.location is None:
+            # no locations of this type
+            return False
         if isinstance(incident.location, Train):
             if incident.location.incidents.count() >= self.INCIDENT_LIMIT:
                 return False  # already has an incident
@@ -443,8 +466,10 @@ class Game(models.Model, GameLevel):
 
     def random_place(self, place_type):
         """ find a place at random.  Place type could be station, line or train
+        Return None if there are no places of this type
         """
-        return random.choice(self.places[place_type])
+        if self.places[place_type]:
+            return random.choice(self.places[place_type])
 
     @cached_property
     def places(self):
@@ -1008,6 +1033,7 @@ class Train(models.Model):
            waited transit_time since we arrived,
            (or the last train departed from a depot) we can move """
         incident_delay = self.calculate_incident_delay(game)
+        log.info("%s delayed %d due to incidents", self, incident_delay)
         if self.location.last_train_time is not None and (
             game.current_time < self.location.last_train_time + (
                 (self.location.transit_delay + incident_delay) *
@@ -1043,7 +1069,8 @@ class Train(models.Model):
         incidents = Incident.objects.filter(query).all()
         impacts = sum((incident.impact_now(ImpactType.LINE, current_time)
                       for incident in incidents), ImpactNow(ImpactType.LINE),)
-        if impacts.blocking and game.has_blocking_incidents():
+        log.info("calculate_incident_delay: impacts=%s", impacts)
+        if impacts.blocking and not game.has_blocking_incidents():
             return impacts.amount + 1
         else:
             return impacts.amount
@@ -1229,13 +1256,16 @@ class Incident(models.Model):
         impact_now = sum((impact.impact_now(is_initial_impact)
                           for impact in filtered_impacts),
                          ImpactNow(impact_type))
+        log.info('%s.impact_now(%s)->incident impact=%s', self, impact_type,
+                 impact_now)
         if self.response:
             filtered_response_impacts = self.response.impacts.filter(
                 type=impact_type).all()
             is_initial_impact = current_time == self.response_start_time
             impact_now = sum(
                 (impact.impact_now(is_initial_impact)
-                 for impact in
-                 filtered_response_impacts.impact_now(is_initial_impact)),
+                 for impact in filtered_response_impacts),
                 impact_now)
+            log.info('%s.impact_now(%s)->incident+response impact=%s', self,
+                     impact_type, impact_now)
         return impact_now
