@@ -37,11 +37,15 @@
 	<tr><th>Members:</th><td>
 	<ul>
 	{% for member in team.members.all %}
+<<<<<<< HEAD
 
 		<li>{{ member.username }}
 		<a href="{% url 'team_member_remove' team.id member.id %}">
 		Remove</a></li>
 
+=======
+		<li>{{ member.username }}</li>
+>>>>>>> e691b3008340b802f5b1ecbd2d679d095a83dbd3
 	{% empty %}
 	<li>No team members!</li>
 	{% endfor %}

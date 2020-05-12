@@ -18,6 +18,7 @@ urlpatterns = [
     url(r'^team/(?P<team_id>[0-9]+)/games$', views.team_games,
         name='team_games'),
 
+<<<<<<< HEAD
     url(r'^team/(?P<team_id>[0-9]+)/invitation/new$',
         views.team_invitation_new, name='team_invitation_new'),
     url(r'^team/(?P<team_id>[0-9]+)/invitation/'
@@ -30,6 +31,10 @@ urlpatterns = [
 
     url(r'^game/(?P<team_id>[0-9]+)$', views.game_new, name='game'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)$', views.game,
+=======
+    url(r'^game/(?P<team_id>[0-9]+)$', views.game_new, name='game'),
+    url(r'^game/(?P<game_id>[0-9]+)/(?P<team_id>[0-9]+)$', views.game,
+>>>>>>> e691b3008340b802f5b1ecbd2d679d095a83dbd3
         name='game'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/delete',
         views.game_delete, name='game_delete'),

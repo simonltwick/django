@@ -75,6 +75,11 @@ class TeamNew(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.save()
         form.instance.members.add(self.request.user)
+<<<<<<< HEAD
+=======
+        log.info("TeamNew.form_valid(): instance==%s, members=%s", form.instance,
+            form.instance.members.all())
+>>>>>>> e691b3008340b802f5b1ecbd2d679d095a83dbd3
         return super().form_valid(form)
 
 
