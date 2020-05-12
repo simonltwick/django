@@ -1,0 +1,45 @@
+{% extends 'bike/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
+{% endblock %}
+
+{% block content %}
+{% load static %}
+<h1>Welcome to Bike</h1>
+<p>Welcome, {{ request.user.username }}.</p>
+<p><a href="{% url 'ride_new' %}" class="btn btn-primary">Record a Ride</a></p>
+<h3>Bikes</h3>
+
+{% for bike in user.bikes.all %}
+{% if forloop.first %}
+<ul>
+{% endif %}
+
+<li><a href="{% url 'bike' bike.id %}">{{ bike.name }}</a></li>
+
+{% if forloop.last %}
+</ul>
+{% endif %}
+{% empty %}
+<p>No bikes found :-(</p>
+{% endfor %}
+
+<p><a class="btn btn-success" href="{% url 'bike_new' %}">New bike</a></p>
+
+{% for activity in request.user.maint_activities.all %}
+{% if forloop.first %}
+<h3>Maintenance Activities</h3>
+<ul>
+{% endif %}
+
+	<li><a href="{% url 'maint_activity' activity.id %}">{{ activity.name }}</a>
+	</li>
+
+{% if forloop.last %}
+</ul>
+{% endif %}
+{% endfor %}
+
+{% endblock%}

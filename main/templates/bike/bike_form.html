@@ -1,0 +1,15 @@
+{% extends 'bike/base.html' %}
+
+
+{% block content %}
+<h1>Bike details:</h1>
+<form method='POST'>
+<table class="table">
+{{ form }}
+{% csrf_token %}
+</table>
+<input type="submit" class="btn btn-secondary" value="Apply">
+<input type="submit" class="btn btn-primary" value="OK"
+   formaction="{% url 'bike' bike.id %}?next={% url 'home' %}">
+</form>
+{% endblock %}
