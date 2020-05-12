@@ -41,7 +41,6 @@
     	</title>
 </head>
 <body>
-<<<<<<< HEAD
 <div class="container-fluid masthead">
 
 <!-- <div class="masthead">  -->
@@ -74,27 +73,6 @@
     {% if user.is_superuser %}
     <li>{% breadcrumb_url 'Admin' 'admin:index' %}</li>
     {% endif %}
-=======
-
-
-{% block banner %}
-<p><strong>🚂🚃🚃🚃🐱 KITTEN ON THE LINE &#x1f682;&#x1f683;🚃🚃&#x1f431;</strong></p>
-{% endblock %}
-
-
-{% load breadcrumb %}
-<small>
-{% breadcrumb_url 'Home' 'home' %}
-{% if team_id %}
-> {% breadcrumb_url 'Team' 'team_games' team_id %}
-{% elif team.id %}
-> {% breadcrumb_url 'Team' 'team_games' team.id %}
-{% endif %}
-
-
-{% block breadcrumbs %}
-{% endblock %}
->>>>>>> e691b3008340b802f5b1ecbd2d679d095a83dbd3
 
     {% if user.is_authenticated %}
     <li>{% breadcrumb_url 'Logout' 'logout' %}</li>
@@ -107,15 +85,12 @@
 </div>
 
 
-<<<<<<< HEAD
 <div class="container">
-=======
 
 {% if user.is_authenticated %}
 &nbsp;&nbsp;{% breadcrumb_url 'Logout' 'logout' %}
 {% endif %}
 </small>
->>>>>>> e691b3008340b802f5b1ecbd2d679d095a83dbd3
 
 
 {% block content %}
