@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, AccessMixin
 # from django.contrib.auth.models import User
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy, reverse
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
@@ -484,7 +484,7 @@ def game_invitation_accept(request, team_id, invitation_id):
 @login_required
 def game_team_remove(request, game_id, team_id, remove_team_id):
     if not Team.objects.filter(games=game_id, members=request.user).exists():
-        return HttpResponse('Unauthorized game', status=401)
+        return HttpResponse('Unauthorized game', status=403)
     game_inst = get_object_or_404(Game, id=game_id)
     if not Game.objects.filter(id=game_id, teams=remove_team_id).exists():
         return HttpResponse(f'Team is not a participant in {game_inst.name}',
@@ -504,18 +504,18 @@ def game_team_remove(request, game_id, team_id, remove_team_id):
 @login_required
 def game_delete(request, game_id, team_id):
     if not is_team_member(request, team_id):
-        return HttpResponse("Unauthorised team", status=401)
+        return HttpResponse("Unauthorised team", status=403)
     if not game_has_team(team_id, game_id):
-        return HttpResponse('Unauthorized game', status=401)
+        return HttpResponse('Unauthorized game', status=403)
     return HttpResponse("Delete game not yet implemented.")
 
 
 @login_required
 def game_play(request, game_id, team_id):
     if not is_team_member(request, team_id):
-        return HttpResponse("Unauthorised team", status=401)
+        return HttpResponse("Unauthorised team", status=403)
     if not game_has_team(team_id, game_id):
-        return HttpResponse('Unauthorized game', status=401)
+        return HttpResponse('Unauthorized game', status=403)
     game = get_object_or_404(Game, pk=game_id)
     game.play_status = GamePlayStatus.RUNNING
     game.save()
@@ -528,9 +528,9 @@ def game_play(request, game_id, team_id):
 @login_required
 def game_pause(request, game_id, team_id):
     if not is_team_member(request, team_id):
-        return HttpResponse("Unauthorised team", status=401)
+        return HttpResponse("Unauthorised team", status=403)
     if not game_has_team(team_id, game_id):
-        return HttpResponse('Unauthorized game', status=401)
+        return HttpResponse('Unauthorized game', status=403)
     game = get_object_or_404(Game, pk=game_id)
     game.play_status = GamePlayStatus.PAUSED
     game.save()
@@ -553,12 +553,30 @@ def game_tick(request, game_id, team_id):
 
 
 @login_required
+def game_status(request, game_id, team_id, status=None):
+    """ query or change game play status.
+    returns a Json response {"status": a string with status,
+                             "teams": an optional list of teams relevant to the
+                             status above}   """
+    if not is_team_member(request, team_id):
+        return HttpResponse("Unauthorised team", status=403)
+    if not game_has_team(team_id, game_id):
+        return HttpResponse('Unauthorized game', status=403)
+    game = get_object_or_404(Game, pk=game_id)
+    try:
+        status = game.request_play_status(team_id, status)
+    except (ValueError, KeyError) as e:
+            return HttpResponse(e.args[0], status=400)
+    return JsonResponse(status)
+
+
+@login_required
 def game_operations(request, game_id, team_id, tick_interval=None):
     if not is_user_in_team_in_game(request, team_id, game_id):
         if not is_team_member(request, team_id):
-            return HttpResponse("Unauthorised team", status=401)
+            return HttpResponse("Unauthorised team", status=403)
         if not game_has_team(team_id, game_id):
-            return HttpResponse('Unauthorized game', status=401)
+            return HttpResponse('Unauthorized game', status=403)
     team = get_object_or_404(Team, pk=team_id)
     game = get_object_or_404(Game, pk=game_id)
     if tick_interval is not None:

@@ -49,36 +49,38 @@
   <h3 class="text-center pt-4">🚂🚃🚃🚃🐱 KITTEN ON THE LINE &#x1f682;&#x1f683;🚃🚃&#x1f431;</h3>
   {% endblock %}
   <div class="row container">
+  
     <div class="col-md-6">
     {% load breadcrumb %}
-    <ul class="kitten-breadcrumb">
-    <li>{% breadcrumb_url 'Home' 'home' %}</li>
-    {% if team_id %}
-    <li>{% breadcrumb_url 'Team' 'team_games' team_id %}
-    {% elif team.id %}
-    <li>{% breadcrumb_url 'Team' 'team_games' team.id %}
-    {% endif %}
-    {% block breadcrumbs %}
-    {% endblock %}
-    </li>
-    <eul>
-    </div>
-    <div class="col-md-6">
-    <ul class="kitten-breadcrumb text-right">
-    {% block help %}
-    <li><a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/" target="_blank">
-    Help</a></li>
-    {% endblock %}
+    <nav><ul class="kitten-breadcrumb">
+    
+      <li>{% breadcrumb_url 'Home' 'home' %}</li>
+      {% if team_id %}
+      <li>{% breadcrumb_url 'Team' 'team_games' team_id %}
+      {% elif team.id %}
+      <li>{% breadcrumb_url 'Team' 'team_games' team.id %}
+      {% endif %}
+      {% block breadcrumbs %}
+      {% endblock %}
+      </li>
 
-    {% if user.is_superuser %}
-    <li>{% breadcrumb_url 'Admin' 'admin:index' %}</li>
-    {% endif %}
+    </ul></nav></div>
+    <div class="col-md-6"><nav><ul class="kitten-breadcrumb text-right">
 
-    {% if user.is_authenticated %}
-    <li>{% breadcrumb_url 'Logout' 'logout' %}</li>
-    {% endif %}
-    </ul>
-    </div>
+      {% block help %}
+      <li><a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/" target="_blank">
+      Help</a></li>
+      {% endblock %}
+
+      {% if user.is_superuser %}
+      <li>{% breadcrumb_url 'Admin' 'admin:index' %}</li>
+      {% endif %}
+
+      {% if user.is_authenticated %}
+      <li>{% breadcrumb_url 'Logout' 'logout' %}</li>
+      {% endif %}
+
+    </ul></nav></div>
 
   </div>
 </div>

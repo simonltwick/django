@@ -285,14 +285,25 @@ class GameInterval(IntEnum):
     MAX_TICKS_PER_ROUND = 20
 
 
-class GamePlayStatus:
+class GamePlayStatus(IntEnum):
     BETWEEN_DAYS = 0
     BETWEEN_STAGES = 1
     PAUSED = 2
     RUNNING = 3
-    CHOICES = ((BETWEEN_DAYS, 'Between days'),
-               (BETWEEN_STAGES, 'Between stages'),
-               (PAUSED, 'Paused'), (RUNNING, 'Running'))
+    PLAY_REQUESTED = 4
+    PAUSE_REQUESTED = 5
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
+
+    @classmethod
+    def get(cls, value):
+        """ return the member corresponding to value, which could be a name or
+        a value """
+        if isinstance(value, str):
+            return cls[value]  # by name: may raise KeyError
+        return cls(value)  # by value: may raise ValueError
 
 
 class Game(models.Model, GameLevel):
@@ -318,13 +329,16 @@ class Game(models.Model, GameLevel):
     tick_interval = models.DurationField(default=Network.TICK_SINGLE)
     delay = models.PositiveIntegerField(default=0)
     play_status = models.PositiveSmallIntegerField(
-        choices=GamePlayStatus.CHOICES, default=GamePlayStatus.BETWEEN_DAYS)
+        choices=GamePlayStatus.choices(), default=GamePlayStatus.BETWEEN_DAYS)
 
     class meta:
         unique_together = [['name', 'team']]
 
     def __str__(self):
         return self.name if self.name else f'[untitled#{self.id}]'
+
+    def get_play_status_label(self):
+        return GamePlayStatus(self.play_status).name.title().replace('_', ' ')
 
     @classmethod
     def new_from_template(cls, template: GameTemplate, teams: List[Team],
@@ -335,7 +349,6 @@ class Game(models.Model, GameLevel):
         LineLocations and Tracks from line_templates.place_templates
         Trains from LineTemplates
         Only one team is required to start a game"""
-        # TODO: creation & linking of IncidentType to Network & Game
         network = template.network
         network_name = network.name
         game = Game.objects.create(
@@ -374,6 +387,20 @@ class Game(models.Model, GameLevel):
         for _t in range(num_ticks - 1):
             self.tick(save=False)
         self.tick(save=save)
+
+    def request_play_status(self, team, status=None):
+        """ handle a request to change the play status from a team.
+        status can either be a GamePlayStatus value or name, or None.
+        returns a dict suitable for a json response:
+        {'status': play_status,
+         'teams': List[team.name]}
+         teams is only provided for certain game status values, when awaiting
+         confirmation from some teams for a status change.
+        """
+        if status is not None:
+            # may raise a ValueError for invalid status
+            self.play_status = GamePlayStatus.get(status)
+        return {'status': self.get_play_status_label()}
 
     def tick(self, save=False):
         """ run the game for one tick of the clock """

@@ -1,11 +1,20 @@
 {# panel for inclusion in other game pages. expects game, GamePlayStatus and next_url to be set #}
+{% load static %}
+<script type="application/javascript">
+var query_url = "{% url 'game_status' team_id game.id %}";
+</script>
+<script async src="{% static 'game_clock.js' %}" type="application/javascript">
+</script>
+
 <div class="card">
   <div class="card-header">
     Network time: {{ game.current_time|date:"D, g:i a" }}
   </div>
   <div class="card-body">
-    Status: {{ game.get_play_status_display }}.&nbsp;&nbsp;
-
+    <p id="game-status">Querying status...</p>
+    <p id="game-clock-status"></p>
+    <button id="game-control" type="button" disabled class="btn">
+      Querying status...</button>
     {% if game.play_status == GamePlayStatus.RUNNING %}
       <a href="{% url 'game_pause' team_id game.id %}?next={{ next_url }}"
       class="btn btn-warning">Pause</a>
