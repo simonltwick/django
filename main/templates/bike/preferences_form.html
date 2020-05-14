@@ -2,20 +2,18 @@
 
 
 {% block content %}
-<h1>Bike details:</h1>
+<h1>Units preferences for {{ request.user.username }}</h1>
 <form method='POST'>
 <table class="table">
 {{ form }}
 {% csrf_token %}
 </table>
+{% if preferences %}
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
-   {% if bike %}
-   formaction="{% url 'bike' bike.id %}?next={% url 'home' %}">
-	<a href="{% url 'bike_delete' bike.id %}" class="btn btn-danger">Delete</a>
-   {% else %}
-   formaction="{% url 'bike' %}?next={% url 'home' %}">
-   {% endif %}
+   formaction="{% url 'preferences' preferences.pk %}?next={% url 'home' %}">
+{% else %}
+<input type="submit" class="btn btn-primary" value="Save">
+{% endif %}
 </form>
- 
 {% endblock %}

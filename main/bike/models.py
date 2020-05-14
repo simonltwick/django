@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 
 
 class Bike(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='bikes')
     description = models.CharField(max_length=200)
@@ -15,6 +15,7 @@ class Bike(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class DistanceUnits:
     MILES = 10
@@ -26,7 +27,7 @@ class DistanceMixin(models.Model):
     distance = models.DecimalField(max_digits=7, decimal_places=2,
                                    null=True, blank=True)
     distance_units = models.PositiveSmallIntegerField(
-        choices=DistanceUnits.CHOICES)
+        choices=DistanceUnits.CHOICES, default=DistanceUnits.MILES)
 
     class Meta:
         abstract = True
@@ -38,6 +39,24 @@ class AscentUnits:
     CHOICES = ((METRES, 'm'), (FEET, 'Ft'))
 
 
+class Preferences(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE,
+                                primary_key=True, related_name='preferences')
+    distance_units = models.PositiveSmallIntegerField(
+        choices=DistanceUnits.CHOICES, default=DistanceUnits.MILES)
+    ascent_units = models.PositiveSmallIntegerField(
+        choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
+
+    class Meta:
+        verbose_name_plural = 'preferences'
+
+    def get_absolute_url(self):
+        return reverse('preferences', kwargs={'pk': self.pk})
+
+    def __str__(self):
+        return f"Preferences for {self.user.username}"
+
+
 class Ride(DistanceMixin):
     rider = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='rides')
@@ -46,7 +65,7 @@ class Ride(DistanceMixin):
     ascent = models.DecimalField(max_digits=7, decimal_places=2,
                                  null=True, blank=True)
     ascent_units = models.PositiveSmallIntegerField(
-        choices=AscentUnits.CHOICES)
+        choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
     bike = models.ForeignKey(Bike, on_delete=models.SET_NULL, null=True,
                              blank=True, related_name='rides')
 
@@ -74,16 +93,20 @@ class IntervalUnits:
 
 
 class ComponentType(models.Model):
-    type = models.CharField(max_length=100)
+    type = models.CharField(max_length=100, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='component_types')
     description = models.CharField(max_length=200)
     subtype_of = models.ForeignKey('ComponentType', related_name='subtypes',
-                                   on_delete=models.PROTECT)
+                                   on_delete=models.PROTECT,
+                                   blank=True, null=True)
     # fk maintenance schedule
     maintenance_interval = models.PositiveIntegerField(null=True, blank=True)
     maint_interval_units = models.PositiveSmallIntegerField(
         choices=IntervalUnits.CHOICES)
+
+    def __str__(self):
+        return f"Component Type: {self.type}"
 
 
 class Component(models.Model):
@@ -94,14 +117,19 @@ class Component(models.Model):
     name = models.CharField(max_length=100)
     type = models.ForeignKey(ComponentType, on_delete=models.PROTECT)
     specification = models.CharField(max_length=200)
-    subcomponent_of = models.ForeignKey('Component', related_name='components',
-                                        on_delete=models.PROTECT)
+    subcomponent_of = models.ForeignKey(
+        'Component', related_name='components', on_delete=models.PROTECT,
+        null=True, blank=True,
+        help_text="leave blank if this is a direct subcomponent of a bike")
     # fk maintenance history
     # fk component history
     # fk subcomponent history
     date_acquired = models.DateField(default=date.today, null=True, blank=True)
     supplier = models.CharField(max_length=200)
     notes = models.CharField(max_length=400)
+
+    def get_absolute_url(self):
+        return reverse('component', kwargs={'pk': self.id})
 
 
 class MaintenanceSchedule(models.Model):

@@ -1,6 +1,16 @@
 {% extends 'bike/base.html' %}
 
 
+{% block breadcrumbs %}
+{% load breadcrumb %}
+{% if ride %}
+> {% breadcrumb_url 'Ride' 'ride' ride.id %}
+{% else %}
+> {% breadcrumb_url 'New Ride' 'ride_new' %}
+{% endif %}
+{% endblock %}
+
+
 {% block content %}
 <h1>Ride details:</h1>
 <form method='POST'>
@@ -13,7 +23,7 @@
 	{% if ride %}
     formaction="{% url 'ride' ride.id %}?next={% url 'home' %}"
     {% else %}
-    formaction="{% url 'ride' %}?next={% url 'home' %}"
+    formaction="{% url 'ride_new' %}?next={% url 'home' %}"
     {% endif %}>
 </form>
 {% endblock %}

@@ -9,10 +9,17 @@
 {% load static %}
 <h1>Welcome to Bike</h1>
 <p>Welcome, {{ request.user.username }}.</p>
+
+{% if not preferences_set %}
+  <h3>Please set your preferences</h3>
+  <p><a href="{% url 'preferences_new' %}" class="btn btn-primary">
+  Set Preferences</a></p>
+{% endif %}
+
 <p><a href="{% url 'ride_new' %}" class="btn btn-primary">Record a Ride</a></p>
 <h3>Bikes</h3>
 
-{% for bike in user.bikes.all %}
+{% for bike in bikes.all %}
 {% if forloop.first %}
 <ul>
 {% endif %}

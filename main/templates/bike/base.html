@@ -26,9 +26,9 @@
     <link rel="stylesheet" href="{% static 'bike.css' %}" type="text/css">
 
 	<link rel="icon" type="image/png" sizes="32x32"
-		href="{% static 'favicon-32x32.png' %}">
+		href="{% static 'orange-bike-favicon-32x32.png' %}">
 	<link rel="icon" type="image/png" sizes="16x16"
-		href="{% static 'favicon-16x16.png' %}">
+		href="{% static 'orange-bike-favicon-16x16.png' %}">
 
     <title>{% block title %}{% if bike %}{{bike.name}} -{% endif %}
     	{% endblock %}
@@ -41,8 +41,9 @@
 <!-- <div class="masthead">  -->
   
   {% block banner %}
-  <h3 class="text-center pt-4">Bike</h3>
+  <h3 class="text-center pt-4">🚲 🚲 🚲 Bike 🚲 🚲 🚲</h3>
   {% endblock %}
+
   <div class="row container">
     <div class="col-md-6">
     {% load breadcrumb %}
@@ -56,7 +57,7 @@
     {% block breadcrumbs %}
     {% endblock %}
     </li>
-    <eul>
+    </ul>
     </div>
     <div class="col-md-6">
     <ul class="bike-breadcrumb text-right">
@@ -66,7 +67,7 @@
     {% endblock %}
 
     {% if user.is_superuser %}
-    <li>{% breadcrumb_url 'Admin' 'admin:index' %}</li>
+    <li><a href="{% url 'admin:index' %}bike">Admin</a></li>
     {% endif %}
 
     {% if user.is_authenticated %}
