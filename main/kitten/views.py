@@ -553,7 +553,7 @@ def game_tick(request, game_id, team_id):
 
 
 @login_required
-def game_status(request, game_id, team_id, status=None):
+def game_status(request, game_id, team_id):
     """ query or change game play status.
     returns a Json response {"status": a string with status,
                              "teams": an optional list of teams relevant to the
@@ -563,10 +563,17 @@ def game_status(request, game_id, team_id, status=None):
     if not game_has_team(team_id, game_id):
         return HttpResponse('Unauthorized game', status=403)
     game = get_object_or_404(Game, pk=game_id)
+    if request.method != 'POST':
+        return HttpResponse(f"Invalid method: {request.method}", 405)
+
+    status = request.POST.get('status')
+    log.info("views.game_status(status=%r), request.POST=%s", status,
+             request.POST)
     try:
         status = game.request_play_status(team_id, status)
     except (ValueError, KeyError) as e:
-            return HttpResponse(e.args[0], status=400)
+        log.error("%r handling game.request_play_status(%r)", e, status)
+        return HttpResponse(e.args[0], status=400)
     return JsonResponse(status)
 
 

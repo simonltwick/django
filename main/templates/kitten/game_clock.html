@@ -12,15 +12,8 @@ var query_url = "{% url 'game_status' team_id game.id %}";
   </div>
   <div class="card-body">
     <p id="game-status">Querying status...</p>
+    <button id="game-control" type="button" disabled class="btn btn-success">
+    Play</button>
     <p id="game-clock-status"></p>
-    <button id="game-control" type="button" disabled class="btn">
-      Querying status...</button>
-    {% if game.play_status == GamePlayStatus.RUNNING %}
-      <a href="{% url 'game_pause' team_id game.id %}?next={{ next_url }}"
-      class="btn btn-warning">Pause</a>
-    {% else %}
-      <a href="{% url 'game_play' team_id game.id %}?next={{ next_url }}"
-      class="btn btn-success">Play</a>
-    {% endif %}
   </div>
 </div>

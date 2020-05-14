@@ -13,6 +13,9 @@ from enum import IntEnum
 import logging
 import random
 from typing import Dict, List, Optional, Union, Tuple
+
+from .signals import signal_game_start
+
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
@@ -388,7 +391,7 @@ class Game(models.Model, GameLevel):
             self.tick(save=False)
         self.tick(save=save)
 
-    def request_play_status(self, team, status=None):
+    def request_play_status(self, team, req_status=None):
         """ handle a request to change the play status from a team.
         status can either be a GamePlayStatus value or name, or None.
         returns a dict suitable for a json response:
@@ -397,9 +400,17 @@ class Game(models.Model, GameLevel):
          teams is only provided for certain game status values, when awaiting
          confirmation from some teams for a status change.
         """
-        if status is not None:
+        if req_status:  # can be passed req_status = ''
             # may raise a ValueError for invalid status
-            self.play_status = GamePlayStatus.get(status)
+            if req_status == 'Play':
+                signal_game_start.send(self, game=self)
+                new_status = GamePlayStatus.RUNNING
+            elif req_status == 'Pause':
+                new_status = GamePlayStatus.PAUSED
+            else:
+                raise ValueError(
+                    f"Invalid game status requested: {req_status}")
+            self.play_status = new_status
         return {'status': self.get_play_status_label()}
 
     def tick(self, save=False):

@@ -40,14 +40,16 @@
     	Kitten on the Line
     	</title>
 </head>
+
+
 <body>
 <div class="container-fluid masthead">
-
-<!-- <div class="masthead">  -->
   
   {% block banner %}
   <h3 class="text-center pt-4">🚂🚃🚃🚃🐱 KITTEN ON THE LINE &#x1f682;&#x1f683;🚃🚃&#x1f431;</h3>
   {% endblock %}
+
+
   <div class="row container">
   
     <div class="col-md-6">
@@ -65,7 +67,9 @@
       </li>
 
     </ul></nav></div>
-    <div class="col-md-6"><nav><ul class="kitten-breadcrumb text-right">
+    
+    <div class="col-md-6">
+    <nav><ul class="kitten-breadcrumb text-right">
 
       {% block help %}
       <li><a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/" target="_blank">
@@ -87,12 +91,6 @@
 
 
 <div class="container">
-
-{% if user.is_authenticated %}
-&nbsp;&nbsp;{% breadcrumb_url 'Logout' 'logout' %}
-{% endif %}
-</small>
-
 
 {% block content %}
 {% endblock %}
