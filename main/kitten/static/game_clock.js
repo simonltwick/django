@@ -4,11 +4,14 @@
 
 // console.info("game_clock.js loaded");
 var game_status;
+var polling_interval_id = null;
+var game_timestamp = null;
 
 $(document).ready(function(){
 	// console.info("document ready");
-	// $("#game-clock-status").text("script loaded");
 	update_status(null);
+	// keep polling every 30 secs
+	polling_interval_id = setInterval(update_status, 30*1000, null);
   	});
 
 // when game-control button pressed, send the text to the server
@@ -17,18 +20,38 @@ $("#game-control").click(function(){
 });
 
 function update_status(game_status){
-	// console.info("update_status(", game_status, ")");
+	console.info("update_status(", game_status, ")");
 	$.post(query_url, {'status': game_status}, status_callback);
 }
+
+var date_formatter = new Intl.DateTimeFormat('default', 
+		{
+		'weekday': 'short',
+		'hour': 'numeric',
+		'minute': 'numeric',
+		'hour12': true
+		});
 
 function status_callback(data, status){
 	if (status != "success") {
 		$("#game-clock-status").text(status);
 	}
 	else {
-		$("#game-status").text("Status: " + data['status']);
 		game_status = data['status'];
+		$("#game-status").text("Status: " + game_status);
+		console.info("status_callback: game_status=", game_status);
 		update_game_control_button();
+		if (data['game_timestamp'] != game_timestamp) {
+			if (game_timestamp == null) {  // initial update_status
+				game_timestamp = data['game_timestamp'];
+				network_time = new Date(game_timestamp * 1000);  // msec
+				$("#network-time").text("Network time: "
+						+ date_formatter.format(network_time))
+			}
+			else { // game tick has happened.  refresh the page
+				location.reload()
+			}
+		}
 	}
 }
 

@@ -396,7 +396,8 @@ class Game(models.Model, GameLevel):
         status can either be a GamePlayStatus value or name, or None.
         returns a dict suitable for a json response:
         {'status': play_status,
-         'teams': List[team.name]}
+         'teams': List[team.name],
+         'game_timestamp': current_time as an int timestamp}
          teams is only provided for certain game status values, when awaiting
          confirmation from some teams for a status change.
         """
@@ -411,7 +412,8 @@ class Game(models.Model, GameLevel):
                 raise ValueError(
                     f"Invalid game status requested: {req_status}")
             self.play_status = new_status
-        return {'status': self.get_play_status_label()}
+        return {'status': self.get_play_status_label(),
+                'game_timestamp': int(self.current_time.timestamp())}
 
     def tick(self, save=False):
         """ run the game for one tick of the clock """

@@ -8,5 +8,4 @@ class KittenConfig(AppConfig):
     name = 'kitten'
 
     def ready(self):
-        from .signals import game_start_handler  # which registers the handler
-        log.info("apps.KittenConfig.ready()")
+        from . import signals  # which registers the handler

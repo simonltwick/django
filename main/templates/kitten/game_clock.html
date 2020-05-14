@@ -8,7 +8,7 @@ var query_url = "{% url 'game_status' team_id game.id %}";
 
 <div class="card">
   <div class="card-header">
-    Network time: {{ game.current_time|date:"D, g:i a" }}
+    <p id="game_time">Network time: {{ game.current_time|date:"D, g:i a" }}</p>
   </div>
   <div class="card-body">
     <p id="game-status">Querying status...</p>
