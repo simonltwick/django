@@ -5,16 +5,19 @@ from . import views
 urlpatterns = [
     url(r'^$', views.home, name='home'),
 
+    url(r'^rides$', views.rides, name='rides'),
     url(r'^ride/new$', views.RideCreate.as_view(), name='ride_new'),
     url(r'^ride$', views.RideUpdate.as_view(), name='ride'),
     url(r'^ride/(?P<pk>[0-9]+)$', views.RideUpdate.as_view(), name='ride'),
 
+    url(r'^bikes$', views.bikes, name='bikes'),
     url(r'^bike/new$', views.BikeCreate.as_view(), name='bike_new'),
     url(r'^bike$', views.BikeUpdate.as_view(), name='bike'),
     url(r'^bike/(?P<pk>[0-9]+)$', views.BikeUpdate.as_view(), name='bike'),
     url(r'^bike/(?P<pk>[0-9]+)/delete$', views.BikeDelete.as_view(),
         name='bike_delete'),
 
+    url(r'^components$', views.components, name='components'),
     url(r'^component/new$', views.ComponentCreate.as_view(),
         name='component_new'),
     url(r'^component$', views.ComponentUpdate.as_view(), name='component'),
@@ -24,6 +27,11 @@ urlpatterns = [
     url(r'^maint/new$', views.maint, name='maint_new'),
     url(r'^maint$', views.maint, name='maint'),
     url(r'^maint/(?P<pk>[0-9]+)$', views.maint, name='maint'),
+
+
+    url(r'^mileage/new$', views.mileage, name='mileage_new'),
+    url(r'^mileage$', views.mileage, name='mileage'),
+    url(r'^mileage/(?P<pk>[0-9]+)$', views.mileage, name='mileage'),
 
     url(r'^preferences/new$', views.PreferencesCreate.as_view(),
         name='preferences_new'),

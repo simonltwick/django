@@ -10,6 +10,10 @@ ul.bike-breadcrumb {
   list-style: none;
 }
 
+ul.navbar-nav, li.nav-item {
+	display: inline-block;
+}
+
 /* Display list items side by side */
 ul.bike-breadcrumb li {
   display: inline;

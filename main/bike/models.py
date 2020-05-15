@@ -3,6 +3,8 @@ from django.urls import reverse
 from datetime import date
 from django.contrib.auth.models import User
 
+from enum import IntEnum
+
 
 class Bike(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -17,17 +19,20 @@ class Bike(models.Model):
         return self.name
 
 
-class DistanceUnits:
+class DistanceUnits(IntEnum):
     MILES = 10
     KILOMETRES = 20
-    CHOICES = ((MILES, 'Miles'), (KILOMETRES, 'Km'))
+
+    @classmethod
+    def choices(cls):
+        return [(key.value, key.name) for key in cls]
 
 
 class DistanceMixin(models.Model):
     distance = models.DecimalField(max_digits=7, decimal_places=2,
                                    null=True, blank=True)
     distance_units = models.PositiveSmallIntegerField(
-        choices=DistanceUnits.CHOICES, default=DistanceUnits.MILES)
+        choices=DistanceUnits.choices(), default=DistanceUnits.MILES)
 
     class Meta:
         abstract = True
@@ -43,7 +48,7 @@ class Preferences(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE,
                                 primary_key=True, related_name='preferences')
     distance_units = models.PositiveSmallIntegerField(
-        choices=DistanceUnits.CHOICES, default=DistanceUnits.MILES)
+        choices=DistanceUnits.choices(), default=DistanceUnits.MILES)
     ascent_units = models.PositiveSmallIntegerField(
         choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
 

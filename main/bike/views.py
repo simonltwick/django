@@ -1,11 +1,12 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Sum
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse, HttpResponseRedirect
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from .models import Bike, MaintenanceAction, Ride, ComponentType, Component, \
-    Preferences
+    Preferences, DistanceUnits
 import logging
 
 log = logging.getLogger(__name__)
@@ -16,10 +17,26 @@ logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 @login_required
 def home(request):
     preferences_set = Preferences.objects.filter(user=request.user).exists()
-    bikes = request.user.bikes
     return render(request, 'bike/home.html',
-                  context={'preferences_set': preferences_set,
-                           'bikes': bikes})
+                  context={'preferences_set': preferences_set})
+
+
+@login_required
+def bikes(request):
+    bikes = (Bike.objects.values('id', 'name', 'rides__distance_units')
+             .annotate(distance=Sum('rides__distance'))
+             .filter(owner=request.user))
+    # change distance_units into distance
+    bikes = [row for row in bikes.all()]  # QuerySet -> List
+    for row in bikes:
+        if row['rides__distance_units'] is None:
+            row['rides__distance_units'] = ''
+        else:
+            row['rides__distance_units'] = DistanceUnits(
+                row['rides__distance_units']).name.lower() 
+    log.info("bikes=%s", bikes)
+    return render(request, 'bike/bikes.html',
+                  context={'bikes': bikes})
 
 
 class PreferencesCreate(LoginRequiredMixin, CreateView):
@@ -78,6 +95,12 @@ class BikeDelete(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy('home')
 
 
+def components(request):
+    components = Component.objects.filter(owner=request.user).all()
+    return render(request, 'bike/components.html',
+                  context={'components': components})
+
+
 class ComponentCreate(LoginRequiredMixin, CreateView):
     model = Component
     fields = ['name', 'description']
@@ -96,6 +119,11 @@ class ComponentUpdate(LoginRequiredMixin, UpdateView):
         if 'next' in self.request.GET:
             return self.request.GET['next']
         return super(ComponentUpdate, self).get_success_url()
+
+
+def rides(request):
+    rides = Ride.objects.filter(rider=request.user).order_by('-date')[:20]
+    return render(request, 'bike/rides.html', context={'rides': rides})
 
 
 class RideCreate(LoginRequiredMixin, CreateView):
@@ -122,4 +150,13 @@ class RideUpdate(LoginRequiredMixin, UpdateView):
 
 @login_required
 def maint(request, pk=None):
-    return HttpResponse("not yet implemented.")
+    # maintenance activities, maintenance schedule ...
+    return HttpResponse("maintenance activities, maintenance schedule ... "
+                        "not yet implemented.")
+
+
+@login_required
+def mileage(request, pk=None):
+    # odometer and recent mileage stuff for bikes / a bike ...
+    return HttpResponse("odometer and recent mileage stuff for bikes / a bike "
+                        "...not yet implemented.")

@@ -1,0 +1,29 @@
+{% extends 'bike/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
+{% endblock %}
+
+{% block content %}
+{% load static %}
+<h1>Components</h1>
+<p>(by bike, name, type)</p>)
+
+{% for componenent in components.all %}
+{% if forloop.first %}
+<ul>
+{% endif %}
+
+<li><a href="{% url 'component' component.id %}">{{ component.name }}</a></li>
+
+{% if forloop.last %}
+</ul>
+{% endif %}
+{% empty %}
+<p>No components found :-(</p>
+{% endfor %}
+
+<p><a class="btn btn-success" href="{% url 'component_new' %}">New component</a></p>
+
+{% endblock%}

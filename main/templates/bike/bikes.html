@@ -7,18 +7,25 @@
 
 {% block content %}
 {% load static %}
-<h1>Welcome to Bike</h1>
-<p>Welcome, {{ request.user.username }}.</p>
 
-{% if not preferences_set %}
-<h3>Preferences not set</h3>
-<p>Your preferences for distance units have not been set.</p>
-<p>Please <a href="{% url 'preferences_new' %}">set your preferences.</a></p>
+<h1>Bikes</h1>
+<p>(add maint due)</p>
+{% for bike in bikes %}
+{% if forloop.first %}
+<ul>
 {% endif %}
 
+<li><a href="{% url 'bike' bike.id %}">{{ bike.name }}</a>:
+{{ bike.distance|floatformat }} {{ bike.rides__distance_units }}</li>
 
-<button class="btn btn-success" href="{% url 'ride_new' %}">Record a ride</button>
+{% if forloop.last %}
+</ul>
+{% endif %}
+{% empty %}
+<p>No bikes found :-(</p>
+{% endfor %}
 
+<p><a class="btn btn-success" href="{% url 'bike_new' %}">New bike</a></p>
 
 {% for activity in request.user.maint_activities.all %}
 {% if forloop.first %}
