@@ -13,8 +13,18 @@
 
 
 {% block content %}
-<h1>{{ team.name }}: Operations Control Room</h1>
-<h2>Line Status on {{ game.current_time|date:"D, g:i a" }}</h2>
+<div class="row">
+  <div class="col-sm-8">
+  <h1>{{ team.name }}: Operations Control Room</h1>
+  <h2>Line Status on {{ game.current_time|date:"D, g:i a" }}</h2>
+  </div>
+  <div class="col-sm-4">
+  <!-- game clock & status display -->
+  {% url 'game_operations' team.id game.id as next_url%}
+  {% include 'kitten/game_clock.html' %}
+  </div>
+</div>
+
 {% for line, details in details.items %}
 <h4>{{ line.name }}</h4>
 <div class="row">
@@ -76,9 +86,11 @@ No incidents to report.
 <a href="{% url 'game_tick' team.id game.id %}">Tick</a>&nbsp;&nbsp;
 <a href="{% url 'game_debug' team.id game.id 1 %}">Debug 1(add an incident)
 </a>&nbsp;&nbsp;
-<a href="{% url 'game_debug' team.id game.id 2 %}">Debug 2(clear incidents)
+<a href="{% url 'game_debug' team.id game.id 2 %}">Debug 2(try_resolve incidents)
 </a>&nbsp;&nbsp;
 <a href="{% url 'game_debug' team.id game.id 3 %}">Debug 3(update trains)
+</a>&nbsp;&nbsp;
+<a href="{% url 'game_debug' team.id game.id 4 %}">Debug 4(clear incidents)
 </a>&nbsp;&nbsp;
 <a href="{% url 'game_incidents_clear' team.id game.id %}">Clear Incidents</a>
 

@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from .models import Network, Team, LineTemplate, GameTemplate, PlaceTemplate, \
     Game, Line, LineLocation, Station, Train, Incident, Impact, IncidentType, \
-    Response, TeamInvitation
+    Response, TeamInvitation, TeamGameStatus
 
 
 admin.site.register(GameTemplate)
@@ -15,6 +15,7 @@ admin.site.register(IncidentType)
 admin.site.register(Response)
 admin.site.register(TeamInvitation)
 admin.site.register(PlaceTemplate)
+admin.site.register(TeamGameStatus)
 
 
 """class UserInline(admin.TabularInline):

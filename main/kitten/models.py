@@ -8,10 +8,11 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
-from django import forms
 from enum import IntEnum
 import logging
 import random
+import threading
+import time
 from typing import Dict, List, Optional, Union, Tuple
 
 from .signals import signal_game_start
@@ -178,7 +179,7 @@ class GameTemplate(models.Model, GameLevel):
 
     def get_absolute_url(self):
         return reverse('gametemplate', kwargs={'network_id': self.network_id,
-                                                'pk': self.id})
+                                               'pk': self.id})
 
 
 # ----- Incident Types and responses -----
@@ -215,6 +216,9 @@ class ImpactNow:
     def __str__(self):
         return (f"ImpactNow(type {self.type}, blocking {self.blocking}, "
                 f"amount {self.amount})")
+
+    def __bool__(self):
+        return self.blocking or self.amount != 0
 
 
 class Impact(models.Model):
@@ -290,7 +294,7 @@ class GameInterval(IntEnum):
 
 class GamePlayStatus(IntEnum):
     BETWEEN_DAYS = 0
-    BETWEEN_STAGES = 1
+    BETWEEN_ROUNDS = 1
     PAUSED = 2
     RUNNING = 3
     PLAY_REQUESTED = 4
@@ -308,15 +312,20 @@ class GamePlayStatus(IntEnum):
             return cls[value]  # by name: may raise KeyError
         return cls(value)  # by value: may raise ValueError
 
+    def title(self):
+        return self.name.title().replace('_', ' ')
+
 
 class Game(models.Model, GameLevel):
     INCIDENT_LIMIT = 1  # per place
     INCIDENT_SEVERITY_VARIATION = 0.5  # in range  +/- variation
     INCIDENT_RATE = 50
+    DELAY_BETWEEN_TICKS = 10  # seconds
     name = models.CharField(max_length=40)
     started = models.DateField(auto_now_add=True)
     last_played = models.DateField(auto_now=True)
-    teams = models.ManyToManyField(Team, related_name='games')
+    teams = models.ManyToManyField(Team, related_name='games',
+                                   through='TeamGameStatus')
     network_name = models.CharField(max_length=40, help_text="""A network is a
      predefined collection of lines, trains and incident types to base your
      game upon""")
@@ -325,8 +334,12 @@ class Game(models.Model, GameLevel):
         default=INCIDENT_RATE, help_text="average rate of incidents, with 100"
         " generating 1 incident per tick of the clock")
     level = models.IntegerField(choices=GameLevel.CHOICES)
-    day_start_time = models.TimeField(default=datetime.time(hour=6))
-    day_end_time = models.TimeField(default=datetime.time(hour=22))
+    day_start_time = models.TimeField(
+        default=datetime.time(hour=6),
+        help_text="time when daily train operations start, in UTC/GMT time")
+    day_end_time = models.TimeField(
+        default=datetime.time(hour=22),
+        help_text="time when daily train operations end, in UTC/GMT time")
     current_time = models.DateTimeField(auto_now_add=True, null=True)
     game_round_duration = models.DurationField(default=Network.TICK_STAGE)
     tick_interval = models.DurationField(default=Network.TICK_SINGLE)
@@ -340,8 +353,9 @@ class Game(models.Model, GameLevel):
     def __str__(self):
         return self.name if self.name else f'[untitled#{self.id}]'
 
-    def get_play_status_label(self):
-        return GamePlayStatus(self.play_status).name.title().replace('_', ' ')
+    @property
+    def play_status_title(self):
+        return GamePlayStatus(self.play_status).title()
 
     @classmethod
     def new_from_template(cls, template: GameTemplate, teams: List[Team],
@@ -375,21 +389,85 @@ class Game(models.Model, GameLevel):
             # lines then create the Station, LineLocations and Trains
         return game
 
-    def run(self, save=False, interval=GameInterval.TICK_SINGLE):
-        """ do a series of ticks up to stage_duration, and save afterwards """
-        if interval is GameInterval.TICK_SINGLE:
-            num_ticks = 1
-        else:
-            # arbitrary max ticks per round, prevent "infinite" rounds
-            # prevent zero ticks per round
-            num_ticks = max(min(self.game_round_duration // self.tick_interval,
-                                GameInterval.MAX_TICKS_PER_ROUND),
-                            1)
-        # log.info("Game.run called for %d ticks with save=%s", num_ticks,
-        #          save)
-        for _t in range(num_ticks - 1):
-            self.tick(save=False)
-        self.tick(save=save)
+    # ----- game play and status management -----
+    def play_init(self):
+        """ run game.play in a separate thread.
+        Called by the signal handler for signal_game_start  """
+        thread = threading.Thread(target=self.play,
+                                  name=f"game_play#{self.id}")
+        thread.start()
+
+    def play(self):
+        """ execute a sequence of clock ticks until paused or end of round.
+            Should be run in a separate thread, called by play_init.
+        """
+        try:
+            self.play_status = GamePlayStatus.RUNNING
+            round_end_datetime = self.calc_round_end_datetime()
+            while True:
+                # log.info("game.play():current_time=%s, round_end_datetime=%s",
+                #          self.current_time, round_end_datetime)
+                self.tick()
+                if (self.play_status != GamePlayStatus.RUNNING or
+                        self.current_time >= round_end_datetime):
+                    break
+                time.sleep(self.DELAY_BETWEEN_TICKS)
+
+            if self.current_time.time() >= self.day_end_time:
+                self.play_status = GamePlayStatus.BETWEEN_DAYS
+            elif self.current_time >= round_end_datetime:
+                self.play_status = GamePlayStatus.BETWEEN_ROUNDS
+            elif self.play_status == GamePlayStatus.PAUSE_REQUESTED:
+                self.play_status = GamePlayStatus.PAUSED
+            else:
+                log.error("Game.play stopped for unrecognised reason: "
+                          "play_status=%s at %s with round_end_time %s",
+                          self.play_status_title,
+                          self.current_time.time(), round_end_datetime)
+                self.play_status = GamePlayStatus.PAUSED
+            log.info("game.play finished with at %s with status %s",
+                     self.current_time.time(), self.play_status_title)
+        except Exception as e:
+            log.exception("Game.Play halted by %r", e)
+            self.play_status = GamePlayStatus.PAUSED
+        finally:
+            self.save()
+
+    def calc_round_end_datetime(self) -> datetime.datetime:
+        ''' return the datetime that this round should end.  Also handle day
+        rollover at end of day '''
+        # TODO: sort out local time (current_date) vs naive time (start/end)
+        # day rollover?
+        if self.current_time.time() >= self.day_end_time:
+            # roll over day
+            new_date = self.current_time.date()
+            new_date += datetime.timedelta(days=1)
+            # and add new start of day time
+            self.current_time = datetime.datetime.combine(
+                new_date, self.day_start_time,
+                tzinfo=self.current_time.tzinfo)
+            self.save()
+        # if current_time before day_start_time, set to day_start_time
+        elif self.current_time.time() < self.day_start_time:
+            self.current_time = datetime.datetime.combine(
+                self.current_time.date(), self.day_start_time,
+                tzinfo=self.current_time.tzinfo)
+            self.save()
+
+        today_start_datetime = datetime.datetime.combine(
+            self.current_time.date(), self.day_start_time,
+            tzinfo=self.current_time.tzinfo)
+        rounds_today = ((self.current_time - today_start_datetime) //
+                        self.game_round_duration)
+        round_end_datetime = today_start_datetime + (
+            (rounds_today + 1) * self.game_round_duration)
+
+        log.info("calc_round_end_time: current_time=%s, day_start_time=%s, "
+                 "rounds_today=%d\nround_end_datetime=%s",
+                 self.current_time, self.day_start_time, rounds_today,
+                 round_end_datetime)
+        # return next round end datetime
+        return round_end_datetime
 
     def request_play_status(self, team, req_status=None):
         """ handle a request to change the play status from a team.
@@ -404,18 +482,28 @@ class Game(models.Model, GameLevel):
         if req_status:  # can be passed req_status = ''
             # may raise a ValueError for invalid status
             if req_status == 'Play':
+                self.play_status = GamePlayStatus.PLAY_REQUESTED
+                # running status only confirmed by Game.Play
                 signal_game_start.send(self, game=self)
-                new_status = GamePlayStatus.RUNNING
             elif req_status == 'Pause':
-                new_status = GamePlayStatus.PAUSED
+                if self.play_status == GamePlayStatus.RUNNING:
+                    self.play_status = GamePlayStatus.PAUSE_REQUESTED
+                    # pause only confirmed by Game.Play at end of Tick
+                else:
+                    log.warning(
+                        "Game.request_play_status(Pause) when play_status=%s",
+                        self.play_status_title)
             else:
                 raise ValueError(
                     f"Invalid game status requested: {req_status}")
-            self.play_status = new_status
-        return {'status': self.get_play_status_label(),
+            # TODO: if multiple teams, set TeamGameStatus + work out what to do
+            self.save()
+        log.info("Game.request_play_status(%s). returning %s",
+                 req_status, self.play_status_title)
+        return {'status': self.play_status_title,
                 'game_timestamp': int(self.current_time.timestamp())}
 
-    def tick(self, save=False):
+    def tick(self):
         """ run the game for one tick of the clock """
         # log.info("Game.Tick at %s", hhmm(self.current_time))
         self.sprinkle_incidents()
@@ -441,6 +529,9 @@ class Game(models.Model, GameLevel):
             line.try_resolve_incidents()
         elif code == 3:
             line.update_trains(self)
+        elif code == 4:
+            log.info("Deleting incidents for %s", self.name)
+            Incident.objects.filter(line__game_id=self.id).delete()
         else:
             raise ValueError(f"Unrecognised debug code: {code}")
 
@@ -487,12 +578,12 @@ class Game(models.Model, GameLevel):
             List[IncidentType], List[int]]:
         """ return (list(IncidentTypes), list(incident_type_percent_chance))
         """
-        log.debug("game.incident_types=%s", self.incident_types.all())
+        # log.debug("game.incident_types=%s", self.incident_types.all())
         pairs = ((incident_type, incident_type.likelihood)
                  for incident_type in self.incident_types.all())
         # and transpose into a pair of lists
         pairs = list(pairs)
-        log.info("incident_type_likelihoods: pairs=%s", pairs)
+        # log.info("incident_type_likelihoods: pairs=%s", pairs)
         return tuple(zip(*pairs))
 
     def random_incident(self):
@@ -538,6 +629,29 @@ class Game(models.Model, GameLevel):
 
         for _i in range(num):
             yield self.random_incident()
+
+
+class TeamGameStatus(models.Model):
+    """ track play/pause request status of a team for a game """
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    game = models.ForeignKey(Game, on_delete=models.CASCADE)
+    play_status = models.PositiveSmallIntegerField(
+        choices=[GamePlayStatus.PAUSE_REQUESTED,
+                 GamePlayStatus.PLAY_REQUESTED], null=True)
+
+    class Meta:
+        unique_together = ['team', 'game']
+        verbose_name_plural = 'Team game status'
+
+    def __str__(self):
+        return (f"Game status for {self.team} on {self.game}: "
+                f"{self.play_status_title}")
+
+    @property
+    def play_status_title(self):
+        return (GamePlayStatus(self.play_status).title()
+                if self.play_status is not None
+                else 'None')
 
 
 class LineTemplate(models.Model):
@@ -1073,7 +1187,8 @@ class Train(models.Model):
            waited transit_time since we arrived,
            (or the last train departed from a depot) we can move """
         incident_delay = self.calculate_incident_delay(game)
-        log.info("%s delayed %d due to incidents", self, incident_delay)
+        if incident_delay:
+            log.info("%s delayed %d due to incidents", self, incident_delay)
         if self.location.last_train_time is not None and (
             game.current_time < self.location.last_train_time + (
                 (self.location.transit_delay + incident_delay) *
@@ -1109,7 +1224,8 @@ class Train(models.Model):
         incidents = Incident.objects.filter(query).all()
         impacts = sum((incident.impact_now(ImpactType.LINE, current_time)
                       for incident in incidents), ImpactNow(ImpactType.LINE),)
-        log.info("calculate_incident_delay: impacts=%s", impacts)
+        if impacts:
+            log.info("calculate_incident_delay: impacts=%s", impacts)
         if impacts.blocking and not game.has_blocking_incidents():
             return impacts.amount + 1
         else:

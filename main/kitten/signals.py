@@ -18,3 +18,4 @@ def game_start_handler(game, **kwargs):
     """ start the game running until the end of the next stage_interval, or
         end of day """
     log.info("game_start signal received for %s", game)
+    game.play_init()

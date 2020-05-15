@@ -58,7 +58,7 @@ function status_callback(data, status){
 
 var game_state_action_map = [
 	['Between Days', 'Play'],
-	['Between Stages', 'Play'],
+	['Between Rounds', 'Play'],
 	['Paused', 'Play'],
 	['Running', 'Pause'],
 	['Play Requested', 'Play', 'Cancel'],

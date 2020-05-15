@@ -567,8 +567,8 @@ def game_status(request, game_id, team_id):
         return HttpResponse(f"Invalid method: {request.method}", 405)
 
     status = request.POST.get('status')
-    log.info("views.game_status(status=%r), request.POST=%s", status,
-             request.POST)
+    # log.info("views.game_status(status=%r), request.POST=%s", status,
+    #          request.POST)
     try:
         status = game.request_play_status(team_id, status)
     except (ValueError, KeyError) as e:
