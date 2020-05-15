@@ -636,8 +636,9 @@ class TeamGameStatus(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE)
     game = models.ForeignKey(Game, on_delete=models.CASCADE)
     play_status = models.PositiveSmallIntegerField(
-        choices=[GamePlayStatus.PAUSE_REQUESTED,
-                 GamePlayStatus.PLAY_REQUESTED], null=True)
+        choices=[(status.value, status.title()) for status in
+                 (GamePlayStatus.PAUSE_REQUESTED,
+                  GamePlayStatus.PLAY_REQUESTED)], null=True)
 
     class Meta:
         unique_together = ['team', 'game']
