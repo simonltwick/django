@@ -33,7 +33,7 @@ def bikes(request):
             row['rides__distance_units'] = ''
         else:
             row['rides__distance_units'] = DistanceUnits(
-                row['rides__distance_units']).name.lower() 
+                row['rides__distance_units']).name.lower()
     log.info("bikes=%s", bikes)
     return render(request, 'bike/bikes.html',
                   context={'bikes': bikes})
@@ -59,7 +59,7 @@ class PreferencesUpdate(LoginRequiredMixin, UpdateView):
             try:
                 kwargs['pk'] = Preferences.objects.get(user=request.user).pk
             except Preferences.DoesNotExist:
-                return HttpResponseRedirect(reverse('preferences_new'))
+                return HttpResponseRedirect(reverse('bike:preferences_new'))
         return super(PreferencesUpdate, self).dispatch(request, *args,
                                                        **kwargs)
 
@@ -92,7 +92,7 @@ class BikeUpdate(LoginRequiredMixin, UpdateView):
 class BikeDelete(LoginRequiredMixin, DeleteView):
     model = Bike
     fields = ['name', 'description']
-    success_url = reverse_lazy('home')
+    success_url = reverse_lazy('bike:bikes')
 
 
 def components(request):
@@ -103,7 +103,8 @@ def components(request):
 
 class ComponentCreate(LoginRequiredMixin, CreateView):
     model = Component
-    fields = ['name', 'description']
+    fields = ['bike', 'type', 'subcomponent_of', 'name', 'specification',
+              'notes', 'supplier', 'date_acquired']
 
     def form_valid(self, form):
         obj = form.save(commit=False)
@@ -113,12 +114,18 @@ class ComponentCreate(LoginRequiredMixin, CreateView):
 
 class ComponentUpdate(LoginRequiredMixin, UpdateView):
     model = Component
-    fields = ['name', 'description']
+    fields = ['bike', 'type', 'subcomponent_of', 'name', 'specification',
+              'notes', 'supplier', 'date_acquired']
 
     def get_success_url(self):
         if 'next' in self.request.GET:
             return self.request.GET['next']
         return super(ComponentUpdate, self).get_success_url()
+
+
+class ComponentDelete(LoginRequiredMixin, DeleteView):
+    model = Component
+    success_url = reverse_lazy('bike:components')
 
 
 def rides(request):

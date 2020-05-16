@@ -15,7 +15,7 @@
 <ul>
 {% endif %}
 
-<li><a href="{% url 'bike' bike.id %}">{{ bike.name }}</a>:
+<li><a href="{% url 'bike:bike' bike.id %}">{{ bike.name }}</a>:
 {{ bike.distance|floatformat }} {{ bike.rides__distance_units }}</li>
 
 {% if forloop.last %}
@@ -25,7 +25,7 @@
 <p>No bikes found :-(</p>
 {% endfor %}
 
-<p><a class="btn btn-success" href="{% url 'bike_new' %}">New bike</a></p>
+<p><a class="btn btn-success" href="{% url 'bike:bike_new' %}">New bike</a></p>
 
 {% for activity in request.user.maint_activities.all %}
 {% if forloop.first %}
@@ -33,7 +33,7 @@
 <ul>
 {% endif %}
 
-	<li><a href="{% url 'maint_activity' activity.id %}">{{ activity.name }}</a>
+	<li><a href="{% url 'bike:maint_activity' activity.id %}">{{ activity.name }}</a>
 	</li>
 
 {% if forloop.last %}

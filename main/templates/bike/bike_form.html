@@ -8,13 +8,14 @@
 {{ form }}
 {% csrf_token %}
 </table>
+<a href="{% url 'bike:bikes' %}" class="btn btn-secondary">Cancel</a>
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
    {% if bike %}
-   formaction="{% url 'bike' bike.id %}?next={% url 'home' %}">
-	<a href="{% url 'bike_delete' bike.id %}" class="btn btn-danger">Delete</a>
+   formaction="{% url 'bike:bike' bike.id %}?next={% url 'bike:bikes' %}">
+	<a href="{% url 'bike:bike_delete' bike.id %}" class="btn btn-danger">Delete</a>
    {% else %}
-   formaction="{% url 'bike' %}?next={% url 'home' %}">
+   formaction="{% url 'bike:bike' %}?next={% url 'bike:bikes' %}">
    {% endif %}
 </form>
  

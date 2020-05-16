@@ -13,11 +13,11 @@
 {% if not preferences_set %}
 <h3>Preferences not set</h3>
 <p>Your preferences for distance units have not been set.</p>
-<p>Please <a href="{% url 'preferences_new' %}">set your preferences.</a></p>
+<p>Please <a href="{% url 'bike:preferences_new' %}">set your preferences.</a></p>
 {% endif %}
 
 
-<button class="btn btn-success" href="{% url 'ride_new' %}">Record a ride</button>
+<a class="btn btn-success" href="{% url 'bike:ride_new' %}">Record a ride</a>
 
 
 {% for activity in request.user.maint_activities.all %}
@@ -26,7 +26,7 @@
 <ul>
 {% endif %}
 
-	<li><a href="{% url 'maint_activity' activity.id %}">{{ activity.name }}</a>
+	<li><a href="{% url 'bike:maint_activity' activity.id %}">{{ activity.name }}</a>
 	</li>
 
 {% if forloop.last %}

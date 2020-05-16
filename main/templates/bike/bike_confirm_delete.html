@@ -6,8 +6,8 @@ Confirm Delete for {{ bike.name }} -
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Bike" 'bike' bike.id %}
-> {% breadcrumb_url "Delete" 'bike_delete' bike.id %}
+> {% breadcrumb_url "Bike" 'bike:bike' bike.id %}
+> {% breadcrumb_url "Delete" 'bike:bike_delete' bike.id %}
 {% endblock %}
 
 {% block content %}
@@ -20,7 +20,7 @@ Confirm Delete for {{ bike.name }} -
 <form method="post">
 	{% csrf_token %}
 	{{ form.as_p }}
-	<p><a class="btn btn-secondary" href="{% url 'bike' bike.id %}">Cancel</a>
+	<p><a class="btn btn-secondary" href="{% url 'bike:bike' bike.id %}">Cancel</a>
 	<input type="submit" class="btn btn-danger" value="Delete">
 </form>
 

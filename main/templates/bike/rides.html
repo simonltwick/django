@@ -14,7 +14,7 @@
 <ul>
 {% endif %}
 
-<li>{{ ride.date }} <a href="{% url 'ride' ride.id %}">{{ ride.description }}</a>
+<li>{{ ride.date }} <a href="{% url 'bike:ride' ride.id %}">{{ ride.description }}</a>
 {{ ride.distance }} {{ ride.get_distance_units_display }}</li>
 
 {% if forloop.last %}
@@ -24,6 +24,6 @@
 <p>No rides found :-(</p>
 {% endfor %}
 
-<p><a class="btn btn-success" href="{% url 'ride_new' %}">New ride</a></p>
+<p><a class="btn btn-success" href="{% url 'bike:ride_new' %}">New ride</a></p>
 
 {% endblock%}

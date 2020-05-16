@@ -4,9 +4,9 @@
 {% block breadcrumbs %}
 {% load breadcrumb %}
 {% if ride %}
-> {% breadcrumb_url 'Ride' 'ride' ride.id %}
+> {% breadcrumb_url 'Ride' 'bike:ride' ride.id %}
 {% else %}
-> {% breadcrumb_url 'New Ride' 'ride_new' %}
+> {% breadcrumb_url 'New Ride' 'bike:ride_new' %}
 {% endif %}
 {% endblock %}
 
@@ -18,12 +18,13 @@
 {{ form }}
 {% csrf_token %}
 </table>
+<a href="{% url 'bike:home' %}" class="btn btn-secondary">Cancel</a>
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
 	{% if ride %}
-    formaction="{% url 'ride' ride.id %}?next={% url 'home' %}"
+    formaction="{% url 'bike:ride' ride.id %}?next={% url 'bike:home' %}"
     {% else %}
-    formaction="{% url 'ride_new' %}?next={% url 'home' %}"
+    formaction="{% url 'bike:ride_new' %}?next={% url 'bike:home' %}"
     {% endif %}>
 </form>
 {% endblock %}

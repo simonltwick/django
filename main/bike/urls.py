@@ -1,7 +1,10 @@
 from django.conf.urls import url
+from django.urls import path
+from django.contrib.auth import views as auth_views
 from . import views
 
 
+app_name = 'bike'  # for url namespacing
 urlpatterns = [
     url(r'^$', views.home, name='home'),
 
@@ -23,6 +26,8 @@ urlpatterns = [
     url(r'^component$', views.ComponentUpdate.as_view(), name='component'),
     url(r'^component/(?P<pk>[0-9]+)$', views.ComponentUpdate.as_view(),
         name='component'),
+    path(r'component/<int:pk>/delete', views.ComponentDelete.as_view(),
+         name='component_delete'),
 
     url(r'^maint/new$', views.maint, name='maint_new'),
     url(r'^maint$', views.maint, name='maint'),
@@ -39,4 +44,26 @@ urlpatterns = [
         name='preferences'),
     url(r'^preferences/(?P<pk>[0-9]+)$', views.PreferencesUpdate.as_view(),
         name='preferences'),
+
+    
+    url(
+        r'^admin/password_reset/$',
+        auth_views.PasswordResetView.as_view(),
+        name='admin_password_reset',
+    ),
+    url(
+        r'^admin/password_reset/done/$',
+        auth_views.PasswordResetDoneView.as_view(),
+        name='password_reset_done',
+    ),
+    url(
+        r'^reset/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>.+)/$',
+        auth_views.PasswordResetConfirmView.as_view(),
+        name='password_reset_confirm',
+    ),
+    url(
+        r'^reset/done/$',
+        auth_views.PasswordResetCompleteView.as_view(),
+        name='password_reset_complete',
+    ),
     ]

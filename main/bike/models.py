@@ -13,7 +13,7 @@ class Bike(models.Model):
     description = models.CharField(max_length=200)
 
     def get_absolute_url(self):
-        return reverse('bike', kwargs={'pk': self.id})
+        return reverse('bike:bike', kwargs={'pk': self.id})
 
     def __str__(self):
         return self.name
@@ -78,7 +78,7 @@ class Ride(DistanceMixin):
         return f"{self.date}: {self.description}"
 
     def get_absolute_url(self):
-        return reverse('ride', kwargs={'pk': self.id})
+        return reverse('bike:ride', kwargs={'pk': self.id})
 
 
 class Odometer(DistanceMixin):
@@ -111,7 +111,7 @@ class ComponentType(models.Model):
         choices=IntervalUnits.CHOICES)
 
     def __str__(self):
-        return f"Component Type: {self.type}"
+        return f"{self.type}"
 
 
 class Component(models.Model):
@@ -121,7 +121,7 @@ class Component(models.Model):
                              blank=True, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     type = models.ForeignKey(ComponentType, on_delete=models.PROTECT)
-    specification = models.CharField(max_length=200)
+    specification = models.CharField(max_length=200, null=True, blank=True)
     subcomponent_of = models.ForeignKey(
         'Component', related_name='components', on_delete=models.PROTECT,
         null=True, blank=True,
@@ -130,11 +130,14 @@ class Component(models.Model):
     # fk component history
     # fk subcomponent history
     date_acquired = models.DateField(default=date.today, null=True, blank=True)
-    supplier = models.CharField(max_length=200)
-    notes = models.CharField(max_length=400)
+    supplier = models.CharField(max_length=200, null=True, blank=True)
+    notes = models.CharField(max_length=400, null=True, blank=True)
 
     def get_absolute_url(self):
-        return reverse('component', kwargs={'pk': self.id})
+        return reverse('bike:component', kwargs={'pk': self.id})
+
+    def __str__(self):
+        return f"{self.type}: {self.name} on {self.bike}"
 
 
 class MaintenanceSchedule(models.Model):
@@ -142,6 +145,9 @@ class MaintenanceSchedule(models.Model):
     activity = models.CharField(max_length=100)
     reference_info = models.CharField(max_length=300)
 
+# TODO: only require units if distance/ascent field is filled in
+# TODO: remove maint. interval and descriptoin from component type
+# TODO: "new component type" option on New Component form
 
 class MaintenanceAction(DistanceMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE,
