@@ -2,21 +2,28 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-&nbsp;&nbsp;{% breadcrumb_url "Change password" 'admin:password_change' %}
+</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
 {% endblock %}
 
 {% block content %}
 {% load static %}
 <h1>Welcome to Kitten on the Line</h1>
-<img src="{% static 'kitten-line-cropped.jpg' %}" alt="Kitten on the line">
+<img class="rounded" src="{% static 'kitten-line-cropped.jpg' %}"
+	alt="Kitten on the line">
+<p>Welcome, {{ request.user.username }}.</p>
 <h3>My teams</h3>
 <ul>
 {% if user.is_authenticated %}
 {% for team in teams %}
-<li><a href="{% url 'team' team.id %}">{{ team.name }}</a></li>
+<li><a href="{% url 'kitten:team_games' team.id %}">{{ team.name }}</a></li>
 {% endfor %}
 {% endif %}
-</ul><ul>
-<li><a href="{% url 'team_join' %}">Join a team</a>
+{% for invitation in request.user.invitations.all %}
+<li>Invitation to join {{ invitation.team.name }} from 
+	{{ invitation.invited_by }}
+	<a href="{% url 'kitten:invitation_accept' invitation.id %}">Accept</a></li>
+{% endfor %}
 </ul>
+<p><a href="{% url 'kitten:team' %}">New team</a></p>
+
 {% endblock%}

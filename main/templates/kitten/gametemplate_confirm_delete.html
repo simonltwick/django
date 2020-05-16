@@ -1,0 +1,28 @@
+{% extends 'kitten/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ gametemplate.name }} -
+{% endblock %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Network" 'kitten:network' gametemplate.network_id %}
+> {% breadcrumb_url "Game Template" 'kitten:gametemplate' gametemplate.network_id gametemplate.id %}
+> {% breadcrumb_url "Delete" 'kitten:gametemplate_delete' gametemplate.id %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ gametemplate }}</h1>
+	<p class="errormsg">This Game Template will be deleted.</p>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p><a class="btn" href="{% url 'kitten:network' gametemplate.network_id %}">Cancel</a>
+	<input type="submit" class="btn btn-danger" value="Delete">
+</form>
+
+
+{% endblock %}

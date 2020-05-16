@@ -3,7 +3,8 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Scheduling' 'game_scheduling' game.id team_id %}
+> {% breadcrumb_url 'Game' 'kitten:game' team_id game.id %}
+> {% breadcrumb_url 'Scheduling' 'kitten:game_scheduling' team_id game.id %}
 {% endblock %}
 
 {% block title %}
@@ -13,7 +14,7 @@ Scheduling -
 {% block content %}
 <div style="color: grey;">
 <h3>Scheduling Centre</h3>
-<p>The Scheduling Centre is currently closed for maintenance.</p>
+<p>The Scheduling Centre is not accessible with your team's skill level.</p>
 <p>Use the Scheduling Centre to optimise train loading and passenger
 throughput:</p>
 <ul>

@@ -1,0 +1,52 @@
+{% extends 'kitten/base.html' %}
+
+
+{% block title %}
+{% if gametemplate %}
+	{{ gametemplate }} details -
+{% else %}
+	New Game Template -
+{% endif %}
+{% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Network" 'kitten:network' network_id %}
+{% if gametemplate %}
+> {% breadcrumb_url "Game Template" 'kitten:gametemplate' network_id gametemplate.id %}
+{% else %}
+> {% breadcrumb_url "New Game Template" 'kitten:gametemplate' network_id %}
+{% endif %}
+{% endblock %}
+
+
+{% block content %}
+
+{% if gametemplate %}
+	<h1>{{ gametemplate }}</h1>
+{% else %}
+	<h1>New Game Template</h1>
+{% endif %}
+
+<form method="post"
+    {% if gametemplate %}
+	  action="{% url 'kitten:gametemplate' network_id gametemplate.id %}"
+	{% else %}
+	  action="{% url 'kitten:gametemplate' network_id %}"
+	{% endif %}
+	>
+	{% csrf_token %}
+	
+	<input type="hidden" name="network_id" value="{{ network_id }}">
+	<input type="hidden" name="gametemplate_id" value="{{ gametemplate.id }}">
+	<table class="table">
+	  {{ form }}
+	</table>
+	<p><a class="btn btn-default" href="{% url 'kitten:network' network_id %}">Cancel</a>
+	<input type="submit" value="OK" class="btn btn-primary">
+	</p>
+</form>
+
+
+{% endblock %}

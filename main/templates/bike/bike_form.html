@@ -1,0 +1,22 @@
+{% extends 'bike/base.html' %}
+
+
+{% block content %}
+<h1>Bike details:</h1>
+<form method='POST'>
+<table class="table">
+{{ form }}
+{% csrf_token %}
+</table>
+<a href="{% url 'bike:bikes' %}" class="btn btn-secondary">Cancel</a>
+<input type="submit" class="btn btn-secondary" value="Apply">
+<input type="submit" class="btn btn-primary" value="OK"
+   {% if bike %}
+   formaction="{% url 'bike:bike' bike.id %}?next={% url 'bike:bikes' %}">
+	<a href="{% url 'bike:bike_delete' bike.id %}" class="btn btn-danger">Delete</a>
+   {% else %}
+   formaction="{% url 'bike:bike' %}?next={% url 'bike:bikes' %}">
+   {% endif %}
+</form>
+ 
+{% endblock %}

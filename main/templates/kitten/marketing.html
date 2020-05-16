@@ -1,0 +1,25 @@
+<!-- Scheduling centre -->
+{% extends 'kitten/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'Marketing' 'kitten:game_marketing' team_id game.id %}
+{% endblock %}
+
+{% block title %}
+Marketing -
+{% endblock %}
+
+{% block content %}
+<div style="color: grey;">
+<h3>Marketing Department</h3>
+<p>The Marketing Department is not accessible with your team's skill level.</p>
+<p>The Marketing Department manages customer feedback and brand appeal to
+maximise passenger traffic and satisfaction:</p>
+<ul>
+<li>Review satisfaction with lines, trains and stations</li>
+<li>Set advertising budgets</li>
+<li>Re-brand stations</li>
+</ul>
+</div>
+{% endblock %}

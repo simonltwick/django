@@ -1,51 +1,96 @@
 {% extends 'kitten/base.html' %}
-
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Game' 'game' game.id team_id %}
+> {% breadcrumb_url 'Game' 'kitten:game' team_id game.id %}
 {% endblock %}
 
 {% block content %}
-<h1>{{ game.name }}</h1>
+<h1>Gaming Suite - {{ game.name }}</h1>
 
-<p>Here are the details of your game.</p>
+<div class="row container">
+
+<div class="col-sm-4">
+<!-- game clock & status display -->
+{% url 'kitten:game' team_id game.id as next_url%}
+{% include 'kitten/game_clock.html' %}
+</div>
+<div class="col-sm-8">
+
+<p>Here are the areas of your game.</p>
 <ul>
-<li><a href="{% url 'game_scheduling' game.id team_id %}">
-Scheduling Centre</a></li>
 
-<li><a href="{% url 'game_operations' game.id team_id %}">
+<li><a href="{% url 'kitten:game_boardroom' team_id game.id %}">Boardroom</a>
+{% if game.level < 20 %}(not accessible at this game level){% endif %}
+</li>
+
+<li><a href="{% url 'kitten:game_operations' team_id game.id %}">
 Operations Control Room</a></li>
 
-{% if game.level >= 30 %}
-<li>HR Department</li>
-{% endif %}
+<li><a href="{% url 'kitten:game_scheduling' team_id game.id %}">
+Scheduling Centre</a>
+{% if game.level < 20 %}(not accessible at this game level){% endif %}
+</li>
 
-{% if game.level >= 40 %}
-<li>Engineering Department</li>
-{% endif %}
+<li><a href="{% url 'kitten:game_hr' team_id game.id %}">HR Department</a>
+{% if game.level < 30 %}(not accessible at this game level){% endif %}
+</li>
 
-{% if game.level >= 20 %}
-<li><a href="{% url 'boardroom' game.id team_id %}">Boardroom</a></li>
-{% endif %}
+<li><a href="{% url 'kitten:game_marketing' team_id game.id %}">
+Marketing Department</a>
+{% if game.level < 30 %}(not accessible at this game level){% endif %}
+</li>
 
+<li><a href="{% url 'kitten:game_engineering' team_id game.id %}">
+Engineering Department</a>
+{% if game.level < 40 %}(not accessible at this game level){% endif %}
+</li>
 </ul>
 
-<h3>Game settings (common to all teams):</h3>
-<form method="POST" class="post-form"
-	action="{% url 'game' game.id team_id %}">
-{% csrf_token %}
-    {{ form.as_p }}
-	<button class="btn btn-default">Add team</button>
-    <p>Game level: {{game.get_level_display}}</p>
-    <p>Network name: {{ game.network_name }}</p>
-    <input type="submit" class="save btn btn-default" value="Save">
+</div>
 
-<input type="button" value="Play">
-<input type="button" class="btn"
-	{% if user.is_superuser %}
-		href="{% url 'admin:kitten_game_delete' game.id %}"
-	{% else %}
-		href="{% url 'game_delete' game.id team_id %}"
-	{% endif %}value="Delete">
-{% endblock %}
+</div>
+
+<h3>Game settings (common to all teams):</h3>
+<table class="table">
+<form method="POST" class="post-form"
+	action="{% url 'kitten:game' team_id game.id %}">
+	{% csrf_token %}
+    {{ form }}
+    <tr><td></td>
+    <td><input type="submit" class="btn btn-secondary" value="Update"></td></tr>
 </form>
+
+<tr><th>Teams:</th>
+<td>
+<ul>{% for participant in game.teams.all %}
+
+<li>{{ participant.name }}
+	<a href="{% url 'kitten:game_team_remove' team_id game.id participant.id %}">
+	Remove</a></li>
+
+{% empty %}
+<li>(no teams found!)</li>
+{% endfor %}
+
+{% if game.invitations %}
+{% for invitation in game.invitations.all %}
+
+<li>Invited: {{ invitation.invited_team.name }}</li>
+
+{% endfor %}
+{% endif %}
+</ul>
+
+<p><a class="btn btn-secondary"
+	href="{% url 'kitten:game_invitation_new' team_id game.id %}">
+	Invite another team</a>
+	</p>
+</td></tr>
+<tr><th>Network name:</th><td>{{ game.network_name }}</td></tr>
+<tr><th>Game level:</th><td>{{game.get_level_display}}</td></tr>
+<tr><th>Delete game:</th><td><a class="btn btn-danger"
+  href="{% url 'kitten:game_delete' team_id game.id %}">
+Delete Game</a>
+</td></tr>
+</table>
+{% endblock %}

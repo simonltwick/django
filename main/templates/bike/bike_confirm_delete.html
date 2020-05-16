@@ -1,0 +1,28 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ bike.name }} -
+{% endblock %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Bike" 'bike:bike' bike.id %}
+> {% breadcrumb_url "Delete" 'bike:bike_delete' bike.id %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ bike }}</h1>
+	<p class="errormsg">This Bike will be deleted, along with all its rides,
+	components and maintenance history.</p>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p><a class="btn btn-secondary" href="{% url 'bike:bike' bike.id %}">Cancel</a>
+	<input type="submit" class="btn btn-danger" value="Delete">
+</form>
+
+
+{% endblock %}

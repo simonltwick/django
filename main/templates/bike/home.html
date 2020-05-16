@@ -1,0 +1,37 @@
+{% extends 'bike/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
+{% endblock %}
+
+{% block content %}
+{% load static %}
+<h1>Welcome to Bike</h1>
+<p>Welcome, {{ request.user.username }}.</p>
+
+{% if not preferences_set %}
+<h3>Preferences not set</h3>
+<p>Your preferences for distance units have not been set.</p>
+<p>Please <a href="{% url 'bike:preferences_new' %}">set your preferences.</a></p>
+{% endif %}
+
+
+<a class="btn btn-success" href="{% url 'bike:ride_new' %}">Record a ride</a>
+
+
+{% for activity in request.user.maint_activities.all %}
+{% if forloop.first %}
+<h3>Maintenance Activities</h3>
+<ul>
+{% endif %}
+
+	<li><a href="{% url 'bike:maint_activity' activity.id %}">{{ activity.name }}</a>
+	</li>
+
+{% if forloop.last %}
+</ul>
+{% endif %}
+{% endfor %}
+
+{% endblock%}

@@ -1,32 +1,26 @@
 {% extends 'kitten/base.html' %}
 <!-- initial dialog when only team is known -->
 
-{% block title %}New Game -
+
+{% block title %}
+New Game -
 {% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url 'New Game' 'kitten:game' team.id %}
+{% endblock %}
+
 
 {% block content %}
 
 <h2>Setup new game for {{ team.name }}</h2>
 
-<form method="POST" class="post-form" action="{% url 'game_new' team.id %}">
+<form method="POST" class="post-form">
  	{% csrf_token %}
-
-    <p class="errorlist">{{ errors }}</p>
-
-	<p><label for="template">Select network and level for your game:</label>
-	<select id="template" name="template" required>
-		<option value="NONE">--Select a network--</option>
-    	{% for template in templates %}
-    	<option value="{{template.id}}">
-    		{{ template.network.name }} ({{ template.get_level_display }})
-    	</option>
-    	{% endfor %}
-    </select></p>
-
-    <p><label for="name">Choose a name for your game:</label>
-    <input name="name"></p>
-
-    <p><input type="submit" class="save btn btn-default" value="Setup"></p>
+    {{ form.as_p }}
+    <p><input type="submit" class="save btn btn-primary" value="Setup"></p>
 </form>
 <p>Next, you can add other teams and customise your game.</p>
 

@@ -1,19 +1,39 @@
 <!doctype html>
 <html lang="en">
-{% load static %}
 <head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" type="image/png" sizes="32x32"
-	href="{% static 'favicon-32x32.png' %}">
-<link rel="icon" type="image/png" sizes="16x16"
-	href="{% static 'favicon-16x16.png' %}">
 
     <!-- w3c core styles: eight offerings: Chocolate, Midnight, Modernist,
     Oldstyle, Steely, Swiss, Traditional, and Ultramarine 
-    ref: https://www.w3.org/StyleSheets/Core/Overview.html -->
+    ref: https://www.w3.org/StyleSheets/Core/Overview.html 
     <link rel="stylesheet" href="https://www.w3.org/StyleSheets/Core/Steely"
-    type="text/css">
+    type="text/css"> -->
+    <!-- Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+	
+	<!-- jQuery library -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	
+	<!-- Popper JS -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+	
+	<!-- Latest compiled JavaScript -->
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+
+    <!-- FontAwesome icons: see https://www.w3schools.com/icons/default.asp -->
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.0/css/all.css"
+    integrity="sha384-lZN37f5QGtY3VHgisS14W3ExzMWZxybE1SJSEsQp9S+oqd12jhcu+A56Ebc1zFSJ"
+    crossorigin="anonymous">
+
+	{% load static %}
     <link rel="stylesheet" href="{% static 'kitten.css' %}" type="text/css">
+	
+	<link rel="icon" type="image/png" sizes="32x32"
+		href="{% static 'favicon-32x32.png' %}">
+	<link rel="icon" type="image/png" sizes="16x16"
+		href="{% static 'favicon-16x16.png' %}">
 
     <title>{% block title %}{% if game %}{{game.name}} -{% endif %}
     	{% endblock %}
@@ -21,40 +41,61 @@
     	</title>
 </head>
 
+
 <body>
-{% block banner %}
-<p><strong>🚂🚃🚃🚃🐱 KITTEN ON THE LINE &#x1f682;&#x1f683;🚃🚃&#x1f431;</strong></p>
-{% endblock %}
+<div class="container-fluid masthead">
+  
+  {% block banner %}
+  <h3 class="text-center pt-4">🚂🚃🚃🚃🐱 KITTEN ON THE LINE &#x1f682;&#x1f683;🚃🚃&#x1f431;</h3>
+  {% endblock %}
 
-{% load breadcrumb %}
-<small>
-{% breadcrumb_url 'Home' 'home' %}
-{% if team_id %}
-> {% breadcrumb_url 'Team' 'team' team_id %}
-{% elif team.id %}
-> {% breadcrumb_url 'Team' 'team' team.id %}
-{% endif %}
 
-{% block breadcrumbs %}
-{% endblock %}
+  <div class="row container">
+  
+    <div class="col-md-6">
+    {% load breadcrumb %}
+    <nav><ul class="kitten-breadcrumb">
+    
+      <li>{% breadcrumb_url 'Home' 'kitten:home' %}</li>
+      {% if team_id %}
+      <li>{% breadcrumb_url 'Team' 'kitten:team_games' team_id %}
+      {% elif team.id %}
+      <li>{% breadcrumb_url 'Team' 'kitten:team_games' team.id %}
+      {% endif %}
+      {% block breadcrumbs %}
+      {% endblock %}
+      </li>
 
-{% if user.is_superuser %}
-&nbsp;&nbsp;{% breadcrumb_url 'Admin' 'admin:index' %}
-{% endif %}
+    </ul></nav></div>
+    
+    <div class="col-md-6">
+    <nav><ul class="kitten-breadcrumb text-right">
 
-&nbsp;&nbsp;
-{% block help %}
-<a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/">Help</a> 
-{% endblock %}
+      {% block help %}
+      <li><a href = "https://app.gitbook.com/@simon-lambourn/s/kitten/" target="_blank">
+      Help</a></li>
+      {% endblock %}
 
-{% if user.is_authenticated %}
-&nbsp;&nbsp;{% breadcrumb_url 'Logout' 'logout' %}
-{% endif %}
-</small>
+      {% if user.is_superuser %}
+      <li>{% breadcrumb_url 'Admin' 'admin:index' %}</li>
+      {% endif %}
+
+      {% if user.is_authenticated %}
+      <li>{% breadcrumb_url 'Logout' 'logout' %}</li>
+      {% endif %}
+
+    </ul></nav></div>
+
+  </div>
+</div>
+
+
+<div class="container">
 
 {% block content %}
 {% endblock %}
 
 <p style="color: grey;"><small>&copy Simon Lambourn 2020</small></p>
+</div>
 </body>
 </html>

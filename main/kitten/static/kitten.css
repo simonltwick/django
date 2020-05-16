@@ -1,6 +1,6 @@
 
 table, tbody, tr, td, th  {
-	border: 1px solid grey;
+	/*border: 1px solid grey; */
 	padding: 2px;
 	vertical-align: top;
 	text-align: top;
@@ -13,17 +13,26 @@ table {
 	border-collapse: collapse;
 }
 
-.no-border, table.no-border {
-	border-style: none;
+.border {
+	border: 1px solid grey;
 }
 
-.errorlist {
+.no-border, table.no-border, tr.no-border, td.no-border, tbody.no-border {
+	border: none;
+}
+
+.errorlist, .errormsg {
 	color: red;
 }
 
 .station {
 	font-weight: bold;
 }
+
+.masthead {
+	background-color: gold;
+}
+
 
 div.location {
 	justify-content: space-between;
@@ -42,7 +51,7 @@ div.location {
 .train-delayed::before, .incident-responding::before {
 	background-color: orange;
 	content: '\00a0\00a0\00a0\00a0';
-	font-size: 15%;
+	font-size: 35%;
 	border-radius: 50%;
 	/*width: 4px;
 	height: 4px; */
@@ -51,9 +60,39 @@ div.location {
 .train-blocked::before, .incident-open::before {
 	background-color: red;
 	content: '\00a0\00a0\00a0\00a0';
-	font-size: 15%;
+	font-size: 35%;
 	border-radius: 50%;
 	/*width: 4px;
 	height: 4px; */
 	vertical-align: super;
 }
+
+.small-int {  /* input fields */
+	width: 6ch;
+}
+
+/* Style the list */
+ul.kitten-breadcrumb {
+  padding: 10px 16px;
+  list-style: none;
+}
+
+/* Display list items side by side */
+ul.kitten-breadcrumb li {
+  display: inline;
+  font-size: 14px;
+}
+
+/* Add a slash symbol (/) before/behind each list item */
+ul.kitten-breadcrumb li+li:before {
+  padding: 8px;
+  color: black;
+  content: "/\00a0";
+}
+
+/* Add a color on mouse-over */
+ul.kitten-breadcrumb li a:hover {
+  color: #01447e;
+  text-decoration: underline;
+}
+

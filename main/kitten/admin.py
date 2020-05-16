@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from .models import Network, Team, LineTemplate, GameTemplate, PlaceTemplate, \
     Game, Line, LineLocation, Station, Train, Incident, Impact, IncidentType, \
-    Response
+    Response, TeamInvitation, TeamGameStatus
 
 
 admin.site.register(GameTemplate)
@@ -10,10 +10,12 @@ admin.site.register(Team)
 admin.site.register(LineLocation)
 admin.site.register(Station)
 admin.site.register(Train)
-admin.site.register(Incident)
 admin.site.register(Impact)
 admin.site.register(IncidentType)
 admin.site.register(Response)
+admin.site.register(TeamInvitation)
+admin.site.register(PlaceTemplate)
+admin.site.register(TeamGameStatus)
 
 
 """class UserInline(admin.TabularInline):
@@ -23,6 +25,11 @@ admin.site.register(Response)
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
     inlines = [UserInline]"""
+
+
+@admin.register(Incident)
+class IncidentAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'line', 'location', 'start_time')
 
 
 class LineTemplateInline(admin.TabularInline):

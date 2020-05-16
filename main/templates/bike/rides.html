@@ -1,0 +1,29 @@
+{% extends 'bike/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
+{% endblock %}
+
+{% block content %}
+{% load static %}
+
+<h1>Rides</h1>
+{% for ride in rides.all %}
+{% if forloop.first %}
+<ul>
+{% endif %}
+
+<li>{{ ride.date }} <a href="{% url 'bike:ride' ride.id %}">{{ ride.description }}</a>
+{{ ride.distance }} {{ ride.get_distance_units_display }}</li>
+
+{% if forloop.last %}
+</ul>
+{% endif %}
+{% empty %}
+<p>No rides found :-(</p>
+{% endfor %}
+
+<p><a class="btn btn-success" href="{% url 'bike:ride_new' %}">New ride</a></p>
+
+{% endblock%}

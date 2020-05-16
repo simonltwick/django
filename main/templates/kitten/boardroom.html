@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Boardroom' 'game_boardroom' game.id team_id %}
+> {% breadcrumb_url 'Boardroom' 'kitten:game_boardroom' team_id game.id %}
 {% endblock %}
 
 {% block title %}
@@ -13,7 +13,7 @@ Board Room -
 {% block content %}
 <div style="color: grey;">
 <h3>Board Room</h3>
-<p>The Board Room is currently closed for maintenance.</p>
+<p>The Board Room is  is not accessible with your team's skill level.</p>
 <p>Use the Board Room for strategic management of your team's performance:</p>
 <ul>
 <li>Review team performance overall

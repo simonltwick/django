@@ -1,0 +1,27 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ component.type }} {{ component.name }} -
+{% endblock %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Component" 'bike:component' component.id %}
+> {% breadcrumb_url "Delete" 'bike:component_delete' component.id %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ component }}</h1>
+	<p class="errormsg">This component will be deleted, along with all its maintenance history.</p>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p><a class="btn btn-secondary" href="{% url 'bike:component' component.id %}">Cancel</a>
+	<input type="submit" class="btn btn-danger" value="Delete">
+</form>
+
+
+{% endblock %}

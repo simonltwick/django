@@ -1,0 +1,20 @@
+{% extends 'bike/base.html' %}
+
+
+{% block content %}
+<h1>Units preferences for {{ request.user.username }}</h1>
+<form method='POST'>
+<table class="table">
+{{ form }}
+{% csrf_token %}
+</table>
+{% if preferences %}
+<a href="{% url 'bike:home' %}" class="btn btn-secondary">Cancel</a>
+<input type="submit" class="btn btn-secondary" value="Apply">
+<input type="submit" class="btn btn-primary" value="OK"
+   formaction="{% url 'bike:preferences' preferences.pk %}?next={% url 'bike:home' %}">
+{% else %}
+<input type="submit" class="btn btn-primary" value="Save">
+{% endif %}
+</form>
+{% endblock %}

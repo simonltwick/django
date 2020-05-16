@@ -1,0 +1,34 @@
+{% extends 'kitten/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ linetemplate.name }} -
+{% endblock %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Network" 'kitten:network' linetemplate.network_id %}
+> {% breadcrumb_url "Line Template" 'kitten:linetemplate' linetemplate.network_id linetemplate.id %}
+> {% breadcrumb_url "Delete" 'kitten:linetemplate_delete' linetemplate.id %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ linetemplate.name }}</h1>
+	<p class="errormsg">This Line Template, and all its locations,
+	will be deleted:</p>
+	<ul>{% for loc in linetemplate.locations.all %}
+
+		<li>{{ location.name }}</li>
+
+	{% endfor %}</ul>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p><a class="button" href="{% url 'kitten:home' %}">Cancel</a>
+	<input type="submit" class="btn btn-danger" value="Delete">
+</form>
+
+
+{% endblock %}

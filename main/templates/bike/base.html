@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+	
+	<!-- jQuery library -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	
+	<!-- Popper JS -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+	
+	<!-- Latest compiled JavaScript -->
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+
+    <!-- FontAwesome icons: see https://www.w3schools.com/icons/default.asp -->
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.0/css/all.css"
+    integrity="sha384-lZN37f5QGtY3VHgisS14W3ExzMWZxybE1SJSEsQp9S+oqd12jhcu+A56Ebc1zFSJ"
+    crossorigin="anonymous">
+
+	{% load static %}
+    <link rel="stylesheet" href="{% static 'bike.css' %}" type="text/css">
+
+	<link rel="icon" type="image/png" sizes="32x32"
+		href="{% static 'orange-bike-favicon-32x32.png' %}">
+	<link rel="icon" type="image/png" sizes="16x16"
+		href="{% static 'orange-bike-favicon-16x16.png' %}">
+
+    <title>{% block title %}{% if bike %}{{bike.name}} -{% endif %}
+    	{% endblock %}
+    	Bike
+    	</title>
+</head>
+<body>
+<div class="container-fluid masthead">
+
+<!-- <div class="masthead">  -->
+  
+  {% block banner %}
+  <h3 class="text-center pt-4">🚲 🚲 🚲 Bike 🚲 🚲 🚲</h3>
+  {% endblock %}
+
+
+  <nav class="navbar">
+  <ul class="navbar-nav">
+    <li class="nav-item"><a class="nav-link" href="{% url 'bike:home' %}">Home</a></li>
+    <li class="nav-item"><a class="nav-link" href="{% url 'bike:bikes' %}">Bikes</a></li>
+    <li class="nav-item"><a class="nav-link" href="{% url 'bike:rides' %}">Rides</a></li>
+    <li class="nav-item"><a class="nav-link" href="{% url 'bike:mileage' %}">Mileage</a></li>
+    <li class="nav-item"><a class="nav-link" href="{% url 'bike:maint' %}">Maintenance</a></li>
+    <li class="nav-item"><a class="nav-link" href="{% url 'bike:components' %}">Components</a></li>
+  </ul>
+  </nav>
+
+  <div class="row container">
+    <div class="col-md-6">
+    {% load breadcrumb %}
+    <ul class="bike-breadcrumb">
+    <li>{% breadcrumb_url 'Home' 'bike:home' %}</li>
+    {% if bike_id %}
+    <li>{% breadcrumb_url 'Bike' 'bike:bike' bike_id %}
+    {% elif bike.id %}
+    <li>{% breadcrumb_url 'Bike' 'bike:bike' bike.id %}
+    {% endif %}
+    {% block breadcrumbs %}
+    {% endblock %}
+    </li>
+    </ul>
+    </div>
+    <div class="col-md-6">
+    <ul class="bike-breadcrumb text-right">
+    {% block help %}
+    <li><a href = "https://app.gitbook.com/@simon-lambourn/s/bike/" target="_blank">
+    Help</a></li>
+    {% endblock %}
+
+    {% if user.is_superuser %}
+    <li><a href="{% url 'admin:index' %}bike">Admin</a></li>
+    {% endif %}
+
+    {% if user.is_authenticated %}
+    <li>{% breadcrumb_url 'Logout' 'logout' %}</li>
+    {% endif %}
+    </ul>
+    </div>
+
+  </div>
+ <!--  </div>  -->
+</div>
+
+
+<div class="container">
+
+{% block content %}
+{% endblock %}
+
+<p style="color: grey;"><small>&copy Simon Lambourn 2020</small></p>
+</div>
+</body>
+</html>

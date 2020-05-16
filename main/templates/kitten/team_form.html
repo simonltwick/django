@@ -1,0 +1,90 @@
+{% extends 'kitten/base.html' %}
+
+
+{% block title %}
+{% if team.name %}
+	{{ team.name }} Settings -
+{% else %}
+	New Team -
+{% endif %}
+{% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+{% if team %}
+> {% breadcrumb_url "Settings" 'kitten:team' team.id %}
+{% else %}
+> {% breadcrumb_url "New Team" 'kitten:team' %}
+{% endif %}
+{% endblock %}
+
+
+{% block content %}
+
+{% if team.name %}
+	<h1>{{ team.name }} Settings</h1>
+{% else %}
+	<h1>New Team</h1>
+{% endif %}
+
+<form method="post">
+<table class="table">
+	{% csrf_token %}
+	{{ form }}
+	{% if team %}
+	<tr><th>Skill level:</th><td>{{ team.get_level_display }}</td></tr>
+	<tr><th>Members:</th><td>
+	<ul>
+	{% for member in team.members.all %}
+
+		<li>{{ member.username }}
+		<a href="{% url 'kitten:team_member_remove' team.id member.id %}">
+		Remove</a></li>
+
+	{% empty %}
+	<li>No team members!</li>
+	{% endfor %}
+	</ul></td></tr>
+	<tr><th>Invitations	to join this team:</th><td>
+	<ul>
+	{% for invitation in team.invitations.all %}
+	
+	<li>{{ invitation.invitee_username }} invited by
+		{{ invitation.invited_by }} on {{ invitation.date }}
+	    <a href="{% url 'kitten:invitation_delete' team.id invitation.id %}">Delete</a>
+	    </li>
+
+	{% empty %}
+	<li>(none)</li>
+	{% endfor %}
+	</ul>
+	<a href="{% url 'kitten:team_invitation_new' team.id %}">New invitation</a>
+	</td></tr>
+	{% endif %} <!-- if team -->
+</table>
+	<p>
+	{% if team %}
+	<a href="{% url 'kitten:team_games' team.id %}" class="btn btn-success">Games</a>
+	<a class="btn btn-danger" href="{% url 'kitten:team_delete' team.id %}">Delete Team</a>
+	{% endif %}
+	<input class="btn btn-primary" type="submit" value="Save"></p>
+</form>
+
+{% if team.networks.exists %}
+<h3>{{ team.name }}'s networks</h3>
+<ul>
+{% for network in team.networks.all %}
+
+	<li><a href="{% url 'kitten:network' network.id %}">{{ network.name }}</a>
+	&nbsp;&nbsp;<a href="{% url 'kitten:network_delete' network.id %}">Delete</a></li>
+
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if team.can_design_networks %}
+<p><a href="{% url 'kitten:network_new' %}">New network</a>
+{% endif %}
+
+{% endblock %}

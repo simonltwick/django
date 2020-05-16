@@ -1,0 +1,30 @@
+{% extends 'bike/base.html' %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+{% if ride %}
+> {% breadcrumb_url 'Ride' 'bike:ride' ride.id %}
+{% else %}
+> {% breadcrumb_url 'New Ride' 'bike:ride_new' %}
+{% endif %}
+{% endblock %}
+
+
+{% block content %}
+<h1>Ride details:</h1>
+<form method='POST'>
+<table class="table">
+{{ form }}
+{% csrf_token %}
+</table>
+<a href="{% url 'bike:home' %}" class="btn btn-secondary">Cancel</a>
+<input type="submit" class="btn btn-secondary" value="Apply">
+<input type="submit" class="btn btn-primary" value="OK"
+	{% if ride %}
+    formaction="{% url 'bike:ride' ride.id %}?next={% url 'bike:home' %}"
+    {% else %}
+    formaction="{% url 'bike:ride_new' %}?next={% url 'bike:home' %}"
+    {% endif %}>
+</form>
+{% endblock %}

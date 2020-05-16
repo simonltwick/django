@@ -1,0 +1,30 @@
+{% extends 'kitten/base.html' %}
+
+
+{% block title %}
+	Invite Team Members -
+{% endblock %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Invite Members" 'kitten:team_invitation_new' team.id %}
+{% endblock %}
+
+
+{% block content %}
+<h1>Invite new members to join {{ team.name }}</h1>
+
+<form method="post">
+	{% csrf_token %}
+	<table class="table">
+	{{ form }}
+	</table>
+	<p>The person you invite will see the invitation next time they visit, and
+	must enter the password to accept the invitation.</p>
+	<p>The invitation will expire in 14 days.</p>
+	<input class= "btn btn-primary" type="submit" value="Invite">
+</form>
+
+
+{% endblock %}
