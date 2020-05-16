@@ -55,6 +55,7 @@ class GameLevel:  # Mixin for Game, handling game level validation
                (EXPERT, 'Expert'))
     # Thresholds for game behaviour
     INCIDENTS_CAN_BLOCK = 25
+    TEAM_CAN_DESIGN_NETWORKS = ADVANCED
 
     def has_multiple_teams(self):
         return self.level > self.BASIC
@@ -83,7 +84,12 @@ class Team(models.Model, GameLevel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('team', args=[str(self.id)])
+        return reverse('kitten:team', args=[str(self.id)])
+
+    def can_design_networks(self):
+        log.info("team.can_design_networks=%s",
+                 self.level >= GameLevel.TEAM_CAN_DESIGN_NETWORKS)
+        return self.level >= GameLevel.TEAM_CAN_DESIGN_NETWORKS
 
 
 class TeamInvitation(models.Model):
@@ -127,7 +133,7 @@ class Network(models.Model):
     description = models.CharField(max_length=300)
     created = models.DateField(auto_now_add=True)
     last_updated = models.DateField(auto_now=True)
-    owner = models.ForeignKey(User, on_delete=models.PROTECT,
+    owner = models.ForeignKey(Team, on_delete=models.PROTECT,
                               null=True, related_name='networks')
     day_start_time = models.TimeField(default=datetime.time(hour=6))
     day_end_time = models.TimeField(default=datetime.time(hour=22))
@@ -149,7 +155,7 @@ class Network(models.Model):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('network', args=[str(self.id)])
+        return reverse('kitten:network', args=[str(self.id)])
 
     def clean(self):
         # game_round_duration must be a multiple of tick_interval
@@ -178,7 +184,7 @@ class GameTemplate(models.Model, GameLevel):
         return f'{self.get_level_display()} game template on {self.network}'
 
     def get_absolute_url(self):
-        return reverse('gametemplate', kwargs={'network_id': self.network_id,
+        return reverse('kitten:gametemplate', kwargs={'network_id': self.network_id,
                                                'pk': self.id})
 
 

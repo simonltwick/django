@@ -6,9 +6,9 @@ Confirm Delete for {{ gametemplate.name }} -
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Network" 'network' gametemplate.network_id %}
-> {% breadcrumb_url "Game Template" 'gametemplate' gametemplate.network_id gametemplate.id %}
-> {% breadcrumb_url "Delete" 'gametemplate_delete' gametemplate.id %}
+> {% breadcrumb_url "Network" 'kitten:network' gametemplate.network_id %}
+> {% breadcrumb_url "Game Template" 'kitten:gametemplate' gametemplate.network_id gametemplate.id %}
+> {% breadcrumb_url "Delete" 'kitten:gametemplate_delete' gametemplate.id %}
 {% endblock %}
 
 {% block content %}
@@ -20,7 +20,7 @@ Confirm Delete for {{ gametemplate.name }} -
 <form method="post">
 	{% csrf_token %}
 	{{ form.as_p }}
-	<p><a class="btn" href="{% url 'network' gametemplate.network_id %}">Cancel</a>
+	<p><a class="btn" href="{% url 'kitten:network' gametemplate.network_id %}">Cancel</a>
 	<input type="submit" class="btn btn-danger" value="Delete">
 </form>
 

@@ -6,8 +6,8 @@ Confirm Delete for {{ network.name }} -
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Network" 'network' network.id %}
-> {% breadcrumb_url "Delete" 'network_delete' network.id %}
+> {% breadcrumb_url "Network" 'kitten:network' network.id %}
+> {% breadcrumb_url "Delete" 'kitten:network_delete' network.id %}
 {% endblock %}
 
 {% block content %}
@@ -25,7 +25,7 @@ Confirm Delete for {{ network.name }} -
 <form method="post">
 	{% csrf_token %}
 	{{ form.as_p }}
-	<p><a class="button" href="{% url 'home' %}">Cancel</a>
+	<p><a class="button" href="{% url 'kitten:home' %}">Cancel</a>
 	<input type="submit" class="btn btn-danger" value="Delete">
 </form>
 

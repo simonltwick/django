@@ -4,20 +4,23 @@ Created on 25 Apr 2020
 @author: simon
 '''
 from django.conf.urls import url
+from django.urls import path
+from django.contrib.auth import views as auth_views
+
 from . import views
 
-
+app_name = 'kitten'  # for url namespacing
 urlpatterns = [
-    url(r'^$', views.home, name='home'),
+    path('', views.home, name='home'),
 
     # team crud
-    url(r'^team$', views.TeamNew.as_view(), name='team'),
-    url(r'^team/(?P<pk>[0-9]+)$', views.TeamUpdate.as_view(),
-        name='team'),
-    url(r'^team/(?P<pk>[0-9]+)/delete$', views.TeamDelete.as_view(),
-        name='team_delete'),
-    url(r'^team/(?P<team_id>[0-9]+)/games$', views.team_games,
-        name='team_games'),
+    path('team/<int:pk>', views.TeamUpdate.as_view(),
+         name='team'),
+    path('team/<int:pk>/delete', views.TeamDelete.as_view(),
+         name='team_delete'),
+    path('team/<int:team_id>/games', views.team_games,
+         name='team_games'),
+    path('team', views.TeamNew.as_view(), name='team'),
 
     # team members invite/accept/remove
     url(r'^team/(?P<team_id>[0-9]+)/invitation/new$',
@@ -31,7 +34,7 @@ urlpatterns = [
         views.team_member_remove, name='team_member_remove'),
 
     # game crud
-    url(r'^game/(?P<team_id>[0-9]+)$', views.game_new, name='game'),
+    path('team/<int:team_id>/game/new', views.game_new, name='game'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)$', views.game,
         name='game'),
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/delete',
@@ -108,4 +111,15 @@ urlpatterns = [
     url(r'linetemplate/(?P<linetemplate_id>[0-9]+)/linelocation/'
         r'(?P<linelocation_id>[0-9]+)',
         views.linelocation, name='linelocation'),
+
+    url(r'^admin/password_reset/$',
+        auth_views.PasswordResetView.as_view(), name='admin_password_reset'),
+    url(r'^admin/password_reset/done/$',
+        auth_views.PasswordResetDoneView.as_view(),
+        name='password_reset_done'),
+    url(r'^reset/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>.+)/$',
+        auth_views.PasswordResetConfirmView.as_view(),
+        name='password_reset_confirm'),
+    url(r'^reset/done/$', auth_views.PasswordResetCompleteView.as_view(),
+        name='password_reset_complete'),
 ]

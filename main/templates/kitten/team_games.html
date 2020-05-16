@@ -6,7 +6,7 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url 'Games' 'team_games' team.id %}
+> {% breadcrumb_url 'Games' 'kitten:team_games' team.id %}
 {% endblock %}
 
 
@@ -15,8 +15,8 @@
 <h1>Team Base - {{ team.name }}</h1>
 <p>{{ team.description }}</p>
 <p>Skill level: {{ team.get_level_display }}</p>
-<p><a class="btn btn-secondary" href="{% url 'team' team.id %}">
-Update team details</a>
+<p><a class="btn btn-secondary" href="{% url 'kitten:team' team.id %}">
+	Team Settings</a>
 <h2>Members</h2>
 
 <ul>{% for user in team.members.all %}
@@ -28,7 +28,7 @@ Update team details</a>
 
 <li>
 {% if team.invitations.count %}
-	<a href="{% url 'team' team.id %}">
+	<a href="{% url 'kitten:team' team.id %}">
 	{{ team.invitations.count }} invitations</a>
 {% else %}
 	No invitations
@@ -36,13 +36,13 @@ Update team details</a>
 	 to join this team have been sent.
 </li>
 </ul>
-<p><a class="btn btn-secondary" href="{% url 'team_invitation_new' team.id %}">
+<p><a class="btn btn-secondary" href="{% url 'kitten:team_invitation_new' team.id %}">
 Invite new members</a></p>
 <h2>Games</h2>
 <ul>
 {% for game in games %}
 
-<li><a href="{% url 'game' team.id game.id %}">{{ game }}</a>
+<li><a href="{% url 'kitten:game' team.id game.id %}">{{ game }}</a>
 started {{ game.started }}, last played {{ game.last_played}}
 </li>
 
@@ -54,13 +54,13 @@ started {{ game.started }}, last played {{ game.last_played}}
 {% if team.game_invitations %}
 <ul>{% for invitation in team.game_invitations.all %}
 <li>Invitation to join
-	<a href="{% url 'game_invitation_accept' team.id invitation.id %}">
+	<a href="{% url 'kitten:game_invitation_accept' team.id invitation.id %}">
 	{{ invitation.game.name }}</a> from {{ invitation.inviting_team.name }}
 	</li>
 {% endfor %}</ul>
 {% endif %}
 
 
-<p><a class="btn btn-success" href="{% url 'game' team.id %}">New game</a></p>
+<p><a class="btn btn-success" href="{% url 'kitten:game' team.id %}">New game</a></p>
 
 {% endblock %}

@@ -86,7 +86,7 @@ class TeamUpdate(IsTeamMemberMixin, UpdateView):
 class TeamDelete(IsTeamMemberMixin, DeleteView):
     model = Team
     fields = ('name', 'description', 'games')
-    success_url = reverse_lazy('home')
+    success_url = reverse_lazy('kitten:home')
 
 
 # TODO: validate that request.user owns this network / linetemplate / gametemp.
@@ -109,7 +109,7 @@ class NetworkUpdate(LoginRequiredMixin, UpdateView):
 
 class NetworkDelete(LoginRequiredMixin, DeleteView):
     model = Network
-    success_url = reverse_lazy('home')
+    success_url = reverse_lazy('kitten:home')
 
 
 @login_required
@@ -206,7 +206,7 @@ class LineTemplateDelete(LoginRequiredMixin, DeleteView):
     model = LineTemplate
 
     def get_success_url(self):
-        return reverse_lazy('network',
+        return reverse_lazy('kitten:network',
                             kwargs={'pk': self.object.network.id})
 
 
@@ -260,7 +260,7 @@ class GameTemplateUpdate(LoginRequiredMixin, UpdateView):
         return context
 
     def get_success_url(self):
-        return reverse('network',
+        return reverse('kitten:network',
                        kwargs={'pk': self.object.network_id})
 
 
@@ -268,7 +268,7 @@ class GameTemplateDelete(LoginRequiredMixin, DeleteView):
     model = GameTemplate
 
     def get_success_url(self):
-        return reverse_lazy('network',
+        return reverse_lazy('kitten:network',
                             kwargs={'pk': self.object.network.id})
 
 
@@ -295,7 +295,7 @@ def invitation_accept(request, invitation_id):
             if form.cleaned_data['password'] == invitation.password:
                 invitation.accept(request.user)
                 return HttpResponseRedirect(reverse(
-                    'team_games', kwargs={'team_id': invitation.team.id}))
+                    'kitten:team_games', kwargs={'team_id': invitation.team.id}))
 
             invitation.failed_attempts += 1
             if invitation.failed_attempts > invitation.MAX_PASSWORD_FAILURES:
@@ -350,7 +350,7 @@ def team_member_remove(request, team_id, user_id):
     log.info("team_member_remove: user_id=%s, request.user.id=%s",
              user_id, request.user.id)
     if user_id == str(request.user.id):  # removed yourself
-        return HttpResponseRedirect(reverse('home'))
+        return HttpResponseRedirect(reverse('kitten:home'))
     return TeamUpdate.as_view()(request, pk=team_id)
 
 
@@ -375,7 +375,7 @@ def game_new(request, team_id):
             game.save()
             form = GameForm(instance=game)
             return HttpResponseRedirect(reverse(
-                'game', kwargs={'game_id': game.id, 'team_id': team.id}))
+                'kitten:game', kwargs={'game_id': game.id, 'team_id': team.id}))
 
     else:  # initial call with only team_id
         form = NewGameForm()
@@ -418,7 +418,7 @@ def game_debug(request, game_id, team_id, code):
     game = get_object_or_404(Game, pk=game_id)
     game.debug(code)
     return HttpResponseRedirect(reverse(
-        'game_operations', kwargs={'team_id': team_id, 'game_id': game_id}))
+        'kitten:game_operations', kwargs={'team_id': team_id, 'game_id': game_id}))
 
 
 @login_required
@@ -437,7 +437,7 @@ def game_invitation_new(request, game_id, team_id):
         if form.is_valid():  # is_valid requires team and game to be set
             form.save()
             return HttpResponseRedirect(reverse(
-                'game', kwargs={'game_id': game_id, 'team_id': team_id}))
+                'kitten:game', kwargs={'game_id': game_id, 'team_id': team_id}))
     else:
         form = GameInvitationForm(initial={"game": game_inst})
     return render(request, 'kitten/game_invitation_new.html',
@@ -458,7 +458,7 @@ def game_invitation_accept(request, team_id, invitation_id):
             if form.cleaned_data['password'] == invitation.password:
                 invitation.accept(team_id)
                 return HttpResponseRedirect(reverse(
-                    'game', kwargs={'game_id': invitation.game.id,
+                    'kitten:game', kwargs={'game_id': invitation.game.id,
                                     'team_id': team_id}))
 
             invitation.failed_attempts += 1
@@ -495,10 +495,10 @@ def game_team_remove(request, game_id, team_id, remove_team_id):
     game_inst.teams.remove(remove_team_id)
     if team_id == remove_team_id:
         return HttpResponseRedirect(
-            reverse('team_games', kwargs={'team_id': team_id}))
+            reverse('kitten:team_games', kwargs={'team_id': team_id}))
     else:
         return HttpResponseRedirect(reverse(
-                'game', kwargs={'game_id': game_id, 'team_id': team_id}))
+                'kitten:game', kwargs={'game_id': game_id, 'team_id': team_id}))
 
 
 @login_required
@@ -549,7 +549,7 @@ def game_tick(request, game_id, team_id):
     game = get_object_or_404(Game, pk=game_id)
     game.run(GameInterval.TICK_SINGLE)
     return HttpResponseRedirect(reverse(
-        'game_operations', kwargs={'team_id': team_id, 'game_id': game_id}))
+        'kitten:game_operations', kwargs={'team_id': team_id, 'game_id': game_id}))
 
 
 @login_required
@@ -686,7 +686,7 @@ def incident(request, team_id, game_id, incident_id):
         else:
             incident.start_response(response_id)
             return HttpResponseRedirect(
-                reverse('game_operations',
+                reverse('kitten:game_operations',
                         kwargs={'team_id': team_id, 'game_id': game_id}))
     return render(request, 'kitten/incident.html',
                   {'game': game,
@@ -724,7 +724,7 @@ def incident_debug(request, team_id, game_id, incident_id, code):
     else:
         raise ValueError(f"incident_debug: invalid code {code!r}")
     return HttpResponseRedirect(reverse(
-        'incident', kwargs={'team_id': team_id, 'game_id': game_id,
+        'kitten:incident', kwargs={'team_id': team_id, 'game_id': game_id,
                             'incident_id': incident_id}))
 
 

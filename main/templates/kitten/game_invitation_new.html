@@ -8,8 +8,8 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Game" 'game' team.id game.id %}
-> {% breadcrumb_url "Invite Teams" 'game_invitation_new' team.id game.id %}
+> {% breadcrumb_url "Game" 'kitten:game' team.id game.id %}
+> {% breadcrumb_url "Invite Teams" 'kitten:game_invitation_new' team.id game.id %}
 {% endblock %}
 
 

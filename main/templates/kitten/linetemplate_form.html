@@ -12,11 +12,11 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Network" 'network' network_id %}
+> {% breadcrumb_url "Network" 'kitten:network' network_id %}
 {% if linetemplate %}
-> {% breadcrumb_url "Line Template" 'linetemplate' network_id linetemplate.id %}
+> {% breadcrumb_url "Line Template" 'kitten:linetemplate' network_id linetemplate.id %}
 {% else %}
-> {% breadcrumb_url "New Line Template" 'linetemplate' network_id %}
+> {% breadcrumb_url "New Line Template" 'kitten:linetemplate' network_id %}
 {% endif %}
 {% endblock %}
 
@@ -31,9 +31,9 @@
 
 <form method="post"
     {% if linetemplate %}
-	action="{% url 'linetemplate' network_id linetemplate.id %}"
+	action="{% url 'kitten:linetemplate' network_id linetemplate.id %}"
 	{% else %}
-	action="{% url 'linetemplate' network_id %}"
+	action="{% url 'kitten:linetemplate' network_id %}"
 	{% endif %}
 	>
 	{% csrf_token %}
@@ -75,13 +75,13 @@
 	</tbody></table>
 	<p>To add line locations, just fill in the name and the position in the
 	blank entry at the bottom, save, and a new blank entry will appear.</p>
-	<p><a href="{% url 'network' network_id %}" class="btn btn-warning">Cancel</a>
+	<p><a href="{% url 'kitten:network' network_id %}" class="btn btn-warning">Cancel</a>
 	<input type="submit" class="btn btn-default" value="Apply">
 	<input type="submit" value="OK" class="btn btn-primary"
 	{% if linetemplate %}
-	formaction="{% url 'linetemplate' network_id linetemplate.id %}?next={% url 'network' network_id %}"
+	formaction="{% url 'kitten:linetemplate' network_id linetemplate.id %}?next={% url 'kitten:network' network_id %}"
 	{% else %}
-	formaction="{% url 'linetemplate' network_id %}?next={% url 'network' network_id %}"
+	formaction="{% url 'kitten:linetemplate' network_id %}?next={% url 'kitten:network' network_id %}"
 	{% endif %}
 	>
 	</p>

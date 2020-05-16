@@ -13,9 +13,9 @@
 {% block breadcrumbs %}
 {% load breadcrumb %}
 {% if network %}
-> {% breadcrumb_url "Network" 'network' network.id %}
+> {% breadcrumb_url "Network" 'kitten:network' network.id %}
 {% else %}
-> {% breadcrumb_url "New Network" 'network_new' %}
+> {% breadcrumb_url "New Network" 'kitten:network_new' %}
 {% endif %}
 {% endblock %}
 
@@ -44,24 +44,24 @@
 	<ul>
 	{% for line in network.lines.all %}
 
-		<li><a href="{% url 'linetemplate' network.id line.id %}">
+		<li><a href="{% url 'kitten:linetemplate' network.id line.id %}">
 		{{ line.name }}</a>&nbsp;&nbsp;
-		<a href="{% url 'linetemplate_delete' line.id %}">Remove</a>
+		<a href="{% url 'kitten:linetemplate_delete' line.id %}">Remove</a>
 		</li>
 
 	{% empty %}
 	<li class="errormsg">You must add one or more lines to the network</li>
 	{% endfor %}
 	</ul>
-	<p><a href="{% url 'linetemplate' network.id %}">Add line</a>
+	<p><a href="{% url 'kitten:linetemplate' network.id %}">Add line</a>
 	</p>
 	
 	<h3>Playable levels</h3><!-- game teamplates in the network -->
 	<ul>{% for level in network.levels.all %}  <!-- GameTemplates -->
 
-		<li><a href="{% url 'gametemplate' network.id level.id %}">
+		<li><a href="{% url 'kitten:gametemplate' network.id level.id %}">
 		{{ level.get_level_display }}</a>&nbsp;&nbsp;
-		<a href="{% url 'gametemplate_delete' level.id %}">Remove</a>
+		<a href="{% url 'kitten:gametemplate_delete' level.id %}">Remove</a>
 		</li>
 
 		{% empty %}
@@ -69,7 +69,7 @@
 		network</li>
 
 	{% endfor %}</ul>
-	<p><a href="{% url 'gametemplate' network.id %}">Add level</a>
+	<p><a href="{% url 'kitten:gametemplate' network.id %}">Add level</a>
 
 {% endif %} <!-- network -->
 

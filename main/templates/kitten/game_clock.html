@@ -2,9 +2,9 @@
 {% load static %}
 <script type="application/javascript">
 {% if team %}
-var query_url = "{% url 'game_status' team.id game.id %}";
+var query_url = "{% url 'kitten:game_status' team.id game.id %}";
 {% else %}
-var query_url = "{% url 'game_status' team_id game.id %}";
+var query_url = "{% url 'kitten:game_status' team_id game.id %}";
 {% endif %}
 </script>
 <script async src="{% static 'game_clock.js' %}" type="application/javascript">

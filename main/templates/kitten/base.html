@@ -56,11 +56,11 @@
     {% load breadcrumb %}
     <nav><ul class="kitten-breadcrumb">
     
-      <li>{% breadcrumb_url 'Home' 'home' %}</li>
+      <li>{% breadcrumb_url 'Home' 'kitten:home' %}</li>
       {% if team_id %}
-      <li>{% breadcrumb_url 'Team' 'team_games' team_id %}
+      <li>{% breadcrumb_url 'Team' 'kitten:team_games' team_id %}
       {% elif team.id %}
-      <li>{% breadcrumb_url 'Team' 'team_games' team.id %}
+      <li>{% breadcrumb_url 'Team' 'kitten:team_games' team.id %}
       {% endif %}
       {% block breadcrumbs %}
       {% endblock %}

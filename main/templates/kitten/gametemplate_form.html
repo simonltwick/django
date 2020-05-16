@@ -12,11 +12,11 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Network" 'network' network_id %}
+> {% breadcrumb_url "Network" 'kitten:network' network_id %}
 {% if gametemplate %}
-> {% breadcrumb_url "Game Template" 'gametemplate' network_id gametemplate.id %}
+> {% breadcrumb_url "Game Template" 'kitten:gametemplate' network_id gametemplate.id %}
 {% else %}
-> {% breadcrumb_url "New Game Template" 'gametemplate' network_id %}
+> {% breadcrumb_url "New Game Template" 'kitten:gametemplate' network_id %}
 {% endif %}
 {% endblock %}
 
@@ -31,9 +31,9 @@
 
 <form method="post"
     {% if gametemplate %}
-	  action="{% url 'gametemplate' network_id gametemplate.id %}"
+	  action="{% url 'kitten:gametemplate' network_id gametemplate.id %}"
 	{% else %}
-	  action="{% url 'gametemplate' network_id %}"
+	  action="{% url 'kitten:gametemplate' network_id %}"
 	{% endif %}
 	>
 	{% csrf_token %}
@@ -43,7 +43,7 @@
 	<table class="table">
 	  {{ form }}
 	</table>
-	<p><a class="btn btn-default" href="{% url 'network' network_id %}">Cancel</a>
+	<p><a class="btn btn-default" href="{% url 'kitten:network' network_id %}">Cancel</a>
 	<input type="submit" value="OK" class="btn btn-primary">
 	</p>
 </form>

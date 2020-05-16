@@ -6,9 +6,9 @@ Confirm Delete for {{ linetemplate.name }} -
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Network" 'network' linetemplate.network_id %}
-> {% breadcrumb_url "Line Template" 'linetemplate' linetemplate.network_id linetemplate.id %}
-> {% breadcrumb_url "Delete" 'linetemplate_delete' linetemplate.id %}
+> {% breadcrumb_url "Network" 'kitten:network' linetemplate.network_id %}
+> {% breadcrumb_url "Line Template" 'kitten:linetemplate' linetemplate.network_id linetemplate.id %}
+> {% breadcrumb_url "Delete" 'kitten:linetemplate_delete' linetemplate.id %}
 {% endblock %}
 
 {% block content %}
@@ -26,7 +26,7 @@ Confirm Delete for {{ linetemplate.name }} -
 <form method="post">
 	{% csrf_token %}
 	{{ form.as_p }}
-	<p><a class="button" href="{% url 'home' %}">Cancel</a>
+	<p><a class="button" href="{% url 'kitten:home' %}">Cancel</a>
 	<input type="submit" class="btn btn-danger" value="Delete">
 </form>
 

@@ -15,30 +15,15 @@
 <ul>
 {% if user.is_authenticated %}
 {% for team in teams %}
-<li><a href="{% url 'team_games' team.id %}">{{ team.name }}</a></li>
+<li><a href="{% url 'kitten:team_games' team.id %}">{{ team.name }}</a></li>
 {% endfor %}
 {% endif %}
 {% for invitation in request.user.invitations.all %}
 <li>Invitation to join {{ invitation.team.name }} from 
 	{{ invitation.invited_by }}
-	<a href="{% url 'invitation_accept' invitation.id %}">Accept</a></li>
+	<a href="{% url 'kitten:invitation_accept' invitation.id %}">Accept</a></li>
 {% endfor %}
 </ul>
-<p><a href="{% url 'team' %}">New team</a></p>
-
-{% if request.user.networks %}
-<h3>My networks</h3>
-<ul>
-{% for network in request.user.networks.all %}
-
-	<li><a href="{% url 'network' network.id %}">{{ network.name }}</a>
-	&nbsp;&nbsp;<a href="{% url 'network_delete' network.id %}">Delete</a></li>
-
-{% endfor %}
-</ul>
-{% endif %}
-{% if user.is_superuser %}
-<p><a href="{% url 'network_new' %}">New network</a>
-{% endif %}
+<p><a href="{% url 'kitten:team' %}">New team</a></p>
 
 {% endblock%}
