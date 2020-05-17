@@ -37,6 +37,10 @@ class DistanceMixin(models.Model):
     class Meta:
         abstract = True
 
+    @property
+    def distance_units_display(self):
+        return self.get_distance_units_display()
+
 
 class AscentUnits:
     METRES = 1
@@ -79,6 +83,10 @@ class Ride(DistanceMixin):
 
     def get_absolute_url(self):
         return reverse('bike:ride', kwargs={'pk': self.id})
+
+    @property
+    def ascent_units_display(self):
+        return self.get_ascent_units_display()
 
 
 class Odometer(DistanceMixin):

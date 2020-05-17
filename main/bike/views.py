@@ -1,3 +1,4 @@
+import csv
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -5,9 +6,11 @@ from django.db.models import Sum
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse, HttpResponseRedirect
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
+import logging
+
 from .models import Bike, MaintenanceAction, Ride, ComponentType, Component, \
     Preferences, DistanceUnits
-import logging
+from .forms import RideSelectionForm
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -54,12 +57,14 @@ class PreferencesUpdate(LoginRequiredMixin, UpdateView):
     fields = ['distance_units', 'ascent_units']
 
     def dispatch(self, request, *args, **kwargs):
-        log.info("PreferencesUpdate called with kwargs=%s", kwargs)
         if 'pk' not in kwargs:
             try:
                 kwargs['pk'] = Preferences.objects.get(user=request.user).pk
             except Preferences.DoesNotExist:
                 return HttpResponseRedirect(reverse('bike:preferences_new'))
+        elif not Preferences.objects.filter(pk=kwargs['pk'],
+                                            user=request.user).exists():
+            return HttpResponse("Unauthorised preferences", status=401)
         return super(PreferencesUpdate, self).dispatch(request, *args,
                                                        **kwargs)
 
@@ -83,6 +88,12 @@ class BikeUpdate(LoginRequiredMixin, UpdateView):
     model = Bike
     fields = ['name', 'description']
 
+    def dispatch(self, request, *args, **kwargs):
+        if not Bike.objects.filter(pk=kwargs['pk'],
+                                   owner=request.user).exists():
+            return HttpResponse("Unauthorised bike", status=401)
+        return super(BikeUpdate, self).dispatch(request, *args, **kwargs)
+
     def get_success_url(self):
         if 'next' in self.request.GET:
             return self.request.GET['next']
@@ -93,6 +104,12 @@ class BikeDelete(LoginRequiredMixin, DeleteView):
     model = Bike
     fields = ['name', 'description']
     success_url = reverse_lazy('bike:bikes')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not Bike.objects.filter(pk=kwargs['pk'],
+                                   owner=request.user).exists():
+            return HttpResponse("Unauthorised bike", status=401)
+        return super(BikeDelete, self).dispatch(request, *args, **kwargs)
 
 
 def components(request):
@@ -117,6 +134,12 @@ class ComponentUpdate(LoginRequiredMixin, UpdateView):
     fields = ['bike', 'type', 'subcomponent_of', 'name', 'specification',
               'notes', 'supplier', 'date_acquired']
 
+    def dispatch(self, request, *args, **kwargs):
+        if not Component.objects.filter(pk=kwargs['pk'],
+                                        owner=request.user).exists():
+            return HttpResponse("Unauthorised component", status=401)
+        return super(ComponentUpdate, self).dispatch(request, *args, **kwargs)
+
     def get_success_url(self):
         if 'next' in self.request.GET:
             return self.request.GET['next']
@@ -127,10 +150,11 @@ class ComponentDelete(LoginRequiredMixin, DeleteView):
     model = Component
     success_url = reverse_lazy('bike:components')
 
-
-def rides(request):
-    rides = Ride.objects.filter(rider=request.user).order_by('-date')[:20]
-    return render(request, 'bike/rides.html', context={'rides': rides})
+    def dispatch(self, request, *args, **kwargs):
+        if not Component.objects.filter(pk=kwargs['pk'],
+                                        owner=request.user).exists():
+            return HttpResponse("Unauthorised component", status=401)
+        return super(ComponentDelete, self).dispatch(request, *args, **kwargs)
 
 
 class RideCreate(LoginRequiredMixin, CreateView):
@@ -153,6 +177,58 @@ class RideUpdate(LoginRequiredMixin, UpdateView):
         if 'next' in self.request.GET:
             return self.request.GET['next']
         return super(RideUpdate, self).get_success_url()
+
+    def dispatch(self, request, *args, **kwargs):
+        if not Ride.objects.filter(pk=kwargs['pk'],
+                                   rider=request.user).exists():
+            return HttpResponse("Unauthorised ride", status=401)
+        return super(RideUpdate, self).dispatch(request, *args, **kwargs)
+
+
+@login_required
+def rides(request):
+    if request.method == 'POST':
+        form = RideSelectionForm(
+            request.POST, bikes=Bike.objects.filter(owner=request.user).all())
+        if form.is_valid():
+            rides = Ride.objects.filter(rider=request.user)
+            if (bike := form.cleaned_data['bike']):
+                rides = rides.filter(bike=bike)
+            if (start_date := form.cleaned_data['start_date']):
+                rides = rides.filter(date__gte=start_date)
+            if (end_date := form.cleaned_data['end_date']):
+                rides = rides.filter(date__lte=end_date)
+            rides = rides.order_by('-date').all()
+            if (num_rides := form.cleaned_data['num_rides']):
+                log.info("Applying filter num_rides=%d", num_rides)
+                rides = rides[:num_rides]
+            log.info("request.GET=%s", request.GET)
+            if not rides.exists():
+                form.add_error(None, "No rides found matching those criteria.")
+            elif request.GET.get('action') == 'download_as_csv':
+                log.info("csv download requested")
+                fields = ['date', 'bike', 'distance', 'distance_units_display',
+                          'ascent', 'ascent_units_display', 'description']
+                return csv_data_response(request, 'rides.csv', rides, fields)
+        else:
+            rides = Ride.objects.order_by('-date').all()[:20]
+    else:
+        form = RideSelectionForm(
+            bikes=Bike.objects.filter(owner=request.user).all())
+        rides = Ride.objects.order_by('-date').all()[:20]
+    return render(request, 'bike/rides.html',
+                  context={'form': form, 'rides': rides})
+
+
+def csv_data_response(request, filename, queryset, fields):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+    writer.writerow(fields)  # header row
+    for row in queryset.all():
+        csv_row = [getattr(row, field_name) for field_name in fields]
+        writer.writerow(csv_row)
+    return response
 
 
 @login_required

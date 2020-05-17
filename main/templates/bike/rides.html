@@ -1,21 +1,35 @@
 {% extends 'bike/base.html' %}
 
+
 {% block breadcrumbs %}
 {% load breadcrumb %}
-</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
+> {% breadcrumb_url 'Rides' 'bike:rides' %}
 {% endblock %}
 
-{% block content %}
-{% load static %}
 
+{% block content %}
 <h1>Rides</h1>
-{% for ride in rides.all %}
+
+<h3>Choose a subset of rides:</h3>
+<form method='POST'>
+<table class="table">
+{{ form }}
+{% csrf_token %}
+</table>
+<input type="submit" class="btn btn-primary" value="Apply Filter">
+<input type="submit" class="btn btn-secondary" value="Download as CSV"
+    formaction="{% url 'bike:rides' %}?action=download_as_csv">
+</form>
+
+<h3>Rides</h3>
+{% for ride in rides %}
 {% if forloop.first %}
 <ul>
 {% endif %}
 
-<li>{{ ride.date }} <a href="{% url 'bike:ride' ride.id %}">{{ ride.description }}</a>
-{{ ride.distance }} {{ ride.get_distance_units_display }}</li>
+<li>{{ ride.date }} {{ ride.bike }}
+  <a href="{% url 'bike:ride' ride.id %}">{{ ride.description }}</a>
+  {{ ride.distance }} {{ ride.get_distance_units_display }}</li>
 
 {% if forloop.last %}
 </ul>
@@ -24,6 +38,4 @@
 <p>No rides found :-(</p>
 {% endfor %}
 
-<p><a class="btn btn-success" href="{% url 'bike:ride_new' %}">New ride</a></p>
-
-{% endblock%}
+{% endblock %}
