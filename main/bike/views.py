@@ -192,14 +192,18 @@ def rides(request):
             request.POST, bikes=Bike.objects.filter(owner=request.user).all())
         if form.is_valid():
             rides = Ride.objects.filter(rider=request.user)
-            if (bike := form.cleaned_data['bike']):
+            bike = form.cleaned_data['bike']
+            if bike:
                 rides = rides.filter(bike=bike)
-            if (start_date := form.cleaned_data['start_date']):
+            start_date = form.cleaned_data['start_date']
+            if start_date:
                 rides = rides.filter(date__gte=start_date)
-            if (end_date := form.cleaned_data['end_date']):
+            end_date = form.cleaned_data['end_date']
+            if end_date:
                 rides = rides.filter(date__lte=end_date)
             rides = rides.order_by('-date').all()
-            if (num_rides := form.cleaned_data['num_rides']):
+            num_rides = form.cleaned_data['num_rides']
+            if num_rides:
                 log.info("Applying filter num_rides=%d", num_rides)
                 rides = rides[:num_rides]
             log.info("request.GET=%s", request.GET)
