@@ -15,7 +15,7 @@
    formaction="{% url 'bike:bike' bike.id %}?next={% url 'bike:bikes' %}">
 	<a href="{% url 'bike:bike_delete' bike.id %}" class="btn btn-danger">Delete</a>
    {% else %}
-   formaction="{% url 'bike:bike' %}?next={% url 'bike:bikes' %}">
+   formaction="{% url 'bike:bike_new' %}?next={% url 'bike:bikes' %}">
    {% endif %}
 </form>
  

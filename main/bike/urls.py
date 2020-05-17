@@ -15,7 +15,7 @@ urlpatterns = [
 
     path('bikes', views.bikes, name='bikes'),
     path('bike/new', views.BikeCreate.as_view(), name='bike_new'),
-    path('bike', views.BikeUpdate.as_view(), name='bike'),
+    # path('bike', views.BikeUpdate.as_view(), name='bike'),
     path('bike/<int:pk>', views.BikeUpdate.as_view(), name='bike'),
     path('bike/<int:pk>/delete', views.BikeDelete.as_view(),
          name='bike_delete'),
