@@ -56,7 +56,7 @@ class Preferences(models.Model):
         verbose_name_plural = 'preferences'
 
     def get_absolute_url(self):
-        return reverse('preferences', kwargs={'pk': self.pk})
+        return reverse('bike:preferences', kwargs={'pk': self.pk})
 
     def __str__(self):
         return f"Preferences for {self.user.username}"
