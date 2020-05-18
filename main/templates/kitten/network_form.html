@@ -81,6 +81,13 @@
 	{% endfor %}</ul>
 	<p><a href="{% url 'kitten:gametemplate' network.id %}">Add level</a>
 
+
+{% if request.user.is_superuser %}
+<h3>Debug options</h3>
+<a href="{% url 'kitten:network_debug' team_id network.id 1 %}">
+Debug 1(traffic profile)</a>
+{% endif %}
+
 {% endif %} <!-- network -->
 
 

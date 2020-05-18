@@ -90,6 +90,8 @@ urlpatterns = [
          name='network'),
     path('team/<int:team_id>/network/<int:pk>/delete',
          views.NetworkDelete.as_view(), name='network_delete'),
+    path('team/<int:team_id>/network/<int:pk>/debug/<int:code>',
+         views.network_debug, name='network_debug'),
 
     url(r'network/(?P<network_id>[0-9]+)/linetemplate/new',
         views.linetemplate, name='linetemplate'),

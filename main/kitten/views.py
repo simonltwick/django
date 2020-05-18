@@ -154,6 +154,21 @@ class NetworkDelete(LoginRequiredMixin, DeleteView):
 
 
 @login_required
+def network_debug(request, team_id, pk, code):
+    if not Team.objects.filter(pk=team_id, members=request.user,
+                               networks=pk).exists():
+        return HttpResponse("Unauthorised network.", status=401)
+    network = Network.objects.get(pk=pk)
+    try:
+        network.debug(code)
+    except ValueError as e:
+        return HttpResponse(e.args, status=400)
+    return HttpResponseRedirect(
+        reverse('kitten:network',
+                kwargs={'team_id': team_id, 'network_id': pk}))
+
+
+@login_required
 def linetemplate(request, network_id, linetemplate_id=None):
     if not Network.objects.filter(
             owner=request.user, pk=network_id).exists():

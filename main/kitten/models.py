@@ -103,42 +103,57 @@ class PassengerTrafficProfile(models.Model):
         abstract = True
 
     def traffic_profile(self, date: dt.date) -> List[
-            Tuple[dt.time, dt.time, int]]:
+            Tuple[dt.datetime, dt.datetime, int]]:
         # peaks are different at weekends...
         peak_morning_traffic, peak_evening_traffic = (
             (self.peak_morning_traffic, self.peak_evening_traffic)
-            if date.weekday < 5  # i.e. Monday-Friday
+            if date.weekday() < 5  # i.e. Monday-Friday
             else (100, 100))
         peak_morning_slots = self.get_traffic_slots(
-            self.day_start_time, self.peak_morning_end,
+            date, self.day_start_time, self.peak_morning_end,
             self.night_traffic, peak_morning_traffic)
-        peak_evening_slots = reversed(self.get_traffic_slots(
-            self.day_end_time, self.peak_evening_start,
-            self.night_traffic, peak_evening_traffic))
-        # add a single (long?) slot in the middle with midday traffic
+        log.info("traffic_profile: peak_morning_slots=%s", peak_morning_slots)
+        peak_evening_slots = self.get_traffic_slots(
+            date, self.peak_evening_start, self.day_end_time,
+            peak_evening_traffic, self.night_traffic)
+        log.info("traffic_profile: peak_evening_slots=%s", peak_evening_slots)
+        # add a single (long) slot in the middle with midday traffic
         midday_slot = [(peak_morning_slots[-1][1],  # end of last morning slot
                        peak_evening_slots[0][0],  # start of 1st evening slot
                        100)]
         return peak_morning_slots + midday_slot + peak_evening_slots
 
-    def get_traffic_slots(self, low_time, high_time,
-                          low_traffic, high_traffic):
-        """ return a list of slots (start_time, end_time, pro_rated_traffic)
-        for slots of duration=tick_interval between low_time and high_time"""
-        num_slots, remainder = divmod((high_time - low_time) /
-                                      self.game_tick_interval)
+    def get_traffic_slots(self, date, start_time, end_time,
+                          start_traffic, end_traffic):
+        """ return a list of slots (start_datetime, end_datetime, traffic%)
+        for slots of duration=tick_interval between start_time and end_time """
+        log.info("get_traffic_slots(date=%s, start_time=%s, end_time=%s, "
+                 "start_traffic=%d, end_traffic=%d",
+                 date, start_time, end_time, start_traffic, end_traffic)
+        duration = (dt.datetime.combine(date, end_time) -
+                    dt.datetime.combine(date, start_time))
+        num_slots, remainder = divmod(duration, self.game_tick_interval)
         if remainder:
             num_slots += 1
         if num_slots == 1:
-            return [(low_time, low_time + self.game_tick_interval,
-                     high_traffic)]
+            return [(start_time, start_time + self.game_tick_interval,
+                     end_traffic)]
         tick_interval = self.game_tick_interval
-        traffic_step = (high_traffic - low_traffic)/(num_slots-1)
-        slots = [(low_time + i * tick_interval,
-                  low_time + (i + 1) * tick_interval,
-                  low_traffic + i * traffic_step)
+        traffic_step = (end_traffic - start_traffic)/(num_slots-1)
+        start_datetime = dt.datetime.combine(date, start_time)
+        slots = [(start_datetime + i * tick_interval,
+                  start_datetime + (i + 1) * tick_interval,
+                  start_traffic + i * traffic_step)
                  for i in range(num_slots)]
+        log.info("get_traffic_slots returning %s", slots)
         return slots
+
+    def traffic_profile_display(self, date: dt.date) -> str:
+        """ return a printable version of traffic_profile_display output """
+        tp = self.traffic_profile(date)
+        tp = (f"{t1.hour}:{t1.minute}-{t2.hour}:{t2.minute} {n:0f}"
+              for t1, t2, n in tp)
+        return '\n'.join(tp)
 
 
 class Team(models.Model, GameLevel):
@@ -253,6 +268,18 @@ class Network(PassengerTrafficProfile):
             raise ValidationError(
                 "Game round duration cannot be longer than the operating day"
                 " length (day end - day start).")
+
+    def debug(self, code):
+        """ various debug options """
+        if code == 1:  # list traffic profile
+            date = dt.date.today()
+            date -= dt.timedelta(days=date.weekday())  # force to Monday
+            log.info("Weekday traffic profile:\n%s",
+                     self.traffic_profile_display(date))
+            log.info("Weekend traffic profile:\n%s",
+                     self.traffic_profile_display(date + dt.timedelta(days=5)))
+        else:
+            raise ValueError(f"Invalid debug code {code!r}")
 
 
 class GameTemplate(models.Model, GameLevel):
