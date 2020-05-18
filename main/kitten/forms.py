@@ -3,7 +3,7 @@ from django.forms import modelformset_factory
 import logging
 
 from .models import Game, TeamInvitation, Team, GameInvitation, User, \
-    Network, Line, LineTemplate, PlaceTemplate
+    Network, Line, LineTemplate, PlaceTemplate, PassengerTrafficProfile
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -113,3 +113,18 @@ PlaceTemplateFormSet = modelformset_factory(
         'transit_delay': forms.NumberInput(attrs={'class': 'small-int'}),
         'ORDER': forms.NumberInput(attrs={'class': 'small-int'})
         })
+
+
+class NetworkForm(forms.ModelForm):
+
+    class Meta:
+        model = Network
+        fields = ('name', 'description',
+                  'game_tick_interval',
+                  'game_round_duration',
+                  'day_start_time',
+                  'peak_morning_end', 'peak_evening_start',
+                  'day_end_time',
+                  'peak_morning_traffic', 'peak_evening_traffic',
+                  'night_traffic',
+                  )

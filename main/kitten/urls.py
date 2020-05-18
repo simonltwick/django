@@ -84,11 +84,12 @@ urlpatterns = [
     url(r'team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/engineering',
         views.game_engineering, name='game_engineering'),
 
-    url(r'network/new', views.NetworkNew.as_view(), name='network_new'),
-    url(r'network/(?P<pk>[0-9]+)$', views.NetworkUpdate.as_view(),
-        name='network'),
-    url(r'network/(?P<pk>[0-9]+)/delete', views.NetworkDelete.as_view(),
-        name='network_delete'),
+    path('team/<int:team_id>/network/new', views.network_new,
+         name='network_new'),
+    path('team/<int:team_id>/network/<int:network_id>', views.network_update,
+         name='network'),
+    path('team/<int:team_id>/network/<int:pk>/delete',
+         views.NetworkDelete.as_view(), name='network_delete'),
 
     url(r'network/(?P<network_id>[0-9]+)/linetemplate/new',
         views.linetemplate, name='linetemplate'),

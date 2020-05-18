@@ -11,7 +11,8 @@ from .models import Game, Team, GameTemplate, Line, Network, \
     GameTemplate, PlaceTemplate, GamePlayStatus
 from .forms import GameForm, TeamInvitationForm, InvitationAcceptanceForm, \
     GameInvitationForm, GameInvitationAcceptanceForm, NewGameForm, \
-    LineTemplateForm, PlaceTemplateFormSet
+    LineTemplateForm, PlaceTemplateFormSet, NetworkForm
+
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -89,27 +90,67 @@ class TeamDelete(IsTeamMemberMixin, DeleteView):
     success_url = reverse_lazy('kitten:home')
 
 
-# TODO: validate that request.user owns this network / linetemplate / gametemp.
-class NetworkNew(LoginRequiredMixin, CreateView):
-    model = Network
-    fields = ('name', 'description', 'day_start_time', 'day_end_time',
-              'game_round_duration')
+@login_required
+def network_new(request, team_id):
+    try:
+        team = Team.objects.get(members=request.user, pk=team_id)
+    except Team.DoesNotExist:
+        return HttpResponse('Unauthorised team.', status=401)
 
-    def form_valid(self, form):
-        obj = form.save(commit=False)
-        obj.owner = self.request.user
-        return super(NetworkNew, self).form_valid(form)
+    if not team.can_design_networks():
+        return HttpResponse(
+            "Your team skill level is not yet high enough to design networks.",
+            status=401)
+
+    if request.method == 'POST':
+        form = NetworkForm(request.POST)
+        if form.is_valid():
+            form.cleaned_data['owner'] = team
+            network = form.save()
+            return HttpResponseRedirect(reverse(
+                'kitten:network',
+                kwargs={'team_id': team.id, 'network_id': network.id}))
+    else:
+        form = NetworkForm()
+    return render(request, 'kitten/network_form.html',
+                  context={'form': form, 'team_id': team_id})
 
 
-class NetworkUpdate(LoginRequiredMixin, UpdateView):
-    model = Network
-    fields = ('name', 'description', 'day_start_time', 'day_end_time',
-              'game_round_duration')
+def network_update(request, team_id, network_id):
+    if not Team.objects.filter(pk=team_id, members=request.user,
+                               networks=network_id).exists():
+        return HttpResponse("Unauthorised network.", status=401)
+
+    if request.method == "POST":
+        form = NetworkForm(request.POST)
+        if form.is_valid():
+            form.cleaned_data['owner'] = team_id
+            try:
+                form.cleaned_data['id'] = request.POST['network_id']
+            except KeyError:
+                pass
+            form.save()
+            success_url = request.GET.get('success')  # redirect on success?
+            if success_url:
+                return HttpResponseRedirect(success_url)
+    else:
+        network = get_object_or_404(Network, pk=network_id)
+        form = NetworkForm(instance=network)
+    return render(request, 'kitten/network_form.html',
+                  context={'form': form, 'team_id': team_id,
+                           'network': network})
 
 
 class NetworkDelete(LoginRequiredMixin, DeleteView):
     model = Network
     success_url = reverse_lazy('kitten:home')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not Team.objects.filter(
+                pk=kwargs.get('team_id'), members=request.user,
+                networks=kwargs.get('pk')).exists():
+            return HttpResponse("Unauthorised network.", status=401)
+        return super(DeleteView, self).dispatch(request, *args, **kwargs)
 
 
 @login_required

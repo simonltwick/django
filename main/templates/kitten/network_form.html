@@ -13,16 +13,16 @@
 {% block breadcrumbs %}
 {% load breadcrumb %}
 {% if network %}
-> {% breadcrumb_url "Network" 'kitten:network' network.id %}
+> {% breadcrumb_url "Network" 'kitten:network' team_id network.id %}
 {% else %}
-> {% breadcrumb_url "New Network" 'kitten:network_new' %}
+> {% breadcrumb_url "New Network" 'kitten:network_new' team_id %}
 {% endif %}
 {% endblock %}
 
 
 {% block content %}
 
-{% if network.name %}
+{% if network %}
 	<h1>{{ network.name }} Design</h1>
 {% else %}
 	<h1>New Network</h1>
@@ -30,13 +30,23 @@
 
 <form method="post">
 	{% csrf_token %}
+	<input type="hidden" name="network_id" value="{{ network.id }}">
 	<table class="table">
 	{{ form }}
 	</table>
 	<p>First, enter the details of your network and save it.  Then, you can add
-	line templates, line locations, and playable levels, so the network can be
+	line templates, line locations, incident types, responses and impacts,
+	and finally some playable levels, so the network can be
 	used in games.</p>
-	<input type="submit" class= "btn btn-primary" value="Save">
+	<a class="btn btn-danger href="{% url 'kitten:network_delete' team_id network.id %}">
+	Delete</a>
+	<input type="submit" class= "btn btn-secondary" value="Save">
+	<input type="submit" class="btn btn-primary" value="OK"
+	{% if network %}
+	formaction="{% url 'kitten:network' team_id network.id %}?success={% url 'kitten:team' team_id %}"
+	{% else %}
+	formaction="{% url 'kitten:network_new' team_id %}?success={% url 'kitten:team' team_id %}"
+	{% endif %}>
 </form>
 
 {% if network %}

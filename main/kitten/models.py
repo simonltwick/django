@@ -1,5 +1,5 @@
 from collections import defaultdict
-import datetime
+import datetime as dt
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
@@ -21,20 +21,20 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 
-def hhmm(dt: Union[datetime.time, datetime.datetime]) -> str:
+def hhmm(dt_or_time: Union[dt.time, dt.datetime, dt.timedelta]) -> str:
     """ accepts a datetime or time object & returns just hh:mm as a string """
-    if dt is None:
+    if dt_or_time is None:
         return None
 
-    if isinstance(dt, datetime.timedelta):
-        mins = dt.seconds // 60
+    if isinstance(dt_or_time, dt.timedelta):
+        mins = dt_or_time.seconds // 60
         hh, mm = divmod(mins, 60)
         return(f"{hh}h{mm:02d}")
 
-    if isinstance(dt, datetime.time):
-        return dt.isoformat(timespec='minutes')
+    if isinstance(dt_or_time, dt.time):
+        return dt_or_time.isoformat(timespec='minutes')
 
-    return dt.strftime('%H:%M')
+    return dt_or_time.strftime('%H:%M')
 
 
 def escape(s):
@@ -69,6 +69,78 @@ class GameLevel:  # Mixin for Game, handling game level validation
     has_scheduling_centre_available = has_line_turnarounds_available
 
 
+class PassengerTrafficProfile(models.Model):
+    """ define how much passenger traffic at peak/normal times of day.
+    This is used to calculate an hourly traffic profile,
+    starting at night_traffic at day start/end times,
+    tapering upto peak traffic
+    at peak_hour (morning and evening).  Between peaks, traffic is flat 100"""
+    TICK_STAGE = dt.timedelta(minutes=30)
+    TICK_SINGLE = dt.timedelta(minutes=5)
+    game_round_duration = models.DurationField(
+        default=TICK_STAGE,
+        help_text="The amount of game time in a round of the game.  Should be"
+        " a multiple of the game tick interval")
+    game_tick_interval = models.DurationField(
+        default=TICK_SINGLE,
+        help_text="The amount of game time that passes in a single iteration "
+        "of simulation (where trains are moved, incidents happen etc.)")
+    day_start_time = models.TimeField(default=dt.time(hour=6))
+    peak_morning_end = models.TimeField(default=dt.time(hour=9))
+    peak_evening_start = models.TimeField(default=dt.time(hour=17))
+    day_end_time = models.TimeField(default=dt.time(hour=22))
+    night_traffic = models.PositiveIntegerField(
+        default=50,
+        help_text="passenger traffic at start/end of the day")
+    peak_morning_traffic = models.PositiveIntegerField(
+        default=200,
+        help_text="passenger traffic compared to daytime normal=100")
+    peak_evening_traffic = models.PositiveIntegerField(
+        default=150,
+        help_text="passenger traffic compared to daytime normal=100")
+
+    class Meta:
+        abstract = True
+
+    def traffic_profile(self, date: dt.date) -> List[
+            Tuple[dt.time, dt.time, int]]:
+        # peaks are different at weekends...
+        peak_morning_traffic, peak_evening_traffic = (
+            (self.peak_morning_traffic, self.peak_evening_traffic)
+            if date.weekday < 5  # i.e. Monday-Friday
+            else (100, 100))
+        peak_morning_slots = self.get_traffic_slots(
+            self.day_start_time, self.peak_morning_end,
+            self.night_traffic, peak_morning_traffic)
+        peak_evening_slots = reversed(self.get_traffic_slots(
+            self.day_end_time, self.peak_evening_start,
+            self.night_traffic, peak_evening_traffic))
+        # add a single (long?) slot in the middle with midday traffic
+        midday_slot = [(peak_morning_slots[-1][1],  # end of last morning slot
+                       peak_evening_slots[0][0],  # start of 1st evening slot
+                       100)]
+        return peak_morning_slots + midday_slot + peak_evening_slots
+
+    def get_traffic_slots(self, low_time, high_time,
+                          low_traffic, high_traffic):
+        """ return a list of slots (start_time, end_time, pro_rated_traffic)
+        for slots of duration=tick_interval between low_time and high_time"""
+        num_slots, remainder = divmod((high_time - low_time) /
+                                      self.game_tick_interval)
+        if remainder:
+            num_slots += 1
+        if num_slots == 1:
+            return [(low_time, low_time + self.game_tick_interval,
+                     high_traffic)]
+        tick_interval = self.game_tick_interval
+        traffic_step = (high_traffic - low_traffic)/(num_slots-1)
+        slots = [(low_time + i * tick_interval,
+                  low_time + (i + 1) * tick_interval,
+                  low_traffic + i * traffic_step)
+                 for i in range(num_slots)]
+        return slots
+
+
 class Team(models.Model, GameLevel):
     name = models.CharField(max_length=40, unique=True)
     description = models.CharField(max_length=300, null=True, blank=True)
@@ -93,7 +165,7 @@ class Team(models.Model, GameLevel):
 
 
 class TeamInvitation(models.Model):
-    EXPIRY_LIMIT = datetime.timedelta(days=14)
+    EXPIRY_LIMIT = dt.timedelta(days=14)
     MAX_PASSWORD_FAILURES = 5
     team = models.ForeignKey(Team, on_delete=models.CASCADE,
                              related_name='invitations')
@@ -123,22 +195,16 @@ class TeamInvitation(models.Model):
 
 
 # ------ network and game templating classes
-class Network(models.Model):
+class Network(PassengerTrafficProfile):
     # map
     # font
     # logo
-    TICK_STAGE = datetime.timedelta(minutes=30)
-    TICK_SINGLE = datetime.timedelta(minutes=5)
     name = models.CharField(max_length=40, unique=True)
     description = models.CharField(max_length=300)
     created = models.DateField(auto_now_add=True)
     last_updated = models.DateField(auto_now=True)
     owner = models.ForeignKey(Team, on_delete=models.PROTECT,
                               null=True, related_name='networks')
-    day_start_time = models.TimeField(default=datetime.time(hour=6))
-    day_end_time = models.TimeField(default=datetime.time(hour=22))
-    game_round_duration = models.DurationField(default=TICK_STAGE)
-    game_tick_interval = models.DurationField(default=TICK_SINGLE)
     # lines = reverse FK (to LineTemplate)
     # levels = reverse FK (to GameTemplate)
     # incident_types= reverse FK
@@ -158,15 +224,35 @@ class Network(models.Model):
         return reverse('kitten:network', args=[str(self.id)])
 
     def clean(self):
-        # game_round_duration must be a multiple of tick_interval
-        if self.game_round_duration % self.game_tick_interval:
-            raise ValidationError("Game round duration must be a multiple of"
-                                  "game tick interval.")
         # Networks must have at least one LineTemplate.
         # BUT can't add Lines until network has been saved!
-        return
-        if not self.lines.exists():
-            raise ValidationError('Networks must have at least one line')
+        if self.day_start_time >= self.day_end_time:
+            raise ValidationError("Day start time must be before end time.")
+        if self.day_start_time >= self.peak_morning_end:
+            raise ValidationError(
+                "Peak morning end time must be after day start time.")
+        if self.peak_morning_end >= self.peak_evening_start:
+            raise ValidationError("Peak morning end time must be before peak "
+                                  "evening start time.")
+        if self.peak_evening_start >= self.day_end_time:
+            raise ValidationError(
+                "Peak evening start time must be before day end time.")
+
+        if self.game_tick_interval < dt.timedelta(minutes=1):
+            raise ValidationError(
+                "Game tick interval cannot be less than 1 minute.")
+        if self.game_tick_interval > self.game_round_duration:
+            raise ValidationError(
+                "Game round duration cannot be less than tick interval.")
+        if self.game_round_duration % self.game_tick_interval:
+            raise ValidationError(
+                "Game round duration must be a multiple of tick interval.")
+        if self.game_round_duration > (
+                dt.datetime.combine(dt.date.today(), self.day_end_time) -
+                dt.datetime.combine(dt.date.today(), self.day_start_time)):
+            raise ValidationError(
+                "Game round duration cannot be longer than the operating day"
+                " length (day end - day start).")
 
 
 class GameTemplate(models.Model, GameLevel):
@@ -184,8 +270,8 @@ class GameTemplate(models.Model, GameLevel):
         return f'{self.get_level_display()} game template on {self.network}'
 
     def get_absolute_url(self):
-        return reverse('kitten:gametemplate', kwargs={'network_id': self.network_id,
-                                               'pk': self.id})
+        return reverse('kitten:gametemplate',
+                       kwargs={'network_id': self.network_id, 'pk': self.id})
 
 
 # ----- Incident Types and responses -----
@@ -255,7 +341,7 @@ class Response(models.Model):
     network = models.ForeignKey(Network, null=True, on_delete=models.CASCADE)
     effectiveness_percent = models.PositiveSmallIntegerField(default=100)
     impacts = models.ManyToManyField(Impact)
-    time_to_fix = models.DurationField(default=datetime.timedelta(0))
+    time_to_fix = models.DurationField(default=dt.timedelta(0))
 
     def __str__(self):
         return self.name
@@ -341,10 +427,10 @@ class Game(models.Model, GameLevel):
         " generating 1 incident per tick of the clock")
     level = models.IntegerField(choices=GameLevel.CHOICES)
     day_start_time = models.TimeField(
-        default=datetime.time(hour=6),
+        default=dt.time(hour=6),
         help_text="time when daily train operations start, in UTC/GMT time")
     day_end_time = models.TimeField(
-        default=datetime.time(hour=22),
+        default=dt.time(hour=22),
         help_text="time when daily train operations end, in UTC/GMT time")
     current_time = models.DateTimeField(auto_now_add=True, null=True)
     game_round_duration = models.DurationField(default=Network.TICK_STAGE)
@@ -379,8 +465,8 @@ class Game(models.Model, GameLevel):
             day_end_time=network.day_end_time,
             game_round_duration=network.game_round_duration,
             tick_interval=network.game_tick_interval,
-            current_time=datetime.datetime.combine(
-                datetime.date.today(), network.day_start_time),
+            current_time=dt.datetime.combine(
+                dt.date.today(), network.day_start_time),
             network_name=network_name,
             level=template.level,
             incident_rate=template.incident_rate,
@@ -411,7 +497,7 @@ class Game(models.Model, GameLevel):
             self.play_status = GamePlayStatus.RUNNING
             round_end_datetime = self.calc_round_end_datetime()
             while True:
-                # log.info("game.play():current_time=%s, round_end_datetime=%s",
+                # log.info("game.play():current_time=%s,round_end_datetime=%s",
                 #          self.current_time, round_end_datetime)
                 self.tick()
                 if (self.play_status != GamePlayStatus.RUNNING or
@@ -439,7 +525,7 @@ class Game(models.Model, GameLevel):
         finally:
             self.save()
 
-    def calc_round_end_datetime(self) -> datetime.datetime:
+    def calc_round_end_datetime(self) -> dt.datetime:
         ''' return the datetime that this round should end.  Also handle day
         rollover at end of day '''
         # TODO: sort out local time (current_date) vs naive time (start/end)
@@ -447,20 +533,20 @@ class Game(models.Model, GameLevel):
         if self.current_time.time() >= self.day_end_time:
             # roll over day
             new_date = self.current_time.date()
-            new_date += datetime.timedelta(days=1)
+            new_date += dt.timedelta(days=1)
             # and add new start of day time
-            self.current_time = datetime.datetime.combine(
+            self.current_time = dt.datetime.combine(
                 new_date, self.day_start_time,
                 tzinfo=self.current_time.tzinfo)
             self.save()
         # if current_time before day_start_time, set to day_start_time
         elif self.current_time.time() < self.day_start_time:
-            self.current_time = datetime.datetime.combine(
+            self.current_time = dt.datetime.combine(
                 self.current_time.date(), self.day_start_time,
                 tzinfo=self.current_time.tzinfo)
             self.save()
 
-        today_start_datetime = datetime.datetime.combine(
+        today_start_datetime = dt.datetime.combine(
             self.current_time.date(), self.day_start_time,
             tzinfo=self.current_time.tzinfo)
         rounds_today = ((self.current_time - today_start_datetime) //
@@ -691,7 +777,7 @@ class LineTemplate(models.Model):
 
 
 class GameInvitation(models.Model):
-    EXPIRY_LIMIT = datetime.timedelta(days=14)
+    EXPIRY_LIMIT = dt.timedelta(days=14)
     MAX_PASSWORD_FAILURES = 5
     game = models.ForeignKey(Game, on_delete=models.CASCADE,
                              related_name='invitations')
@@ -740,7 +826,7 @@ class Line(models.Model):
     train_interval = models.IntegerField(default=10)
     train_type = models.CharField(max_length=20, default='Train')
     total_arrivals = models.PositiveIntegerField(default=0)
-    total_delay = models.DurationField(default=datetime.timedelta(0))
+    total_delay = models.DurationField(default=dt.timedelta(0))
     on_time_arrivals = models.PositiveIntegerField(default=0)
     # num_trains local variable for assigning train serial numbers
     # line style / colour
@@ -775,7 +861,7 @@ class Line(models.Model):
         self.incidents.append(incident)
 
     def close_incident(self, incident: 'Incident',
-                       _closure_time: datetime.datetime):
+                       _closure_time: dt.datetime):
         self.incidents.remove(incident)
 
     def try_resolve_incidents(self):
@@ -918,7 +1004,7 @@ class Line(models.Model):
             if train.location.is_start_of_line:
                 break  # as above, move max 1 train from depot
 
-    def report_punctuality(self, delay: datetime.timedelta):
+    def report_punctuality(self, delay: dt.timedelta):
         """ record train arrival punctuality """
         self.total_arrivals += 1
         self.total_delay += delay
@@ -935,7 +1021,6 @@ class LocationType:
 
 
 class PlaceTemplate(models.Model, LocationType):
-    # TODO: validate that station names are non-blank
     name = models.CharField(
         max_length=40, help_text="A name is only required for stations",
         default='', verbose_name="Name (if station)", blank=True)
@@ -947,10 +1032,13 @@ class PlaceTemplate(models.Model, LocationType):
     transit_delay = models.IntegerField(
         default=1, help_text='time to travel along lines; wait time at '
         'stations or depots')
+    # the following fields are only used for stations
     turnaround_percent_direction1 = models.PositiveSmallIntegerField(
         default=0, validators=[MaxValueValidator(100)])
     turnaround_percent_direction2 = models.PositiveSmallIntegerField(
         default=0, validators=[MaxValueValidator(100)])
+    passenger_traffic_percent = models.PositiveSmallIntegerField(
+        default=100, help_text="Relative passenger traffic at this station.")
 
     class Meta:
         ordering = ('position',)
@@ -961,6 +1049,10 @@ class PlaceTemplate(models.Model, LocationType):
 
     def __str__(self):
         return f'{self.name} ({self.display_type()})'
+
+    def clean(self):
+        if self.type == LocationType.STATION and not self.name:
+            raise ValidationError("Station name cannot be blank.")
 
 
 class LineLocation(models.Model, LocationType):
@@ -1067,7 +1159,6 @@ class LineLocation(models.Model, LocationType):
             classes.append('station')
         classes = ' '.join(classes)
         name = escape(self.name) or '[Track]'
-        # TODO: add turnaround indicator
         return ('<div class="location">'  # allows transit-delay -> right
                 f'<span class="{classes}">{name}</span>'
                 f'<span class="transit-delay">{self.transit_delay}</span>'
@@ -1136,7 +1227,7 @@ class Train(models.Model):
     serial = models.PositiveIntegerField(default=1)
     awaiting_turnaround = models.BooleanField(default=False)
     blocked = models.BooleanField(default=False)
-    delay = models.DurationField(default=datetime.timedelta(0))
+    delay = models.DurationField(default=dt.timedelta(0))
     # this is kept in step with LineLocation.direction_is_forward,(performance)
     direction_is_forward = models.BooleanField(default=True)
 
@@ -1278,7 +1369,7 @@ class Train(models.Model):
         reverse_loc = self.location.reverse
         if reverse_loc.trains.exists():
             # clear delays if there's already a train in the depot
-            self.delay = datetime.timedelta(0)
+            self.delay = dt.timedelta(0)
         self.direction_is_forward = reverse_loc.direction_is_forward
         self.move(reverse_loc, current_time)
 
