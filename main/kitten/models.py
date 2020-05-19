@@ -174,8 +174,6 @@ class Team(models.Model, GameLevel):
         return reverse('kitten:team', args=[str(self.id)])
 
     def can_design_networks(self):
-        log.info("team.can_design_networks=%s",
-                 self.level >= GameLevel.TEAM_CAN_DESIGN_NETWORKS)
         return self.level >= GameLevel.TEAM_CAN_DESIGN_NETWORKS
 
 

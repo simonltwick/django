@@ -14,31 +14,29 @@ urlpatterns = [
     path('', views.home, name='home'),
 
     # team crud
+    path('team', views.TeamNew.as_view(), name='team'),
     path('team/<int:pk>', views.TeamUpdate.as_view(),
          name='team'),
     path('team/<int:pk>/delete', views.TeamDelete.as_view(),
          name='team_delete'),
     path('team/<int:team_id>/games', views.team_games,
          name='team_games'),
-    path('team', views.TeamNew.as_view(), name='team'),
 
     # team members invite/accept/remove
-    url(r'^team/(?P<team_id>[0-9]+)/invitation/new$',
-        views.team_invitation_new, name='team_invitation_new'),
-    url(r'^team/(?P<team_id>[0-9]+)/invitation/'
-        r'(?P<invitation_id>[0-9]+)/delete',
-        views.invitation_delete, name='invitation_delete'),
-    url(r'^invitation/(?P<invitation_id>[0-9]+)/accept',
-        views.invitation_accept, name='invitation_accept'),
-    url(r'^team/(?P<team_id>[0-9]+)/member/(?P<user_id>[0-9]+)/remove',
-        views.team_member_remove, name='team_member_remove'),
+    path('team/<int:team_id>/invitation/new',
+         views.team_invitation_new, name='team_invitation_new'),
+    path('team/<int:team_id>/invitation/<int:invitation_id>/delete',
+         views.invitation_delete, name='invitation_delete'),
+    path('invitation/<int:invitation_id>/accept',
+         views.invitation_accept, name='invitation_accept'),
+    path('team/<int:team_id>/member/<int:user_id>/remove',
+         views.team_member_remove, name='team_member_remove'),
 
     # game crud
     path('team/<int:team_id>/game/new', views.game_new, name='game'),
-    url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)$', views.game,
-        name='game'),
-    url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/delete',
-        views.game_delete, name='game_delete'),
+    path('team/<int:team_id>/game/<int:game_id>', views.game, name='game'),
+    path('team/<int:team_id>/game/<int:pk>/delete',
+         views.GameDelete.as_view(), name='game_delete'),
 
     # game team invite/accept/remove
     url(r'^team/(?P<team_id>[0-9]+)/game/(?P<game_id>[0-9]+)/invitation/new',

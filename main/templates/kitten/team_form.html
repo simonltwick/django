@@ -66,12 +66,12 @@
 </table>
 	<p>
 	<input class="btn btn-primary" type="submit" value="Save team Settings">
+	</p>
+	{% if team %}
 	<a class="btn btn-danger" href="{% url 'kitten:team_delete' team.id %}">
 	Delete Team</a>
 	<a href="{% url 'kitten:team_games' team.id %}" class="btn btn-success">
 	Games</a>
-	</p>
-	{% if team %}
 	{% endif %}
 </form>
 

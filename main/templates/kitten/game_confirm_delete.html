@@ -1,0 +1,39 @@
+{% extends 'kitten/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ game.name }} -
+{% endblock %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Game" 'kitten:game' team_id game.id %}
+> {% breadcrumb_url "Delete" 'kitten:game_delete' team_id game.id %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ game.name }}</h1>
+	<p class="errormsg">This game will be deleted for all teams:</p>
+	<ul>
+
+	{% for team in game.teams.all %}
+
+		<li>{{ team.name }}</li>
+
+	{% empty %}
+	<li>No teams!</li>
+	{% endfor %}
+
+	</ul>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p><a class="btn btn-secondary" href="{% url 'kitten:team_games' team_id %}">
+	Cancel</a>
+	<input type="submit" class="btn btn-danger" value="Delete">
+</form>
+
+
+{% endblock %}

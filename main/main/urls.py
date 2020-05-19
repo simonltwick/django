@@ -1,4 +1,4 @@
-"""kotl URL Configuration
+"""main URL Configuration
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/1.11/topics/http/urls/
@@ -13,27 +13,22 @@ Including another URLconf
     1. Import the include() function: from django.conf.urls import url, include
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
-from django.conf.urls import url
 from django.urls import path, include
 from django.contrib import admin
-# from django.views.generic import RedirectView
 from django.conf import settings
-from django.conf.urls.static import static
-from django.contrib.auth import views as auth_views
+# from django.conf.urls.static import static  # not with runserver
 
 
 urlpatterns = [
     path('admin/', admin.site.urls, name='admin'),
     path('kitten/', include('kitten.urls', namespace='kitten'), name='kitten'),
     path('bike/', include('bike.urls', namespace='bike'), name='bike'),
-    # path('', RedirectView.as_view(url='kitten/', permanent=False)),
-    path('accounts/login/', auth_views.LoginView.as_view()),
-    path('', include('django.contrib.auth.urls')),
+    path('accounts/', include('django.contrib.auth.urls')),
     # static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 ]
 
 if settings.DEBUG:
     import debug_toolbar
     urlpatterns = [
-        url(r'^__debug__/', include(debug_toolbar.urls)),
+        path('__debug__/', include(debug_toolbar.urls)),
     ] + urlpatterns

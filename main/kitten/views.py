@@ -6,12 +6,15 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy, reverse
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
-from .models import Game, Team, GameTemplate, Line, Network, \
-    GameInterval, Incident, TeamInvitation, GameInvitation, LineTemplate, \
-    GameTemplate, PlaceTemplate, GamePlayStatus
-from .forms import GameForm, TeamInvitationForm, InvitationAcceptanceForm, \
-    GameInvitationForm, GameInvitationAcceptanceForm, NewGameForm, \
-    LineTemplateForm, PlaceTemplateFormSet, NetworkForm
+from .models import (
+    Game, Team, Line, Network, GameInterval, Incident, TeamInvitation,
+    GameInvitation, LineTemplate, GameTemplate, PlaceTemplate, GamePlayStatus,
+    )
+from .forms import (
+    GameForm, TeamInvitationForm, InvitationAcceptanceForm,
+    GameInvitationForm, GameInvitationAcceptanceForm, NewGameForm,
+    LineTemplateForm, PlaceTemplateFormSet, NetworkForm,
+    )
 
 import logging
 log = logging.getLogger(__name__)
@@ -227,7 +230,7 @@ def linetemplate(request, network_id, linetemplate_id=None):
             if len(formset):
                 # decided not to ensure turnaround at end of line, confusing
                 # to user: leave it to Line.new_from_template
-                r = formset.save()
+                formset.save()
             next_url = request.GET.get('next', None)
             if next_url:
                 return HttpResponseRedirect(next_url)
@@ -337,12 +340,12 @@ def invitation_delete(request, team_id, invitation_id):
                                          team=team_id).exists:
         return HttpResponse("Unauthorised invitation", status=401)
     TeamInvitation.objects.filter(id=invitation_id).delete()
-    return TeamUpdate.as_view()(request, pk=team_id)
+    return HttpResponseRedirect(reverse('kitten:team', kwargs={'pk': team_id}))
 
 
 @login_required
 def invitation_accept(request, invitation_id):
-    invitation = get_object_or_404(TeamInvitation, pk=invitation_id)
+    invitation = get_object_or_404(TeamInvitation, id=invitation_id)
     if invitation.invitee_username != request.user:
         return HttpResponse("Unauthorised invitation", status=401)
     if request.method == 'POST':
@@ -351,7 +354,8 @@ def invitation_accept(request, invitation_id):
             if form.cleaned_data['password'] == invitation.password:
                 invitation.accept(request.user)
                 return HttpResponseRedirect(reverse(
-                    'kitten:team_games', kwargs={'team_id': invitation.team.id}))
+                    'kitten:team_games',
+                    kwargs={'team_id': invitation.team.id}))
 
             invitation.failed_attempts += 1
             if invitation.failed_attempts > invitation.MAX_PASSWORD_FAILURES:
@@ -403,11 +407,11 @@ def team_member_remove(request, team_id, user_id):
         return HttpResponse(f"User is not a member of {team.name}.",
                             status=400)
     team.members.remove(user_id)
-    log.info("team_member_remove: user_id=%s, request.user.id=%s",
-             user_id, request.user.id)
+    # log.info("team_member_remove: user_id=%s, request.user.id=%s",
+    #          user_id, request.user.id)
     if user_id == str(request.user.id):  # removed yourself
         return HttpResponseRedirect(reverse('kitten:home'))
-    return TeamUpdate.as_view()(request, pk=team_id)
+    return HttpResponseRedirect(reverse('kitten:team', kwargs={'pk': team_id}))
 
 
 @login_required
@@ -431,7 +435,8 @@ def game_new(request, team_id):
             game.save()
             form = GameForm(instance=game)
             return HttpResponseRedirect(reverse(
-                'kitten:game', kwargs={'game_id': game.id, 'team_id': team.id}))
+                'kitten:game',
+                kwargs={'game_id': game.id, 'team_id': team.id}))
 
     else:  # initial call with only team_id
         form = NewGameForm()
@@ -474,7 +479,8 @@ def game_debug(request, game_id, team_id, code):
     game = get_object_or_404(Game, pk=game_id)
     game.debug(code)
     return HttpResponseRedirect(reverse(
-        'kitten:game_operations', kwargs={'team_id': team_id, 'game_id': game_id}))
+        'kitten:game_operations',
+        kwargs={'team_id': team_id, 'game_id': game_id}))
 
 
 @login_required
@@ -493,7 +499,8 @@ def game_invitation_new(request, game_id, team_id):
         if form.is_valid():  # is_valid requires team and game to be set
             form.save()
             return HttpResponseRedirect(reverse(
-                'kitten:game', kwargs={'game_id': game_id, 'team_id': team_id}))
+                'kitten:game',
+                kwargs={'game_id': game_id, 'team_id': team_id}))
     else:
         form = GameInvitationForm(initial={"game": game_inst})
     return render(request, 'kitten/game_invitation_new.html',
@@ -515,7 +522,7 @@ def game_invitation_accept(request, team_id, invitation_id):
                 invitation.accept(team_id)
                 return HttpResponseRedirect(reverse(
                     'kitten:game', kwargs={'game_id': invitation.game.id,
-                                    'team_id': team_id}))
+                                           'team_id': team_id}))
 
             invitation.failed_attempts += 1
             if invitation.failed_attempts > invitation.MAX_PASSWORD_FAILURES:
@@ -554,16 +561,28 @@ def game_team_remove(request, game_id, team_id, remove_team_id):
             reverse('kitten:team_games', kwargs={'team_id': team_id}))
     else:
         return HttpResponseRedirect(reverse(
-                'kitten:game', kwargs={'game_id': game_id, 'team_id': team_id}))
+                'kitten:game',
+                kwargs={'game_id': game_id, 'team_id': team_id}))
 
 
-@login_required
-def game_delete(request, game_id, team_id):
-    if not is_team_member(request, team_id):
-        return HttpResponse("Unauthorised team", status=403)
-    if not game_has_team(team_id, game_id):
-        return HttpResponse('Unauthorized game', status=403)
-    return HttpResponse("Delete game not yet implemented.")
+class GameDelete(LoginRequiredMixin, DeleteView):
+    model = Game
+
+    def get_success_url(self):
+        return reverse_lazy('kitten:team',
+                            kwargs={'team_id': self.kwargs['team_id']})
+
+    def dispatch(self, request, *args, team_id, **kwargs):
+        if not is_team_member(request, team_id):
+            return HttpResponse("Unauthorised team", status=403)
+        if not game_has_team(team_id, kwargs.get('pk')):
+            return HttpResponse('Unauthorized game', status=403)
+        return super(DeleteView, self).dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['team_id'] = self.kwargs['team_id']
+        return context
 
 
 @login_required
@@ -605,7 +624,8 @@ def game_tick(request, game_id, team_id):
     game = get_object_or_404(Game, pk=game_id)
     game.run(GameInterval.TICK_SINGLE)
     return HttpResponseRedirect(reverse(
-        'kitten:game_operations', kwargs={'team_id': team_id, 'game_id': game_id}))
+        'kitten:game_operations',
+        kwargs={'team_id': team_id, 'game_id': game_id}))
 
 
 @login_required
@@ -781,7 +801,7 @@ def incident_debug(request, team_id, game_id, incident_id, code):
         raise ValueError(f"incident_debug: invalid code {code!r}")
     return HttpResponseRedirect(reverse(
         'kitten:incident', kwargs={'team_id': team_id, 'game_id': game_id,
-                            'incident_id': incident_id}))
+                                   'incident_id': incident_id}))
 
 
 @login_required
