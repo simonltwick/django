@@ -1,6 +1,16 @@
 {% extends 'bike/base.html' %}
 
 
+{% block breadcrumbs %}
+{% load breadcrumb %}
+{% if component %}
+> {% breadcrumb_url "Component" 'bike:component' component.id %}
+{% else %}
+> {% breadcrumb_url "New Component" 'bike:component_new' %}
+{% endif %}
+{% endblock %}
+
+
 {% block content %}
 <h1>Component details:</h1>
 <form method='POST'>
@@ -19,4 +29,34 @@
    {% endif %}
 </form>
  
+{% for subcomponent in subcomponents %}
+  {% if forloop.first %}
+  <h3>Sub-components</h3>
+  <table class="table">
+    <tr><th>Type</th>
+	<th>Description</th>
+	<th>Specification</th>
+	</tr>
+  {% endif %}
+
+  {% include 'bike/subcomponent.html' %}
+
+  {% if forloop.last %}
+	</table>
+  {% endif %}
+{% empty %}
+  <p>(no sub-components)</p>
+{% endfor %}
+
+{% if component %}
+<p><a class="btn btn-secondary"
+	  href="{% url 'bike:component_new' %}?subcomponent_of={{ component.id }}&success={% url 'bike:component' component.id %}">
+	Add sub-component
+   </a>
+</p>
+{% endif %}
+<a class="btn btn-secondary" href="{% url 'bike:component_type_new' %}">
+   Add component type
+</a>
+
 {% endblock %}

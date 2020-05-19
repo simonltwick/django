@@ -1,0 +1,27 @@
+{% extends 'bike/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
+{% endblock %}
+
+{% block content %}
+{% load static %}
+<h1>Component Types</h1>
+
+{% for component_type in component_types.all %}
+{% if forloop.first %}<ul>{% endif %}
+
+<li>{{ component_type.subtype_of|default:"-" }} /
+<a href="{% url 'bike:component_type' component_type.id %}">
+{{ component_type }}: {{ component_type.description }}</a></li>
+
+{% if forloop.last %}</ul>
+{% endif %}
+{% empty %}
+<p>No component types found :-(</p>
+{% endfor %}
+
+<p><a class="btn btn-success" href="{% url 'bike:component_type_new' %}">New component type</a></p>
+
+{% endblock%}

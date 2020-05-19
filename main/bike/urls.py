@@ -38,6 +38,16 @@ urlpatterns = [
     path('mileage', views.mileage, name='mileage'),
     path('mileage/<int:pk>', views.mileage, name='mileage'),
 
+    path('component_types', views.component_types, name='component_types'),
+    path('component_type/new', views.ComponentTypeCreate.as_view(),
+         name='component_type_new'),
+    path('component_type', views.ComponentTypeUpdate.as_view(),
+         name='component_type'),
+    path('component_type/<int:pk>', views.ComponentTypeUpdate.as_view(),
+         name='component_type'),
+    path(r'component_type/<int:pk>/delete',
+         views.ComponentTypeDelete.as_view(), name='component_type_delete'),
+
     path('preferences/new', views.PreferencesCreate.as_view(),
          name='preferences_new'),
     path('preferences', views.PreferencesUpdate.as_view(),

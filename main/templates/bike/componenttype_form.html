@@ -1,0 +1,61 @@
+{% extends 'bike/base.html' %}
+
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+{% if component_type %}
+> {% breadcrumb_url "Component Type" 'bike:component_type' component_type.id %}
+{% else %}
+> {% breadcrumb_url "New Component Type" 'bike:component_type_new' %}
+{% endif %}
+{% endblock %}
+
+
+{% block content %}
+<h1>Component Type details:</h1>
+<form method='POST'>
+<table class="table">
+{{ form }}
+{% csrf_token %}
+</table>
+<a href="{% url 'bike:component_types' %}" class="btn btn-secondary">Cancel</a>
+<input type="submit" class="btn btn-secondary" value="Apply">
+<input type="submit" class="btn btn-primary" value="OK"
+   {% if component %}
+   formaction="{% url 'bike:component_type' component_type.id %}?next={% url 'bike:component_types' %}">
+	<a href="{% url 'bike:component_type_delete' component_type.id %}" class="btn btn-danger">Delete</a>
+   {% else %}
+   formaction="{% url 'bike:component_type_new' %}?success={% url 'bike:component_types' %}">
+   {% endif %}
+</form>
+ 
+{% for subcomponent in subcomponent_types %}
+  {% if forloop.first %}
+  <h3>Sub-component-types</h3>
+  <table class="table">
+    <tr><th>Type</th>
+	<th>Description</th>
+	</tr>
+  {% endif %}
+
+  {% include 'bike/subcomponent.html' %}
+
+  {% if forloop.last %}
+	</table>
+  {% endif %}
+{% empty %}
+  <p>(no sub-component-types)</p>
+{% endfor %}
+
+{% if component_type %}
+<p><a class="btn btn-secondary"
+	  href="{% url 'bike:component_type_new' %}?subtype_of={{ component_type.id }}&success={% url 'bike:component_type' component_type.id %}">
+	Add sub-component-type
+   </a>
+</p>
+{% endif %}
+<a class="btn btn-secondary" href="{% url 'bike:component_type_new' %}">
+   Add sub-component type
+</a>
+
+{% endblock %}

@@ -13,8 +13,10 @@
 {% if forloop.first %}<ul>
 {% endif %}
 
-<li>{{ component.bike }}<a href="{% url 'bike:component' component.id %}">
-{{ component.type }}: {{ component.name }}</a></li>
+<li>{{ component.bike|default:"" }}{{ component.subcomponent_of|default:"" }}
+<a href="{% url 'bike:component' component.id %}">
+{{ component.type }}: {{ component.name }}
+</a></li>
 
 {% if forloop.last %}</ul>
 {% endif %}

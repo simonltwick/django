@@ -134,10 +134,17 @@ class ComponentCreate(LoginRequiredMixin, CreateView):
         initial = super(CreateView, self).get_initial()
         # Copy the dictionary so we don't accidentally change a mutable dict
         bike_id = self.request.GET.get('bike')
-        if bike_id is not None:
+        subcomp_of_id = self.request.GET.get('subcomponent_of')
+        if bike_id or subcomp_of_id:
             initial = initial.copy()
-            bike = get_object_or_404(Bike, pk=bike_id, owner=self.request.user)
-            initial['bike'] = bike
+            if bike_id is not None:
+                bike = get_object_or_404(
+                    Bike, pk=bike_id, owner=self.request.user)
+                initial['bike'] = bike
+            if subcomp_of_id is not None:
+                subcomp_of = get_object_or_404(
+                    Component, pk=subcomp_of_id, owner=self.request.user)
+                initial['subcomponent_of'] = subcomp_of
         return initial
 
     def form_valid(self, form):
@@ -150,6 +157,13 @@ class ComponentCreate(LoginRequiredMixin, CreateView):
                 form.instance.bike_id = bike_id
         form.instance.owner = self.request.user
         return super(ComponentCreate, self).form_valid(form)
+
+    def get_success_url(self):
+        if self.request.method == 'POST':
+            success_url = self.request.GET.get('success')
+            if success_url:
+                return success_url
+        return super(ComponentCreate, self).get_success_url()
 
 
 class ComponentUpdate(LoginRequiredMixin, UpdateView):
@@ -178,6 +192,52 @@ class ComponentDelete(LoginRequiredMixin, DeleteView):
                                         owner=request.user).exists():
             return HttpResponse("Unauthorised component", status=401)
         return super(ComponentDelete, self).dispatch(request, *args, **kwargs)
+
+
+def component_types(request):
+    component_types = ComponentType.objects.filter(user=request.user).all()
+    return render(request, 'bike/component_types.html',
+                  context={'component_types': component_types})
+
+
+class ComponentTypeCreate(LoginRequiredMixin, CreateView):
+    model = ComponentType
+    fields = ['type', 'subtype_of', 'description', 'maintenance_interval',
+              'maint_interval_units']
+
+    def form_valid(self, form):
+        form.instance.user = self.request.user
+        return super(ComponentTypeCreate, self).form_valid(form)
+
+
+class ComponentTypeUpdate(LoginRequiredMixin, UpdateView):
+    model = ComponentType
+    fields = ['type', 'subtype_of', 'description', 'maintenance_interval',
+              'maint_interval_units']
+
+    def dispatch(self, request, *args, **kwargs):
+        if not ComponentType.objects.filter(pk=kwargs['pk'],
+                                            user=request.user).exists():
+            return HttpResponse("Unauthorised component", status=401)
+        return super(ComponentTypeUpdate, self).dispatch(
+            request, *args, **kwargs)
+
+    def get_success_url(self):
+        if 'success' in self.request.GET:
+            return self.request.GET['success']
+        return super(ComponentTypeUpdate, self).get_success_url()
+
+
+class ComponentTypeDelete(LoginRequiredMixin, DeleteView):
+    model = ComponentType
+    success_url = reverse_lazy('bike:component_types')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not ComponentType.objects.filter(pk=kwargs['pk'],
+                                            user=request.user).exists():
+            return HttpResponse("Unauthorised component", status=401)
+        return super(ComponentTypeDelete, self).dispatch(
+            request, *args, **kwargs)
 
 
 class RideCreate(LoginRequiredMixin, CreateView):

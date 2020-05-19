@@ -1,6 +1,9 @@
 from django import forms
+from django.forms import modelformset_factory
 import datetime as dt
 import logging
+
+from .models import Component
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -23,3 +26,8 @@ class RideSelectionForm(forms.Form):
         choices = [(None, '-All-')]
         choices += [(bike.id, bike.name) for bike in bikes]
         self.fields['bike'].choices = choices
+
+
+ComponentFormSet = modelformset_factory(
+    Component,
+    fields=('bike', 'subcomponent_of', 'name', 'type'))

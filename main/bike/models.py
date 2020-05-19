@@ -119,14 +119,20 @@ class ComponentType(models.Model):
         choices=IntervalUnits.CHOICES)
 
     def __str__(self):
-        return f"{self.type}"
+        return str(self.type)
+
+    def get_absolute_url(self):
+        return reverse('bike:component_type', kwargs={'pk': self.id})
 
 
 class Component(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='components')
-    bike = models.ForeignKey(Bike, related_name='components', null=True,
-                             blank=True, on_delete=models.CASCADE)
+    bike = models.ForeignKey(
+        Bike, related_name='components', null=True,
+        blank=True, on_delete=models.CASCADE,
+        help_text="Leave blank if this is a subcomponent of another part of a "
+        "bike.")
     name = models.CharField(max_length=100)
     type = models.ForeignKey(ComponentType, on_delete=models.PROTECT)
     specification = models.CharField(max_length=200, null=True, blank=True)
@@ -141,11 +147,11 @@ class Component(models.Model):
     supplier = models.CharField(max_length=200, null=True, blank=True)
     notes = models.CharField(max_length=400, null=True, blank=True)
 
-    def get_absolute_url(self):
-        return reverse('bike:component', kwargs={'pk': self.id})
-
     def __str__(self):
         return f"{self.type}: {self.name} on {self.bike}"
+    
+    def get_absolute_url(self):
+        return reverse('bike:component', kwargs={'pk': self.id})
 
 
 class MaintenanceSchedule(models.Model):
