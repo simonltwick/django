@@ -94,6 +94,12 @@ class BikeUpdate(LoginRequiredMixin, UpdateView):
             return HttpResponse("Unauthorised bike", status=401)
         return super(BikeUpdate, self).dispatch(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        context = super(UpdateView, self).get_context_data(**kwargs)
+        pk = self.kwargs['pk']
+        context['components'] = Component.objects.filter(bike_id=pk)
+        return context
+
     def get_success_url(self):
         if 'next' in self.request.GET:
             return self.request.GET['next']
@@ -123,9 +129,26 @@ class ComponentCreate(LoginRequiredMixin, CreateView):
     fields = ['bike', 'type', 'subcomponent_of', 'name', 'specification',
               'notes', 'supplier', 'date_acquired']
 
+    def get_initial(self):
+        # Get the initial dictionary from the superclass method
+        initial = super(CreateView, self).get_initial()
+        # Copy the dictionary so we don't accidentally change a mutable dict
+        bike_id = self.request.GET.get('bike')
+        if bike_id is not None:
+            initial = initial.copy()
+            bike = get_object_or_404(Bike, pk=bike_id, owner=self.request.user)
+            initial['bike'] = bike
+        return initial
+
     def form_valid(self, form):
-        obj = form.save(commit=False)
-        obj.owner = self.request.user
+        bike_id = self.request.GET.get('bike')
+        if bike_id:
+            if not Bike.objects.filter(
+                    pk=bike_id, owner=self.request.user).exists():
+                return HttpResponse("Unauthorised or non-existent bike.",
+                                    status=401)
+                form.instance.bike_id = bike_id
+        form.instance.owner = self.request.user
         return super(ComponentCreate, self).form_valid(form)
 
 

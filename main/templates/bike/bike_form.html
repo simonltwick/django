@@ -8,15 +8,43 @@
 {{ form }}
 {% csrf_token %}
 </table>
+<p>
 <a href="{% url 'bike:bikes' %}" class="btn btn-secondary">Cancel</a>
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
-   {% if bike %}
-   formaction="{% url 'bike:bike' bike.id %}?next={% url 'bike:bikes' %}">
+  {% if bike %}
+  formaction="{% url 'bike:bike' bike.id %}?next={% url 'bike:bikes' %}">
 	<a href="{% url 'bike:bike_delete' bike.id %}" class="btn btn-danger">Delete</a>
-   {% else %}
-   formaction="{% url 'bike:bike_new' %}?next={% url 'bike:bikes' %}">
-   {% endif %}
+  {% else %}
+  formaction="{% url 'bike:bike_new' %}?next={% url 'bike:bikes' %}">
+  {% endif %}
+</p>
 </form>
  
+{% for subcomponent in components %}
+  {% if forloop.first %}
+    <h3>Components</h3>
+    <table class="table">
+<tr><th>Type</th>
+	<th>Description</th>
+	<th>Specification</th>
+	</tr>
+  {% endif %}
+
+  <tr><td>{{ subcomponent.type }}</td>
+	<td><a href="{% url 'bike:component' subcomponent.id %}">{{ subcomponent.name }}
+	</a></td>
+	<td>{{ subcomponent.specification }}</td>
+	</tr>
+
+  {% if forloop.last %}
+	</table>
+  {% endif %}
+  {% empty %}
+  (no components.)
+{% endfor %}
+<p><a class="btn btn-secondary"
+	  href="{% url 'bike:component_new' %}?bike={{ bike.id }}">Add component
+   </a>
+</p>
 {% endblock %}
