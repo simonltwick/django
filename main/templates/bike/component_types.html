@@ -14,7 +14,7 @@
 
 <li>{{ component_type.subtype_of|default:"-" }} /
 <a href="{% url 'bike:component_type' component_type.id %}">
-{{ component_type }}: {{ component_type.description }}</a></li>
+{{ component_type }}: {{ component_type.description|default:"" }}</a></li>
 
 {% if forloop.last %}</ul>
 {% endif %}
@@ -24,4 +24,4 @@
 
 <p><a class="btn btn-success" href="{% url 'bike:component_type_new' %}">New component type</a></p>
 
-{% endblock%}
+{% endblock %}

@@ -8,8 +8,9 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 import logging
 
-from .models import Bike, MaintenanceAction, Ride, ComponentType, Component, \
-    Preferences, DistanceUnits
+from .models import (
+    Bike, Ride, ComponentType, Component, Preferences, DistanceUnits,
+    )
 from .forms import RideSelectionForm
 
 log = logging.getLogger(__name__)
@@ -37,7 +38,6 @@ def bikes(request):
         else:
             row['rides__distance_units'] = DistanceUnits(
                 row['rides__distance_units']).name.lower()
-    log.info("bikes=%s", bikes)
     return render(request, 'bike/bikes.html',
                   context={'bikes': bikes})
 
@@ -126,7 +126,7 @@ def components(request):
 
 class ComponentCreate(LoginRequiredMixin, CreateView):
     model = Component
-    fields = ['bike', 'type', 'subcomponent_of', 'name', 'specification',
+    fields = ['type', 'name', 'bike', 'subcomponent_of', 'specification',
               'notes', 'supplier', 'date_acquired']
 
     def get_initial(self):
@@ -168,7 +168,7 @@ class ComponentCreate(LoginRequiredMixin, CreateView):
 
 class ComponentUpdate(LoginRequiredMixin, UpdateView):
     model = Component
-    fields = ['bike', 'type', 'subcomponent_of', 'name', 'specification',
+    fields = ['type', 'name', 'bike', 'subcomponent_of', 'specification',
               'notes', 'supplier', 'date_acquired']
 
     def dispatch(self, request, *args, **kwargs):
@@ -181,6 +181,13 @@ class ComponentUpdate(LoginRequiredMixin, UpdateView):
         if 'next' in self.request.GET:
             return self.request.GET['next']
         return super(ComponentUpdate, self).get_success_url()
+
+    def get_context_data(self):
+        context_data = super(ComponentUpdate, self).get_context_data()
+        subcomponents = Component.objects.filter(
+            subcomponent_of=self.object).all()
+        context_data['subcomponents'] = subcomponents
+        return context_data
 
 
 class ComponentDelete(LoginRequiredMixin, DeleteView):
@@ -208,6 +215,13 @@ class ComponentTypeCreate(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.user = self.request.user
         return super(ComponentTypeCreate, self).form_valid(form)
+
+    def get_success_url(self):
+        url = super(ComponentTypeCreate, self).get_success_url()
+        success_url = self.request.GET.get('success')
+        if success_url:
+            url += f'?success={success_url}'
+        return url
 
 
 class ComponentTypeUpdate(LoginRequiredMixin, UpdateView):

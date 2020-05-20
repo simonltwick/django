@@ -4,7 +4,7 @@ from django.contrib.auth.hashers import make_password
 from django.urls import reverse
 
 from .models import (
-    Bike,
+    Bike, ComponentType
     )
 
 
@@ -30,9 +30,19 @@ class BikeUrlTest(TestCase):
         bid = self.bike.id
         self.try_url(reverse('bike:bikes'))
         self.try_url(reverse('bike:bike', kwargs={'pk': bid}),
-                     context={'team': self.team})
+                     context={'bike': self.bike})
         self.try_url(reverse('bike:bike_delete', kwargs={'pk': bid}))
         self.try_url(reverse('bike:bike_new'),)
+
+    def test_component_type(self):
+        ct = ComponentType.objects.create(user=self.user, type="Test type")
+        ct.save()
+        self.try_url(reverse('bike:component_types'))
+        self.try_url(reverse('bike:component_type', kwargs={'pk': ct.id}),
+                     context={'componenttype': ct})
+        self.try_url(reverse('bike:component_type_delete',
+                             kwargs={'pk': ct.id}))
+        self.try_url(reverse('bike:component_type_new'),)
 
     def try_url(self, url, status=200, context=None, redirect=None):
         follow = redirect is not None

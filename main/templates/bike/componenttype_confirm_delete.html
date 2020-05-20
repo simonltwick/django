@@ -1,0 +1,29 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Confirm Delete -
+{% endblock %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Component types" 'bike:component_types' %}
+> {% breadcrumb_url "Component type" 'bike:component_type' componenttype.id %}
+> {% breadcrumb_url "Delete" 'bike:component_type_delete' componenttype.id %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ componenttype }}</h1>
+	<p class="errormsg">This component type will be deleted.  You can only do this
+	if there are no components of this type.</p>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p><a class="btn btn-secondary" href="{% url 'bike:component_type' componenttype.id %}">Cancel</a>
+	<input type="submit" class="btn btn-danger" value="Delete">
+</form>
+
+
+{% endblock %}

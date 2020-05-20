@@ -1,8 +1,9 @@
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
-from datetime import date
-from django.contrib.auth.models import User
 
+from datetime import date
 from enum import IntEnum
 
 
@@ -109,20 +110,24 @@ class ComponentType(models.Model):
     type = models.CharField(max_length=100, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='component_types')
-    description = models.CharField(max_length=200)
+    description = models.CharField(max_length=200, null=True, blank=True)
     subtype_of = models.ForeignKey('ComponentType', related_name='subtypes',
                                    on_delete=models.PROTECT,
                                    blank=True, null=True)
     # fk maintenance schedule
     maintenance_interval = models.PositiveIntegerField(null=True, blank=True)
     maint_interval_units = models.PositiveSmallIntegerField(
-        choices=IntervalUnits.CHOICES)
+        choices=IntervalUnits.CHOICES, null=True, blank=True)
 
     def __str__(self):
         return str(self.type)
 
     def get_absolute_url(self):
         return reverse('bike:component_type', kwargs={'pk': self.id})
+
+    def clean(self):
+        if self.maintenance_interval and not self.maint_interval_units:
+            raise ValidationError("Maintenance interval units not specified.")
 
 
 class Component(models.Model):
@@ -149,7 +154,7 @@ class Component(models.Model):
 
     def __str__(self):
         return f"{self.type}: {self.name} on {self.bike}"
-    
+
     def get_absolute_url(self):
         return reverse('bike:component', kwargs={'pk': self.id})
 
@@ -162,6 +167,7 @@ class MaintenanceSchedule(models.Model):
 # TODO: only require units if distance/ascent field is filled in
 # TODO: remove maint. interval and descriptoin from component type
 # TODO: "new component type" option on New Component form
+
 
 class MaintenanceAction(DistanceMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE,
