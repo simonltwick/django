@@ -12,11 +12,13 @@
 <p>(add maint due)</p>
 {% for bike in bikes %}
 {% if forloop.first %}
+<p>(distances this month/year/all time (units))</p>
 <ul>
 {% endif %}
 
 <li><a href="{% url 'bike:bike' bike.id %}">{{ bike.name }}</a>:
-{{ bike.distance|floatformat }} {{ bike.rides__distance_units }}</li>
+{{ bike.sum_month|floatformat }} / {{ bike.sum_year|floatformat }} / 
+{{ bike.distance|floatformat }} ({{ bike.rides__distance_units }})</li>
 
 {% if forloop.last %}
 </ul>

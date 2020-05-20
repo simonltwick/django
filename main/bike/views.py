@@ -1,11 +1,13 @@
-import csv
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse, HttpResponseRedirect
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
+
+import csv
+import datetime as dt
 import logging
 
 from .models import (
@@ -27,10 +29,25 @@ def home(request):
 
 @login_required
 def bikes(request):
+    today = dt.date.today()
+    this_month = dt.date(year=today.year, month=today.month, day=1)
+    sum_month = Sum('rides__distance', filter=Q(rides__date__gte=this_month))
+    this_year = dt.date(year=today.year, month=1, day=1)
+    sum_year = Sum('rides__distance', filter=Q(rides__date__gte=this_year))
     bikes = (Bike.objects.values('id', 'name', 'rides__distance_units')
-             .annotate(distance=Sum('rides__distance'))
+             .annotate(distance=Sum('rides__distance'),
+                       sum_month=sum_month,
+                       sum_year=sum_year)
              .filter(owner=request.user))
     # change distance_units into distance
+    """ sum for this month
+    this_month=dt.date(year=dt.date.today().year, month=dt.date.today().month,
+                       day=1)
+    sum_month=Sum('rides__distance', filter=Q(rides__date__gte=this_month))
+    bikes = Bike.objects.annotate(sum_month=sum_month).all()
+    # but need to add values('rides__distance_units')
+    """
+
     bikes = [row for row in bikes.all()]  # QuerySet -> List
     for row in bikes:
         if row['rides__distance_units'] is None:
@@ -258,6 +275,14 @@ class RideCreate(LoginRequiredMixin, CreateView):
     model = Ride
     fields = ['bike', 'date', 'description', 'distance', 'distance_units',
               'ascent', 'ascent_units']
+
+    def get_initial(self):
+        initial = super(RideCreate, self).get_initial()
+        last_bike = Bike.objects.order_by('-rides__date').first()
+        # copy, so we don't accidentally change a mutable dict
+        initial = initial.copy()
+        initial['bike'] = last_bike
+        return initial
 
     def form_valid(self, form):
         obj = form.save(commit=False)
