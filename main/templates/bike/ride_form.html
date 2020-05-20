@@ -18,7 +18,6 @@
 {{ form }}
 {% csrf_token %}
 </table>
-<a href="{% url 'bike:home' %}" class="btn btn-secondary">Cancel</a>
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
 	{% if ride %}

@@ -9,7 +9,6 @@
 {% csrf_token %}
 </table>
 {% if preferences %}
-<a href="{% url 'bike:home' %}" class="btn btn-secondary">Cancel</a>
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
    formaction="{% url 'bike:preferences' preferences.pk %}?next={% url 'bike:home' %}">
