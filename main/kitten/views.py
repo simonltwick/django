@@ -9,11 +9,13 @@ from django.views.generic.edit import CreateView, DeleteView, UpdateView
 from .models import (
     Game, Team, Line, Network, GameInterval, Incident, TeamInvitation,
     GameInvitation, LineTemplate, GameTemplate, PlaceTemplate, GamePlayStatus,
+    LocationType
     )
 from .forms import (
     GameForm, TeamInvitationForm, InvitationAcceptanceForm,
     GameInvitationForm, GameInvitationAcceptanceForm, NewGameForm,
     LineTemplateForm, PlaceTemplateFormSet, NetworkForm,
+    StationTemplateTrafficFormSet,
     )
 
 import logging
@@ -174,11 +176,12 @@ def network_debug(request, team_id, pk, code):
 @login_required
 def linetemplate(request, network_id, linetemplate_id=None):
     if not Network.objects.filter(
-            owner=request.user, pk=network_id).exists():
+            owner__members=request.user, pk=network_id).exists():
         return HttpResponse("Unauthorised network.", status=401)
-
+    team_id = Network.objects.values('owner_id').get(pk=network_id)['owner_id']
     if linetemplate_id is not None:
-        linetemplate = get_object_or_404(LineTemplate, pk=linetemplate_id)
+        linetemplate = get_object_or_404(LineTemplate, pk=linetemplate_id,
+                                         network=network_id)
     else:
         linetemplate = None
 
@@ -190,7 +193,8 @@ def linetemplate(request, network_id, linetemplate_id=None):
         if linetemplate_id is None:
             # linetemplate_id is None: returning a new LineTemplate
             form = LineTemplateForm(request.POST)
-            formset = PlaceTemplateFormSet(request.POST)
+            ll_formset = PlaceTemplateFormSet(
+                request.POST, prefix='pl_t')
             if form.is_valid():
                 form.instance.network_id = network_id
                 linetemplate = form.save(commit=False)  # get id assigned
@@ -204,47 +208,68 @@ def linetemplate(request, network_id, linetemplate_id=None):
                 return HttpResponse("Invalid line template.", status=401)
 
             form = LineTemplateForm(request.POST, instance=linetemplate)
-            formset = PlaceTemplateFormSet(request.POST)
+            ll_formset = PlaceTemplateFormSet(
+                request.POST, prefix='pl_t')
+            log.info("len(ll_formset)=%d", len(ll_formset))
+            station_formset = StationTemplateTrafficFormSet(
+                request.POST, prefix='st_t_tr')
 
-        formset.is_valid()  # force clean of data, prior to validating order
-        positions = []
-        for place_form in formset:
-            if place_form.cleaned_data:
-                try:
-                    pos = int(place_form.cleaned_data['ORDER'])
-                except (ValueError, TypeError):
-                    place_form.add_error('ORDER', 'Order must be a number')
-                    continue
-                if pos in positions:
-                    place_form.add_error('ORDER', 'Duplicate value for Order')
-                else:
-                    positions.append(pos)
+        if ll_formset.is_valid():
+            # validate positions
+            positions = []
+            for place_form in ll_formset:
+                if place_form.cleaned_data:
+                    try:
+                        pos = int(place_form.cleaned_data['ORDER'])
+                    except (ValueError, TypeError):
+                        place_form.add_error('ORDER', 'Order must be a number')
+                        continue
+                    if pos in positions:
+                        place_form.add_error(
+                            'ORDER', 'Duplicate value for Order')
+                    else:
+                        positions.append(pos)
 
-        if form.is_valid() and formset.is_valid():
+        if all((form.is_valid(),
+                ll_formset.is_valid(),
+                station_formset.is_valid),):
             form.save()
-            for place_form in formset:
+            for place_form in ll_formset:
                 if place_form.cleaned_data:  # keyerror if blank form
                     place_form.instance.line_id = linetemplate.id
                     place_form.instance.position = place_form.cleaned_data[
                         'ORDER']
-            if len(formset):
+            if len(ll_formset):
                 # decided not to ensure turnaround at end of line, confusing
                 # to user: leave it to Line.new_from_template
-                formset.save()
+                ll_formset.save()
+            if len(station_formset):
+                station_formset.save()
             next_url = request.GET.get('next', None)
             if next_url:
                 return HttpResponseRedirect(next_url)
                 # refresh formset to action deletions & reordering
-            formset = PlaceTemplateFormSet(
-                queryset=PlaceTemplate.objects.filter(line=linetemplate))
+            place_templates = PlaceTemplate.objects.filter(line=linetemplate)
+            ll_formset = PlaceTemplateFormSet(
+                prefix='pl_t', queryset=place_templates.all())
+            log.info("1.len(ll_formset)=%d, len(queryset)=%d", len(ll_formset),
+                     len(ll_formset.queryset))
+            station_formset = StationTemplateTrafficFormSet(
+                prefix='st_t_tr', queryset=place_templates.filter(
+                    type=LocationType.STATION).all())
+            log.info("2.len(ll_formset)=%d, len(queryset)=%d", len(ll_formset),
+                     len(ll_formset.queryset))
 
     elif linetemplate_id is None:
         # Get with no linetemplate id - new linelocation
         form = LineTemplateForm()
-        formset = PlaceTemplateFormSet(
-            queryset=PlaceTemplate.objects.none(),
+        no_locations = PlaceTemplate.objects.none()
+        ll_formset = PlaceTemplateFormSet(
+            prefix='pl_t', queryset=no_locations,
             initial=[{'name': f"Depot{i}", 'type': PlaceTemplate.DEPOT}
                      for i in range(1, 3)])
+        station_formset = StationTemplateTrafficFormSet(
+            prefix='st_t_tr', queryset=no_locations)
     else:  # get (for update) with linetemplate_id
         if linetemplate.network_id != int(network_id):
             log.error("views.linetemplate(network_id=%r, linetemplate_id=%s)"
@@ -252,12 +277,17 @@ def linetemplate(request, network_id, linetemplate_id=None):
                       linetemplate_id, linetemplate.network_id)
             return HttpResponse("Invalid network.", status=401)
         form = LineTemplateForm(instance=linetemplate)
-        formset = PlaceTemplateFormSet(
-            queryset=PlaceTemplate.objects.filter(line=linetemplate))
+        place_templates = PlaceTemplate.objects.filter(line=linetemplate)
+        ll_formset = PlaceTemplateFormSet(
+            prefix='pl_t', queryset=place_templates.all())
+        station_formset = StationTemplateTrafficFormSet(
+                prefix='st_t_tr', queryset=place_templates.filter(
+                    type=LocationType.STATION).all())
 
     return render(request, 'kitten/linetemplate_form.html',
-                  context={'form': form, 'formset': formset,
-                           'network_id': network_id,
+                  context={'form': form, 'line_location_formset': ll_formset,
+                           'station_formset': station_formset,
+                           'network_id': network_id, 'team_id': team_id,
                            'linetemplate': linetemplate})
 
 

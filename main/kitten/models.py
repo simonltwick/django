@@ -70,7 +70,7 @@ class GameLevel:  # Mixin for Game, handling game level validation
 
 
 class PassengerTrafficProfile(models.Model):
-    """ define how much passenger traffic at peak/normal times of day.
+    """ Abstract.define how much passenger traffic at peak/normal times of day.
     This is used to calculate an hourly traffic profile,
     starting at night_traffic at day start/end times,
     tapering upto peak traffic
@@ -773,7 +773,6 @@ class TeamGameStatus(models.Model):
 
 
 class LineTemplate(models.Model):
-    # TODO: validate that ends of the line are depots
     network = models.ForeignKey(Network, related_name='lines',
                                 on_delete=models.CASCADE)
     name = models.CharField(max_length=40, default='')
@@ -796,6 +795,12 @@ class LineTemplate(models.Model):
     # train icon
     # mapping? (line path)
     # places = fk to PlaceTemplate
+
+    def clean(self):
+        start = self.places.order_by('position').first()
+        end = self.places.order_by('position').last()
+        if start.type != LocationType.DEPOT or end.type != LocationType.DEPOT:
+            raise ValidationError("Line must start and end with a Depot.")
 
     def __str__(self):
         return f'{self.name} in {self.network}'
@@ -995,9 +1000,6 @@ class Line(models.Model):
         """train turnaround at depots and where turnaround specified
         move trains from end-of-line depots to start-of-line depots in
         opposite direction, and update last_train_time """
-        # TODO: ensure can't set turnaround% in both directions for a posn
-        # on a line - it would create a deadlock
-
         # create a list of trains which can turnaround first
         trains_to_turnaround = [train for train in self.trains
                                 if train.will_turnaround()]
@@ -1062,8 +1064,14 @@ class PlaceTemplate(models.Model, LocationType):
         default=0, validators=[MaxValueValidator(100)])
     turnaround_percent_direction2 = models.PositiveSmallIntegerField(
         default=0, validators=[MaxValueValidator(100)])
-    passenger_traffic_percent = models.PositiveSmallIntegerField(
-        default=100, help_text="Relative passenger traffic at this station.")
+    passenger_traffic_dir1 = models.PositiveSmallIntegerField(
+        default=100, help_text="Relative peak passenger traffic in direction 1"
+        " at this station.",
+        verbose_name="Peak passenger traffic in direction1")
+    passenger_traffic_dir2 = models.PositiveSmallIntegerField(
+        default=100, help_text="Relative peak passenger traffic in direction 2"
+        " at this station.",
+        verbose_name="Peak passenger traffic in direction2")
 
     class Meta:
         ordering = ('position',)
@@ -1077,11 +1085,16 @@ class PlaceTemplate(models.Model, LocationType):
 
     def clean(self):
         if self.type == LocationType.STATION and not self.name:
-            raise ValidationError("Station name cannot be blank.")
+            raise ValidationError({"name": ["Station name cannot be blank."]})
+        if (self.turnaround_percent_direction1 and
+                self.turnaround_percent_direction2):
+            raise ValidationError({
+                "turnaround_percent_direction2":
+                ["Cannot have turnaround in both directions."]})
 
 
 class LineLocation(models.Model, LocationType):
-    """ a place on the line: a station, a depot or a line  """
+    """ a place on the line: a station, a depot or a line """
     line = models.ForeignKey(Line, on_delete=models.CASCADE, null=True)
     name = models.CharField(max_length=40, default='', blank=True)
     type = models.IntegerField(choices=LocationType.CHOICES,
@@ -1139,6 +1152,13 @@ class LineLocation(models.Model, LocationType):
                              else line.trains_dir2)
         return ll
 
+    def clean(self):
+        if self.turnaround_percent:
+            reverse_loc = self.reverse()
+            if reverse_loc and reverse_loc.turnaround_percent:
+                raise ValidationError(
+                    "Can't have turnaround in both directions.")
+
     def update_name(self):
         """  Calculate and update self.name (and return True) if not set.
          name for track segments is computed as "Between x and y" """
@@ -1178,7 +1198,6 @@ class LineLocation(models.Model, LocationType):
 
     def html(self):
         """ return description for display, including <span> classes """
-        # TODO: escape user-provided names in .html methods:replace < with &lt.
         classes = ['location']
         if self.is_station():
             classes.append('station')

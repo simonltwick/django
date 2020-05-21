@@ -115,6 +115,19 @@ PlaceTemplateFormSet = modelformset_factory(
         })
 
 
+StationTemplateTrafficFormSet = modelformset_factory(
+    PlaceTemplate,
+    fields=('name', 'passenger_traffic_dir1', 'passenger_traffic_dir2'),
+    widgets={
+        'passenger_traffic_dir1': forms.NumberInput(
+            attrs={'class': 'small-int'}),
+        'passenger_traffic_dir2': forms.NumberInput(
+            attrs={'class': 'small-int'}),
+        },
+    extra=0,
+    )
+
+
 class NetworkForm(forms.ModelForm):
 
     class Meta:
