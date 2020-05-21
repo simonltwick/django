@@ -10,8 +10,9 @@ urlpatterns = [
 
     path('rides', views.rides, name='rides'),
     path('ride/new', views.RideCreate.as_view(), name='ride_new'),
-    path('ride', views.RideUpdate.as_view(), name='ride'),
     path('ride/<int:pk>', views.RideUpdate.as_view(), name='ride'),
+    path('ride/<int:pk>/delete', views.RideDelete.as_view(),
+         name='ride_delete'),
 
     path('bikes', views.bikes, name='bikes'),
     path('bike/new', views.BikeCreate.as_view(), name='bike_new'),
@@ -29,9 +30,11 @@ urlpatterns = [
     path(r'component/<int:pk>/delete', views.ComponentDelete.as_view(),
          name='component_delete'),
 
-    path('maint/new', views.maint, name='maint_new'),
-    path('maint', views.maint, name='maint'),
-    path('maint/<int:pk>', views.maint, name='maint'),
+    path('maint', views.MaintActionList.as_view(), name='maint_actions'),
+    path('maint/new', views.MaintActionCreate.as_view(), name='maint_new'),
+    path('maint/<int:pk>', views.MaintActionUpdate.as_view(), name='maint'),
+    path('maint/<int:pk>/delete', views.MaintActionDelete.as_view(),
+         name='maint_delete'),
 
 
     path('mileage/new', views.mileage, name='mileage_new'),

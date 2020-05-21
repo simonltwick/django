@@ -5,6 +5,7 @@ from django.db.models import Sum, Q
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse, HttpResponseRedirect
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
+from django.views.generic.list import ListView
 
 import csv
 import datetime as dt
@@ -12,6 +13,7 @@ import logging
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, DistanceUnits,
+    MaintenanceAction
     )
 from .forms import RideSelectionForm
 
@@ -278,7 +280,8 @@ class RideCreate(LoginRequiredMixin, CreateView):
 
     def get_initial(self):
         initial = super(RideCreate, self).get_initial()
-        last_bike = Bike.objects.order_by('-rides__date').first()
+        last_bike = Bike.objects.filter(
+            owner=self.request.user).order_by('-rides__date').first()
         # copy, so we don't accidentally change a mutable dict
         initial = initial.copy()
         initial['bike'] = last_bike
@@ -305,6 +308,17 @@ class RideUpdate(LoginRequiredMixin, UpdateView):
                                    rider=request.user).exists():
             return HttpResponse("Unauthorised ride", status=401)
         return super(RideUpdate, self).dispatch(request, *args, **kwargs)
+
+
+class RideDelete(LoginRequiredMixin, DeleteView):
+    model = Ride
+    success_url = reverse_lazy('bike:rides')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not Ride.objects.filter(pk=kwargs['pk'],
+                                   rider=request.user).exists():
+            return HttpResponse("Unauthorised ride", status=401)
+        return super(RideDelete, self).dispatch(request, *args, **kwargs)
 
 
 @login_required
@@ -357,11 +371,70 @@ def csv_data_response(request, filename, queryset, fields):
     return response
 
 
-@login_required
-def maint(request, pk=None):
-    # maintenance activities, maintenance schedule ...
-    return HttpResponse("maintenance activities, maintenance schedule ... "
-                        "not yet implemented.")
+class MaintActionList(LoginRequiredMixin, ListView):
+    model = MaintenanceAction
+    ordering = ('bike', 'component', 'distance', 'due_date')
+
+    def get_queryset(self):
+        return MaintenanceAction.objects.filter(
+            user=self.request.user, completed=False)
+
+
+class MaintActionCreate(LoginRequiredMixin, CreateView):
+    model = MaintenanceAction
+    fields = ['bike', 'component', 'activity_type', 'description', 'due_date',
+              'distance', 'distance_units', 'completed', 'completed_date',
+              'completed_distance']
+
+    def get_form(self, *args, **kwargs):
+        form = super(MaintActionCreate, self).get_form(*args, **kwargs)
+        form.fields['bike'].queryset = self.request.user.bikes
+        form.fields['component'].queryset = self.request.user.components
+        return form
+
+    def get_initial(self):
+        initial = super(MaintActionCreate, self).get_initial()
+        last_bike = Bike.objects.filter(
+            owner=self.request.user).order_by('-rides__date').first()
+        # copy, so we don't accidentally change a mutable dict
+        initial = initial.copy()
+        initial['bike'] = last_bike
+        return initial
+
+    def form_valid(self, form):
+        obj = form.save(commit=False)
+        obj.user = self.request.user
+        return super(MaintActionCreate, self).form_valid(form)
+
+
+class MaintActionUpdate(LoginRequiredMixin, UpdateView):
+    model = MaintenanceAction
+    fields = MaintActionCreate.fields
+
+    def get_success_url(self):
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        return super(MaintActionUpdate, self).get_success_url()
+
+    def dispatch(self, request, *args, **kwargs):
+        if not MaintenanceAction.objects.filter(
+                pk=kwargs['pk'], user=request.user).exists():
+            return HttpResponse("Unauthorised maint. action", status=401)
+        return super(
+            MaintActionUpdate, self).dispatch(request, *args, **kwargs)
+
+
+# TODO: acc maint actions to home and bike page
+class MaintActionDelete(LoginRequiredMixin, DeleteView):
+    model = MaintenanceAction
+    success_url = reverse_lazy('bike:maint_actions')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not MaintenanceAction.objects.filter(
+                pk=kwargs['pk'], user=request.user).exists():
+            return HttpResponse("Unauthorised maint. action", status=401)
+        return super(
+            MaintActionDelete, self).dispatch(request, *args, **kwargs)
 
 
 @login_required

@@ -4,7 +4,7 @@ from django.contrib.auth.hashers import make_password
 from django.urls import reverse
 
 from .models import (
-    Bike, ComponentType
+    Bike, ComponentType, Ride, Component, MaintenanceAction
     )
 
 
@@ -20,11 +20,24 @@ class BikeUrlTest(TestCase):
         self.bike = Bike.objects.create(
             name='Test bike', description="test", owner=self.user)
         self.bike.save()
+        self.ct = ComponentType.objects.create(user=self.user, type="Test type")
+        self.ct.save()
         self.client = Client(raise_request_exception=True)
         self.client.login(username='tester', password='testpw')
 
     def test_home(self):
         self.try_url(reverse('bike:home'), context={'preferences_set': False})
+
+    def test_ride(self):
+        ride = Ride.objects.create(rider=self.user, bike=self.bike)
+        ride.save()
+        rid = ride.id
+        self.try_url(reverse('bike:rides'), context={'rides': [ride]})
+        self.try_url(reverse('bike:ride', kwargs={'pk': rid}),
+                     context={'ride': ride})
+        self.try_url(reverse('bike:ride_delete', kwargs={'pk': rid}),
+                     context={'ride': ride})
+        self.try_url(reverse('bike:ride_new'))
 
     def test_bike(self):
         bid = self.bike.id
@@ -34,15 +47,35 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:bike_delete', kwargs={'pk': bid}))
         self.try_url(reverse('bike:bike_new'),)
 
+    def test_component(self):
+        comp = Component.objects.create(type=self.ct, name='Test component',
+                                        owner=self.user)
+        self.try_url(reverse('bike:components'))
+        self.try_url(reverse('bike:component', kwargs={'pk': comp.id}),
+                     context={'component': comp})
+        self.try_url(reverse('bike:component_delete', kwargs={'pk': comp.id}),
+                     context={'component': comp})
+        self.try_url(reverse('bike:component_new'),)
+
     def test_component_type(self):
-        ct = ComponentType.objects.create(user=self.user, type="Test type")
-        ct.save()
+        ct = self.ct
         self.try_url(reverse('bike:component_types'))
         self.try_url(reverse('bike:component_type', kwargs={'pk': ct.id}),
                      context={'componenttype': ct})
         self.try_url(reverse('bike:component_type_delete',
                              kwargs={'pk': ct.id}))
         self.try_url(reverse('bike:component_type_new'),)
+
+    def test_maint_action(self):
+        maint = MaintenanceAction.objects.create(
+            bike=self.bike, user=self.user)
+        maint.save()
+        self.try_url(reverse('bike:maint_actions'))
+        self.try_url(reverse('bike:maint', kwargs={'pk': maint.id}),
+                     context={'maintenanceaction': maint})
+        self.try_url(reverse('bike:maint_delete',
+                             kwargs={'pk': maint.id}))
+        self.try_url(reverse('bike:maint_new'),)
 
     def try_url(self, url, status=200, context=None, redirect=None):
         follow = redirect is not None

@@ -89,6 +89,15 @@ class Ride(DistanceMixin):
     def ascent_units_display(self):
         return self.get_ascent_units_display()
 
+    def clean(self):
+        validation_errors = {}
+        if self.distance and not self.distance_units:
+            validation_errors['distance_units'] = "You must specify units."
+        if self.ascent and not self.ascent_units:
+            validation_errors['ascent_units'] = "You must specify units."
+        if validation_errors:
+            raise ValidationError(validation_errors)
+
 
 class Odometer(DistanceMixin):
     date = models.DateField(default=date.today)
@@ -114,7 +123,7 @@ class ComponentType(models.Model):
     subtype_of = models.ForeignKey('ComponentType', related_name='subtypes',
                                    on_delete=models.PROTECT,
                                    blank=True, null=True)
-    # fk maintenance schedule
+    maintenance_schedule = models.ManyToManyField('MaintenanceSchedule')
     maintenance_interval = models.PositiveIntegerField(null=True, blank=True)
     maint_interval_units = models.PositiveSmallIntegerField(
         choices=IntervalUnits.CHOICES, null=True, blank=True)
@@ -135,7 +144,7 @@ class Component(models.Model):
                               related_name='components')
     bike = models.ForeignKey(
         Bike, related_name='components', null=True,
-        blank=True, on_delete=models.CASCADE,
+        blank=True, on_delete=models.SET_NULL,
         help_text="Leave blank if this is a subcomponent of another part of a "
         "bike.")
     name = models.CharField(max_length=100)
@@ -164,17 +173,37 @@ class MaintenanceSchedule(models.Model):
     activity = models.CharField(max_length=100)
     reference_info = models.CharField(max_length=300)
 
-# TODO: only require units if distance/ascent field is filled in
-# TODO: remove maint. interval and descriptoin from component type
-# TODO: "new component type" option on New Component form
-
 
 class MaintenanceAction(DistanceMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_actions')
-    component = models.ForeignKey(Component, on_delete=models.CASCADE)
-    completed_date = models.DateField(default=date.today, null=True,
-                                      blank=True)
+    bike = models.ForeignKey(Bike, related_name="maint_actions",
+                             on_delete=models.SET_NULL,
+                             null=True, blank=True)
+    component = models.ForeignKey(
+        Component, on_delete=models.CASCADE, null=True, blank=True,
+        help_text='you only need to specify one of bike or component.')
+    activity_type = models.ForeignKey(MaintenanceSchedule,
+                                      on_delete=models.SET_NULL,
+                                      blank=True, null=True)
+    description = models.CharField(max_length=100, blank=True, null=True)
+    due_date = models.DateField(null=True, blank=True,
+                                default=date.today)
+    completed = models.BooleanField(default=False)
+    completed_date = models.DateField(null=True, blank=True)
+    completed_distance = models.DecimalField(max_digits=7, decimal_places=2,
+                                             null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'bike', 'component', 'activity_type',
+                           'description', 'due_date', 'distance')
+
+    def __str__(self):
+        return (f"{self.bike or self.component}: "
+                f"{self.description or self.activity_type}")
+
+    def get_absolute_url(self):
+        return reverse('bike:maint', kwargs={'pk': self.id})
 
 
 class ComponentChange(DistanceMixin):
