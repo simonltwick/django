@@ -102,6 +102,11 @@ class BikeCreate(LoginRequiredMixin, CreateView):
         obj.owner = self.request.user
         return super(BikeCreate, self).form_valid(form)
 
+    def get_success_url(self):
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        return super(RideCreate, self).get_success_url()
+
 
 class BikeUpdate(LoginRequiredMixin, UpdateView):
     model = Bike
@@ -114,14 +119,19 @@ class BikeUpdate(LoginRequiredMixin, UpdateView):
         return super(BikeUpdate, self).dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
-        context = super(UpdateView, self).get_context_data(**kwargs)
+        context = super(BikeUpdate, self).get_context_data(**kwargs)
         pk = self.kwargs['pk']
         context['components'] = Component.objects.filter(bike_id=pk)
         return context
 
+    def form_valid(self, form):
+        resp = super(BikeUpdate, self).form_valid(form)
+        return resp
+
     def get_success_url(self):
-        if 'next' in self.request.GET:
-            return self.request.GET['next']
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
         return super(BikeUpdate, self).get_success_url()
 
 
@@ -150,7 +160,7 @@ class ComponentCreate(LoginRequiredMixin, CreateView):
 
     def get_initial(self):
         # Get the initial dictionary from the superclass method
-        initial = super(CreateView, self).get_initial()
+        initial = super(ComponentCreate, self).get_initial()
         # Copy the dictionary so we don't accidentally change a mutable dict
         bike_id = self.request.GET.get('bike')
         subcomp_of_id = self.request.GET.get('subcomponent_of')
@@ -280,17 +290,27 @@ class RideCreate(LoginRequiredMixin, CreateView):
 
     def get_initial(self):
         initial = super(RideCreate, self).get_initial()
-        last_bike = Bike.objects.filter(
+        self.bike = Bike.objects.filter(
             owner=self.request.user).order_by('-rides__date').first()
         # copy, so we don't accidentally change a mutable dict
         initial = initial.copy()
-        initial['bike'] = last_bike
+        initial['bike'] = self.bike
         return initial
+
+    def get_context_data(self, **kwargs):
+        context = super(RideCreate, self).get_context_data(**kwargs)
+        context['bike_id'] = self.bike.id
+        return context
 
     def form_valid(self, form):
         obj = form.save(commit=False)
         obj.rider = self.request.user
         return super(RideCreate, self).form_valid(form)
+
+    def get_success_url(self):
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        return super(RideCreate, self).get_success_url()
 
 
 class RideUpdate(LoginRequiredMixin, UpdateView):
@@ -298,16 +318,21 @@ class RideUpdate(LoginRequiredMixin, UpdateView):
     fields = ['bike', 'date', 'description', 'distance', 'distance_units',
               'ascent', 'ascent_units']
 
-    def get_success_url(self):
-        if 'next' in self.request.GET:
-            return self.request.GET['next']
-        return super(RideUpdate, self).get_success_url()
-
     def dispatch(self, request, *args, **kwargs):
         if not Ride.objects.filter(pk=kwargs['pk'],
                                    rider=request.user).exists():
             return HttpResponse("Unauthorised ride", status=401)
         return super(RideUpdate, self).dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super(RideUpdate, self).get_context_data(**kwargs)
+        context['bike_id'] = self.object.bike_id
+        return context
+
+    def get_success_url(self):
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        return super(RideUpdate, self).get_success_url()
 
 
 class RideDelete(LoginRequiredMixin, DeleteView):
@@ -394,11 +419,15 @@ class MaintActionCreate(LoginRequiredMixin, CreateView):
 
     def get_initial(self):
         initial = super(MaintActionCreate, self).get_initial()
-        last_bike = Bike.objects.filter(
-            owner=self.request.user).order_by('-rides__date').first()
+        bike_id = self.request.GET.get('bike')
+        if bike_id:
+            bike = get_object_or_404(Bike, owner=self.request.user, pk=bike_id)
+        else:
+            bike = Bike.objects.filter(
+                owner=self.request.user).order_by('-rides__date').first()
         # copy, so we don't accidentally change a mutable dict
         initial = initial.copy()
-        initial['bike'] = last_bike
+        initial['bike'] = bike
         return initial
 
     def form_valid(self, form):
@@ -424,7 +453,7 @@ class MaintActionUpdate(LoginRequiredMixin, UpdateView):
             MaintActionUpdate, self).dispatch(request, *args, **kwargs)
 
 
-# TODO: acc maint actions to home and bike page
+# TODO: add maint actions to home and bike page
 class MaintActionDelete(LoginRequiredMixin, DeleteView):
     model = MaintenanceAction
     success_url = reverse_lazy('bike:maint_actions')

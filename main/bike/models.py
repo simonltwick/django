@@ -79,6 +79,9 @@ class Ride(DistanceMixin):
     bike = models.ForeignKey(Bike, on_delete=models.SET_NULL, null=True,
                              blank=True, related_name='rides')
 
+    class Meta:
+        unique_together = ('rider', 'date', 'bike', 'description')
+
     def __str__(self):
         return f"{self.date}: {self.description}"
 

@@ -18,14 +18,18 @@
 {{ form }}
 {% csrf_token %}
 </table>
+
 <p>
-<input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
   {% if bike %}
-  formaction="{% url 'bike:bike' bike.id %}?next={% url 'bike:bikes' %}">
-	<a href="{% url 'bike:bike_delete' bike.id %}" class="btn btn-danger">Delete</a>
+    {% url 'bike:bike' bike.id as save_url %}
+    formaction="{{ save_url }}?next={% url 'bike:bikes' %}">
+    <input type="submit" class="btn btn-secondary" value="Add maint. action"
+    	   formaction="{{ save_url }}?next={% url 'bike:maint_new' %}?bike={{  bike.id }}">
+	<a href="{% url 'bike:bike_delete' bike.id %}" class="btn btn-danger">
+	Delete</a>
   {% else %}
-  formaction="{% url 'bike:bike_new' %}?success={% url 'bike:bikes' %}">
+    formaction="{% url 'bike:bike_new' %}?success={% url 'bike:bikes' %}">
   {% endif %}
 </p>
 </form>

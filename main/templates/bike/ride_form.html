@@ -18,12 +18,19 @@
 {{ form }}
 {% csrf_token %}
 </table>
+
+{% if ride %}
+  {% url 'bike:ride' ride.id as save_url %}
+{% else %}
+  {% url 'bike:ride_new' as save_url %}
+{% endif %}
+
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
-	{% if ride %}
-    formaction="{% url 'bike:ride' ride.id %}?next={% url 'bike:home' %}"
-    {% else %}
-    formaction="{% url 'bike:ride_new' %}?next={% url 'bike:home' %}"
-    {% endif %}>
+       formaction="{{ save_url }}?next={% url 'bike:home' %}">
+{% if bike_id %}
+<input type="submit" class="btn btn-secondary" value="Add maint. action"
+       formaction="{{ save_url }}?next={% url 'bike:maint_new' %}?bike={{ bike_id }}">
+{% endif %}
 </form>
 {% endblock %}
