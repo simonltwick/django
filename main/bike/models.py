@@ -1,8 +1,10 @@
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Func, Sum
 from django.urls import reverse
 
+from collections import defaultdict
 from datetime import date
 from enum import IntEnum
 
@@ -40,7 +42,7 @@ class DistanceMixin(models.Model):
 
     @property
     def distance_units_display(self):
-        return self.get_distance_units_display()
+        return self.get_distance_units_display().lower()
 
 
 class AscentUnits:
@@ -100,6 +102,28 @@ class Ride(DistanceMixin):
             validation_errors['ascent_units'] = "You must specify units."
         if validation_errors:
             raise ValidationError(validation_errors)
+
+    @classmethod
+    def mileage_by_month(cls, user, year, bike=None):
+        """ return total mileage by month, for a given year [and bike]
+        Also return the detailed data, grouped by month, if detail=True """
+        rides = cls.objects.filter(date__year=year, rider=user)
+        if bike is not None:
+            rides = rides.filter(bike=bike)
+
+        rides = rides.order_by('date', 'distance_units').all()
+        monthly_mileage = defaultdict(lambda: defaultdict(int))
+
+        for ride in rides:
+            if ride.distance is not None:
+                monthly_mileage[ride.date.month][
+                    ride.distance_units_display] += ride.distance
+
+        # return a dict, not defaultdict: templates won't iterate over
+        #     defaultdict
+        monthly_mileage = {month: {k: v for k, v in value.items()}
+                           for month, value in monthly_mileage.items()}
+        return monthly_mileage
 
 
 class Odometer(DistanceMixin):

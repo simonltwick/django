@@ -37,9 +37,13 @@ urlpatterns = [
          name='maint_delete'),
 
 
-    path('mileage/new', views.mileage, name='mileage_new'),
     path('mileage', views.mileage, name='mileage'),
-    path('mileage/<int:pk>', views.mileage, name='mileage'),
+    path('mileage/<int:year>', views.mileage, name='mileage'),
+    path('bike/<int:bike_id>/mileage', views.mileage, name='mileage'),
+    path('mileage/<int:year>/bike/<int:bike_id>', views.mileage,
+         name='mileage'),
+    path('rides/<int:year>/<int:month>', views.RideMonthArchiveView.as_view(),
+         name='rides_month'),
 
     path('component_types', views.component_types, name='component_types'),
     path('component_type/new', views.ComponentTypeCreate.as_view(),

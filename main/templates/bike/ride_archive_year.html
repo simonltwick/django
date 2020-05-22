@@ -1,0 +1,31 @@
+{% extends 'bike/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+{% if bike %}
+> {% breadcrumb_url "Mileage" 'bike:mileage' year bike.id %}
+{% else %}
+> {% breadcrumb_url "Mileage" 'bike:mileage' year %}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% load month_name %}
+
+<h1>Mileage{% if bike %} for {{ bike }}{% endif %} in {{ year }}</h1>
+
+<table class="table">
+    {% for month, month_summary in monthly_mileage.items %}
+        <tr><th>
+		  <a href="{% url 'bike:rides_month' year month %}">
+		    {{ month|month_name }}</a></th>
+          {% for mileage_units, miles in month_summary.items %}
+            <td>{{ miles }} {{ mileage_units }}</td>
+          {% empty %} -
+          {% endfor %}
+        </tr>
+    {% empty %}(no rides on record)
+    {% endfor %}
+</table>
+
+{% endblock%}

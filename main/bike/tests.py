@@ -4,7 +4,7 @@ from django.contrib.auth.hashers import make_password
 from django.urls import reverse
 
 from .models import (
-    Bike, ComponentType, Ride, Component, MaintenanceAction
+    Bike, ComponentType, Ride, Component, MaintenanceAction, DistanceUnits
     )
 
 
@@ -20,7 +20,12 @@ class BikeUrlTest(TestCase):
         self.bike = Bike.objects.create(
             name='Test bike', description="test", owner=self.user)
         self.bike.save()
-        self.ct = ComponentType.objects.create(user=self.user, type="Test type")
+        self.ride = Ride.objects.create(rider=self.user, bike=self.bike,
+                                        distance=5,
+                                        distance_units=DistanceUnits.MILES)
+        self.ride.save()
+        self.ct = ComponentType.objects.create(user=self.user,
+                                               type="Test type")
         self.ct.save()
         self.client = Client(raise_request_exception=True)
         self.client.login(username='tester', password='testpw')
@@ -29,14 +34,12 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:home'), context={'preferences_set': False})
 
     def test_ride(self):
-        ride = Ride.objects.create(rider=self.user, bike=self.bike)
-        ride.save()
-        rid = ride.id
-        self.try_url(reverse('bike:rides'), context={'rides': [ride]})
+        rid = self.ride.id
+        self.try_url(reverse('bike:rides'), context={'rides': [self.ride]})
         self.try_url(reverse('bike:ride', kwargs={'pk': rid}),
-                     context={'ride': ride})
+                     context={'ride': self.ride})
         self.try_url(reverse('bike:ride_delete', kwargs={'pk': rid}),
-                     context={'ride': ride})
+                     context={'ride': self.ride})
         self.try_url(reverse('bike:ride_new'))
 
     def test_bike(self):
@@ -57,15 +60,6 @@ class BikeUrlTest(TestCase):
                      context={'component': comp})
         self.try_url(reverse('bike:component_new'),)
 
-    def test_component_type(self):
-        ct = self.ct
-        self.try_url(reverse('bike:component_types'))
-        self.try_url(reverse('bike:component_type', kwargs={'pk': ct.id}),
-                     context={'componenttype': ct})
-        self.try_url(reverse('bike:component_type_delete',
-                             kwargs={'pk': ct.id}))
-        self.try_url(reverse('bike:component_type_new'),)
-
     def test_maint_action(self):
         maint = MaintenanceAction.objects.create(
             bike=self.bike, user=self.user)
@@ -76,6 +70,51 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:maint_delete',
                              kwargs={'pk': maint.id}))
         self.try_url(reverse('bike:maint_new'),)
+
+    def test_mileage(self):
+        self.try_url(
+            reverse('bike:mileage'),
+            context={
+                'monthly_mileage':
+                    {self.ride.date.month: {self.ride.distance_units_display:
+                                            self.ride.distance}}
+                    }
+            )
+        self.try_url(
+            reverse('bike:mileage', kwargs={'year': self.ride.date.year}),
+            context={'monthly_mileage': {
+                self.ride.date.month: {self.ride.distance_units_display:
+                                       self.ride.distance}
+                }
+            })
+        self.try_url(
+            reverse('bike:mileage', kwargs={'bike_id': self.bike.id}),
+            context={'monthly_mileage': {
+                self.ride.date.month: {self.ride.distance_units_display:
+                                       self.ride.distance}
+                }
+            })
+        self.try_url(
+            reverse('bike:mileage', kwargs={'bike_id': self.bike.id,
+                                            'year': self.ride.date.year}),
+            context={'monthly_mileage': {
+                self.ride.date.month: {self.ride.distance_units_display:
+                                       self.ride.distance}
+                }
+            })
+        self.try_url(reverse('bike:rides_month',
+                             kwargs={'month': self.ride.date.month,
+                                     'year': self.ride.date.year}),
+                     context={'object_list': [self.ride]})
+
+    def test_component_type(self):
+        ct = self.ct
+        self.try_url(reverse('bike:component_types'))
+        self.try_url(reverse('bike:component_type', kwargs={'pk': ct.id}),
+                     context={'componenttype': ct})
+        self.try_url(reverse('bike:component_type_delete',
+                             kwargs={'pk': ct.id}))
+        self.try_url(reverse('bike:component_type_new'),)
 
     def try_url(self, url, status=200, context=None, redirect=None):
         follow = redirect is not None
@@ -97,7 +136,8 @@ class BikeUrlTest(TestCase):
                     key_value = resp.context[key]
                     if isinstance(value, list):
                         # key_value is a QuerySet
-                        self.assertEqual(len(key_value), len(value))
+                        self.assertEqual(len(key_value), len(value),
+                                         'len(values) matches')
                         self.assertEqual(list(key_value), value)
                     else:
                         self.assertEqual(key_value, value)

@@ -1,0 +1,32 @@
+{% extends 'bike/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Monthly rides" 'bike:rides_month' month.year month.month %}
+{% endblock %}
+
+{% block content %}
+{% load month_name %}
+
+<h1>Mileage in {{ month|date:"M Y" }}</h1>
+
+<table class="table">
+    {% for ride in object_list %}
+        <tr><th>{{ ride.date|date:"D jS" }}</th>
+            <td>{{ ride.distance }} {{ ride.distance_units_display }}</td>
+        </tr>
+    {% empty %}(no rides on record)
+    {% endfor %}
+</table>
+
+<p>
+    {% if previous_month %}
+        &gt; Previous Month: {{ previous_month|date:"F y" }}
+    {% endif %}
+    {% if next_month %}
+        Next Month: {{ next_month|date:"F y" }} >
+    {% endif %}
+</p>
+
+
+{% endblock%}

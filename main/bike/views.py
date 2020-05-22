@@ -6,6 +6,7 @@ from django.urls import reverse, reverse_lazy
 from django.http import HttpResponse, HttpResponseRedirect
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic.list import ListView
+from django.views.generic.dates import MonthArchiveView
 
 import csv
 import datetime as dt
@@ -385,7 +386,7 @@ def rides(request):
                   context={'form': form, 'rides': rides})
 
 
-def csv_data_response(request, filename, queryset, fields):
+def csv_data_response(_request, filename, queryset, fields):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     writer = csv.writer(response)
@@ -453,7 +454,6 @@ class MaintActionUpdate(LoginRequiredMixin, UpdateView):
             MaintActionUpdate, self).dispatch(request, *args, **kwargs)
 
 
-# TODO: add maint actions to home and bike page
 class MaintActionDelete(LoginRequiredMixin, DeleteView):
     model = MaintenanceAction
     success_url = reverse_lazy('bike:maint_actions')
@@ -466,8 +466,29 @@ class MaintActionDelete(LoginRequiredMixin, DeleteView):
             MaintActionDelete, self).dispatch(request, *args, **kwargs)
 
 
+# TODO: odometer display / entry / adjustment rides
 @login_required
-def mileage(request, pk=None):
+def mileage(request, year=None, bike_id=None):
     # odometer and recent mileage stuff for bikes / a bike ...
-    return HttpResponse("odometer and recent mileage stuff for bikes / a bike "
-                        "...not yet implemented.")
+    """ show a monthly summary of mileage, with detail if requested """
+    if year is None:
+        year = dt.date.today().year
+    if bike_id is not None:
+        bike = get_object_or_404(Bike, pk=bike_id, owner=request.user)
+    else:
+        bike = None
+    monthly_mileage = Ride.mileage_by_month(request.user, year, bike_id)
+    return render(request, 'bike/ride_archive_year.html',
+                  context={'monthly_mileage': monthly_mileage,
+                           'bike': bike,
+                           'year': year})
+
+
+class RideMonthArchiveView(LoginRequiredMixin, MonthArchiveView):
+    """ called with kwargs year=None, bike_id=None, detail=False """
+    make_object_list = True
+    date_field = 'date'
+    month_format = '%m'  # int
+
+    def get_queryset(self):
+        return Ride.objects.filter(rider=self.request.user)
