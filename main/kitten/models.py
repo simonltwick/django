@@ -89,13 +89,13 @@ class PassengerTrafficProfile(models.Model):
     peak_morning_end = models.TimeField(default=dt.time(hour=9))
     peak_evening_start = models.TimeField(default=dt.time(hour=17))
     day_end_time = models.TimeField(default=dt.time(hour=22))
-    night_traffic = models.PositiveIntegerField(
+    night_traffic = models.PositiveSmallIntegerField(
         default=50,
         help_text="passenger traffic at start/end of the day")
-    peak_morning_traffic = models.PositiveIntegerField(
+    peak_morning_traffic = models.PositiveSmallIntegerField(
         default=200,
         help_text="passenger traffic compared to daytime normal=100")
-    peak_evening_traffic = models.PositiveIntegerField(
+    peak_evening_traffic = models.PositiveSmallIntegerField(
         default=150,
         help_text="passenger traffic compared to daytime normal=100")
 
@@ -163,7 +163,7 @@ class Team(models.Model, GameLevel):
     invitees = models.ManyToManyField(
         User, through='TeamInvitation',
         through_fields=['team', 'invitee_username'])
-    level = models.IntegerField(choices=GameLevel.CHOICES,
+    level = models.PositiveSmallIntegerField(choices=GameLevel.CHOICES,
                                 default=GameLevel.BASIC)
     # games = reverse FK
 
@@ -283,7 +283,7 @@ class Network(PassengerTrafficProfile):
 class GameTemplate(models.Model, GameLevel):
     network = models.ForeignKey(Network, related_name='levels',
                                 on_delete=models.CASCADE)
-    level = models.IntegerField(choices=GameLevel.CHOICES)
+    level = models.PositiveSmallIntegerField(choices=GameLevel.CHOICES)
     incident_rate = models.PositiveSmallIntegerField(
         default=50, help_text="average rate of incidents, with 100 generating"
         " 1 incident per tick of the clock, across the network")
@@ -342,11 +342,11 @@ class Impact(models.Model):
     name = models.CharField(max_length=40, default='?')
     type = models.PositiveSmallIntegerField(choices=ImpactType.CHOICES,
                                             default=ImpactType.LINE)
-    blocking = models.BooleanField(default=False)
-    one_time_amount = models.IntegerField(default=0)
-    recurring_amount = models.IntegerField(default=0)
     network = models.ForeignKey(Network, related_name='impacts',
                                 on_delete=models.CASCADE)
+    blocking = models.BooleanField(default=False)
+    one_time_amount = models.SmallIntegerField(default=0)
+    recurring_amount = models.SmallIntegerField(default=0)
 
     def __str__(self):
         return self.name
@@ -390,12 +390,13 @@ class IncidentType(models.Model):
     network = models.ForeignKey(Network, related_name='incident_types',
                                 on_delete=models.CASCADE)
     name = models.CharField(max_length=40, default='?')
-    type = models.IntegerField(choices=IncidentFamily.CHOICES)
+    type = models.PositiveSmallIntegerField(choices=IncidentFamily.CHOICES)
     description = models.CharField(max_length=100, null=True, blank=True)
     likelihood = models.PositiveSmallIntegerField(
         default=10, help_text="0-100: likelihood of this incident type "
         "occuring compared to other incident types")
-    responses = models.ManyToManyField(Response)
+    responses = models.ManyToManyField(Response,
+                                       verbose_name='possible responses')
     impacts = models.ManyToManyField(Impact)
 
     def __str__(self):
@@ -439,10 +440,16 @@ class Game(models.Model, GameLevel):
     INCIDENT_RATE = 50
     DELAY_BETWEEN_TICKS = 10  # seconds
     name = models.CharField(max_length=40)
-    started = models.DateField(auto_now_add=True)
-    last_played = models.DateField(auto_now=True)
     teams = models.ManyToManyField(Team, related_name='games',
                                    through='TeamGameStatus')
+    play_status = models.PositiveSmallIntegerField(
+        choices=GamePlayStatus.choices(), default=GamePlayStatus.BETWEEN_DAYS)
+    started = models.DateField(auto_now_add=True)
+    last_played = models.DateField(auto_now=True)
+    # delay = models.PositiveIntegerField(
+    #     default=0, verbose_name='total delays on line today')
+
+    level = models.PositiveSmallIntegerField(choices=GameLevel.CHOICES)
     network_name = models.CharField(max_length=40, help_text="""A network is a
      predefined collection of lines, trains and incident types to base your
      game upon""")
@@ -450,19 +457,17 @@ class Game(models.Model, GameLevel):
     incident_rate = models.PositiveSmallIntegerField(
         default=INCIDENT_RATE, help_text="average rate of incidents, with 100"
         " generating 1 incident per tick of the clock")
-    level = models.IntegerField(choices=GameLevel.CHOICES)
+
+    current_time = models.DateTimeField(null=True)
+    game_round_duration = models.DurationField(default=Network.TICK_STAGE)
+    tick_interval = models.DurationField(default=Network.TICK_SINGLE)
     day_start_time = models.TimeField(
         default=dt.time(hour=6),
         help_text="time when daily train operations start, in UTC/GMT time")
     day_end_time = models.TimeField(
         default=dt.time(hour=22),
         help_text="time when daily train operations end, in UTC/GMT time")
-    current_time = models.DateTimeField(auto_now_add=True, null=True)
-    game_round_duration = models.DurationField(default=Network.TICK_STAGE)
-    tick_interval = models.DurationField(default=Network.TICK_SINGLE)
-    delay = models.PositiveIntegerField(default=0)
-    play_status = models.PositiveSmallIntegerField(
-        choices=GamePlayStatus.choices(), default=GamePlayStatus.BETWEEN_DAYS)
+    # lines FK
 
     class meta:
         unique_together = [['name', 'team']]
@@ -765,11 +770,13 @@ class TeamGameStatus(models.Model):
         return (f"Game status for {self.team} on {self.game}: "
                 f"{self.play_status_title}")
 
-    @property
-    def play_status_title(self):
+    def _play_status_title(self):
         return (GamePlayStatus(self.play_status).title()
                 if self.play_status is not None
                 else 'None')
+    # this way of doing it is for Admin list_display
+    _play_status_title.short_description = "Play status"
+    play_status_title = property(_play_status_title)
 
 
 class LineTemplate(models.Model):
@@ -781,15 +788,12 @@ class LineTemplate(models.Model):
                                   "Northbound, Clockwise")
     direction2 = models.CharField(max_length=20, default='Down',
                                   help_text="for the opposite direction")
-    trains_dir1 = models.IntegerField(default=3,
-                                      verbose_name="Number of trains starting"
-                                      " in direction1")
-    trains_dir2 = models.IntegerField(default=3,
-                                      verbose_name="Number of trains starting"
-                                      " in direction2")
-    train_interval = models.IntegerField(default=10,
-                                         verbose_name="Interval between trains"
-                                         " starting")
+    trains_dir1 = models.PositiveSmallIntegerField(
+        default=3, verbose_name="Number of trains starting in direction1")
+    trains_dir2 = models.PositiveSmallIntegerField(
+        default=3, verbose_name="Number of trains starting in direction2")
+    train_interval = models.PositiveSmallIntegerField(
+        default=10, verbose_name="Interval between trains starting")
     train_type = models.CharField(max_length=20, default='Train')
     # line style / colour
     # train icon
@@ -842,22 +846,22 @@ class Line(models.Model):
     # train_type = all from LineParameters
     game = models.ForeignKey(Game, on_delete=models.CASCADE, null=True,
                              related_name='lines')
+    name = models.CharField(max_length=40, default='')
     operator = models.ForeignKey(Team, null=True,
                                  on_delete=models.SET_NULL)
-    line_reputation = models.IntegerField(default=100)
-    name = models.CharField(max_length=40, default='')
     # direction fields must be read-only or locations become orphans
     direction1 = models.CharField(max_length=20, default='Up',
                                   editable=False)
     direction2 = models.CharField(max_length=20, default='Down',
                                   editable=False)
-    trains_dir1 = models.IntegerField(default=3)
-    trains_dir2 = models.IntegerField(default=3)
-    train_interval = models.IntegerField(default=10)
+    trains_dir1 = models.PositiveSmallIntegerField(default=3)
+    trains_dir2 = models.PositiveSmallIntegerField(default=3)
+    train_interval = models.PositiveSmallIntegerField(default=10)
     train_type = models.CharField(max_length=20, default='Train')
-    total_arrivals = models.PositiveIntegerField(default=0)
+    line_reputation = models.PositiveSmallIntegerField(default=100)
+    total_arrivals = models.PositiveSmallIntegerField(default=0)
     total_delay = models.DurationField(default=dt.timedelta(0))
-    on_time_arrivals = models.PositiveIntegerField(default=0)
+    on_time_arrivals = models.PositiveSmallIntegerField(default=0)
     # num_trains local variable for assigning train serial numbers
     # line style / colour
     # train icon
@@ -1048,22 +1052,26 @@ class LocationType:
 
 
 class PlaceTemplate(models.Model, LocationType):
-    name = models.CharField(
-        max_length=40, help_text="A name is only required for stations",
-        default='', verbose_name="Name (if station)", blank=True)
-    type = models.IntegerField(choices=LocationType.CHOICES,
-                               default=LocationType.TRACK)
-    position = models.IntegerField()
     line = models.ForeignKey(LineTemplate, related_name='places',
                              on_delete=models.CASCADE)
-    transit_delay = models.IntegerField(
+    position = models.PositiveSmallIntegerField()
+    type = models.PositiveSmallIntegerField(choices=LocationType.CHOICES,
+                                            default=LocationType.TRACK)
+    name = models.CharField(
+        max_length=40, help_text="A name is only required for stations",
+        default='', blank=True)
+
+    transit_delay = models.PositiveSmallIntegerField(
         default=1, help_text='time to travel along lines; wait time at '
         'stations or depots')
-    # the following fields are only used for stations
     turnaround_percent_direction1 = models.PositiveSmallIntegerField(
-        default=0, validators=[MaxValueValidator(100)])
+        default=0, validators=[MaxValueValidator(100)],
+        verbose_name="Turnaround % from direction 1")
     turnaround_percent_direction2 = models.PositiveSmallIntegerField(
-        default=0, validators=[MaxValueValidator(100)])
+        default=0, validators=[MaxValueValidator(100)],
+        verbose_name="Turnaround % from direction 2")
+
+    # the following fields are only used for stations
     passenger_traffic_dir1 = models.PositiveSmallIntegerField(
         default=100, help_text="Relative peak passenger traffic in direction 1"
         " at this station.",
@@ -1097,19 +1105,18 @@ class LineLocation(models.Model, LocationType):
     """ a place on the line: a station, a depot or a line """
     line = models.ForeignKey(Line, on_delete=models.CASCADE, null=True)
     name = models.CharField(max_length=40, default='', blank=True)
-    type = models.IntegerField(choices=LocationType.CHOICES,
-                               default=LocationType.DEPOT)
-    position = models.IntegerField()
-    transit_delay = models.IntegerField(default=1)
+    type = models.PositiveSmallIntegerField(choices=LocationType.CHOICES,
+                                            default=LocationType.DEPOT)
+    position = models.PositiveSmallIntegerField()
     direction = models.CharField(max_length=20, default='direction?')
     direction_is_forward = models.BooleanField(default=True)
     is_start_of_line = models.BooleanField(default=False)
     is_end_of_line = models.BooleanField(default=False)
+    transit_delay = models.PositiveSmallIntegerField(default=1)
     turnaround_percent = models.PositiveSmallIntegerField(default=0)
     last_train_time = models.DateTimeField(null=True)
     # trains = fk Trains
     # incidents= fk
-    # type (from LocationType abc)
 
     @classmethod
     def new_from_template(cls, line, line_length, template: PlaceTemplate,

@@ -77,7 +77,7 @@
       {% endblock %}
 
       {% if user.is_superuser %}
-      <li>{% breadcrumb_url 'Admin' 'admin:index' %}</li>
+      <li><a href="{% url 'admin:index' %}kitten">Admin</a></li>
       {% endif %}
 
       {% if user.is_authenticated %}
