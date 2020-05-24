@@ -13,8 +13,8 @@ import datetime as dt
 import logging
 
 from .models import (
-    Bike, Ride, ComponentType, Component, Preferences, DistanceUnits,
-    MaintenanceAction
+    Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
+    DistanceUnits
     )
 from .forms import RideSelectionForm
 
@@ -33,33 +33,33 @@ def home(request):
 @login_required
 def bikes(request):
     today = dt.date.today()
-    this_month = dt.date(year=today.year, month=today.month, day=1)
-    sum_month = Sum('rides__distance', filter=Q(rides__date__gte=this_month))
-    this_year = dt.date(year=today.year, month=1, day=1)
-    sum_year = Sum('rides__distance', filter=Q(rides__date__gte=this_year))
-    bikes = (Bike.objects.values('id', 'name', 'rides__distance_units')
-             .annotate(distance=Sum('rides__distance'),
-                       sum_month=sum_month,
-                       sum_year=sum_year)
-             .filter(owner=request.user))
-    # change distance_units into distance
-    """ sum for this month
-    this_month=dt.date(year=dt.date.today().year, month=dt.date.today().month,
-                       day=1)
-    sum_month=Sum('rides__distance', filter=Q(rides__date__gte=this_month))
-    bikes = Bike.objects.annotate(sum_month=sum_month).all()
-    # but need to add values('rides__distance_units')
-    """
-
-    bikes = [row for row in bikes.all()]  # QuerySet -> List
-    for row in bikes:
-        if row['rides__distance_units'] is None:
-            row['rides__distance_units'] = ''
+    sum_year = Sum('rides__distance', filter=Q(rides__date__year=today.year))
+    sum_month = Sum('rides__distance', filter=(
+        Q(rides__date__month=today.month) & Q(rides__date__year=today.year)))
+    bikes = (Bike.objects  # .values('id', 'name', 'rides__distance_units')
+             .filter(owner=request.user)
+             .order_by('id'))
+    maint = bikes.prefetch_related('maint_actions')
+    mileage = (bikes
+               .values('id', 'rides__distance_units')
+               .filter(rides__distance_units__isnull=False)
+               .annotate(distance=Sum('rides__distance'),
+                         distance_month=sum_month,
+                         distance_year=sum_year)
+               )
+    # mileage is a queryset of dicts, one for each bike/distance_unit combo
+    # add mileages to bike entries
+    bikes_by_id = {bike.id: bike for bike in maint}
+    for entry in mileage:
+        bike = bikes_by_id[entry['id']]
+        entry['distance_units'] = DistanceUnits(  # km or miles
+            entry['rides__distance_units']).name.lower()
+        if hasattr(bike, 'mileage'):
+            bike.mileage.append(entry)
         else:
-            row['rides__distance_units'] = DistanceUnits(
-                row['rides__distance_units']).name.lower()
+            bike.mileage = [entry]
     return render(request, 'bike/bikes.html',
-                  context={'bikes': bikes})
+                  context={'bikes': maint})
 
 
 class PreferencesCreate(LoginRequiredMixin, CreateView):
@@ -349,6 +349,8 @@ class RideDelete(LoginRequiredMixin, DeleteView):
 
 @login_required
 def rides(request):
+    # TODO: implement search rides with QuerySet.(description_icontains=xx)
+    # TODO: search for year/month with Queryset.filter(date__year=xx)
     if request.method == 'POST':
         form = RideSelectionForm(
             request.POST, bikes=Bike.objects.filter(owner=request.user).all())
@@ -467,11 +469,13 @@ class MaintActionDelete(LoginRequiredMixin, DeleteView):
 
 
 # TODO: odometer display / entry / adjustment rides
+# TODO: use Rides.objects.dates(date, "year"/ "month"), to get available yy/mm
 @login_required
 def mileage(request, year=None, bike_id=None):
     # odometer and recent mileage stuff for bikes / a bike ...
     """ show a monthly summary of mileage, with detail if requested """
     if year is None:
+        # TODO: use Queryset.latest() to retrieve latest ride on blog
         year = dt.date.today().year
     if bike_id is not None:
         bike = get_object_or_404(Bike, pk=bike_id, owner=request.user)

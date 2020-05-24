@@ -9,19 +9,46 @@
 {% load static %}
 
 <h1>Bikes</h1>
-<p>(add maint due)</p>
 {% for bike in bikes %}
 {% if forloop.first %}
-<p>(distances this month/year/all time (units))</p>
-<ul>
+<table class="table">
+<tr><th></th><th>month</th><th>year</th><th>total</th><th>units</th>
+    <th>maint</th>
+</tr>
 {% endif %}
 
-<li><a href="{% url 'bike:bike' bike.id %}">{{ bike.name }}</a>:
-{{ bike.sum_month|floatformat }} / {{ bike.sum_year|floatformat }} / 
-{{ bike.distance|floatformat }} ({{ bike.rides__distance_units }})</li>
+<tr>
+  <td><a href="{% url 'bike:bike' bike.id %}">{{ bike.name }}</a>
+    {% if bike.mileage %}
+    {# loop through all mileages units for each of 4  columns #}
+    {% with mileage=bike.mileage %}
+  </td>
+  <td>{% for entry in mileage %}
+	  {{ entry.distance_month|floatformat|default:"" }}<br />
+      {% endfor %}</td>
+  <td>{% for entry in mileage %}
+	  {{ entry.distance_year|floatformat|default:"" }}<br />
+      {% endfor %}</td> 
+  <td>{% for entry in mileage %}
+	  {{ entry.distance|floatformat|default:"" }}<br />
+      {% endfor %}</td>
+  <td>{% for entry in mileage %}
+	  {{ entry.distance_units|default:"" }}<br />
+      {% endfor %}</td>
+    {% endwith %}
+    {% else %}
+    <td></td><td></td><td></td><td></td>
+    {% endif %}
+  <td>{% for maint in bike.maint_actions.all %}
+      {% if forloop.first %}<ul>{% endif %}
+      <li><a href="{% url 'bike:maint' maint.id %}">{{ maint }}</a></li>
+      {% if forloop.last %}</ul>{% endif %}
+	  {% endfor %}
+  </td>
+</tr>
 
 {% if forloop.last %}
-</ul>
+</table>
 {% endif %}
 {% empty %}
 <p>No bikes found :-(</p>

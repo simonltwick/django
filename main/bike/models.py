@@ -226,8 +226,7 @@ class MaintenanceAction(DistanceMixin):
                            'description', 'due_date', 'distance')
 
     def __str__(self):
-        return (f"{self.bike or self.component}: "
-                f"{self.description or self.activity_type}")
+        return f"{self.description or self.activity_type}"
 
     def get_absolute_url(self):
         return reverse('bike:maint', kwargs={'pk': self.id})
