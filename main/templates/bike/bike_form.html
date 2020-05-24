@@ -19,43 +19,48 @@
 {% csrf_token %}
 </table>
 
-<p>
-<input type="submit" class="btn btn-primary" value="OK"
-  {% if bike %}
-    {% url 'bike:bike' bike.id as save_url %}
-    formaction="{{ save_url }}?next={% url 'bike:bikes' %}">
-    <input type="submit" class="btn btn-secondary" value="Add maint. action"
-    	   formaction="{{ save_url }}?next={% url 'bike:maint_new' %}?bike={{  bike.id }}">
-	<a href="{% url 'bike:bike_delete' bike.id %}" class="btn btn-danger">
-	Delete</a>
-  {% else %}
-    formaction="{% url 'bike:bike_new' %}?success={% url 'bike:bikes' %}">
-  {% endif %}
-</p>
-</form>
+
+{% for action in maint %}
+  {% if forloop.first %}<h3>Maintenance actions</h3><ul>{% endif %}
+  <li><a href="{% url 'bike:maint' action.id %}">{{ action }}</a></li>
+  {% if forloop.last %}</ul>{% endif %}
+{% endfor %}
+
  
 {% for subcomponent in components %}
   {% if forloop.first %}
     <h3>Components</h3>
     <table class="table">
-<tr><th>Type</th>
-	<th>Description</th>
-	<th>Specification</th>
+    <tr><th>Type</th>
+	  <th>Description</th>
+	  <th>Specification</th>
 	</tr>
   {% endif %}
 
-{% include 'bike/subcomponent.html' %}
+  {% include 'bike/subcomponent.html' %}
 
-  {% if forloop.last %}
-	</table>
-  {% endif %}
+  {% if forloop.last %}</table>{% endif %}
   {% empty %}
-  (no components.)
+  <p>(no components.)</p>
 {% endfor %}
+
+<p>
 {% if bike %}
-<p><a class="btn btn-secondary"
-	  href="{% url 'bike:component_new' %}?bike={{ bike.id }}&success={% url 'bike:bike' bike.id %}">Add component
-   </a>
-</p>
+    <input type="submit" class="btn btn-primary" value="OK"
+    {% url 'bike:bike' bike.id as save_url %}
+    formaction="{{ save_url }}?next={% url 'bike:bikes' %}">
+	<a href="{% url 'bike:bike_delete' bike.id %}?next={% url 'bike:bikes' %}"
+	class="btn btn-danger">Delete</a>
+    <input type="submit" class="btn btn-secondary" value="Add maint. action"
+    	   formaction="{{ save_url }}?next={% url 'bike:maint_new' %}?bike={{  bike.id }}">
+	<a class="btn btn-secondary"
+	  href="{% url 'bike:component_new' %}?bike={{ bike.id }}&next={% url 'bike:bike' bike.id %}">
+	Add component</a>
+{% else %}
+    <input type="submit" class="btn btn-primary" value="OK"
+    formaction="{% url 'bike:bike_new' %}?next={% url 'bike:bikes' %}">
 {% endif %}
+</p>
+</form>
+
 {% endblock %}
