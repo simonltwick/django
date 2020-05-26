@@ -1,9 +1,10 @@
-from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum, Q
-from django.urls import reverse, reverse_lazy
+from django import forms
 from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import render, get_object_or_404
+from django.urls import reverse, reverse_lazy
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic.list import ListView
 from django.views.generic.dates import MonthArchiveView
@@ -16,7 +17,7 @@ from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
     DistanceUnits
     )
-from .forms import RideSelectionForm
+from .forms import RideSelectionForm, RideForm
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -287,8 +288,7 @@ class ComponentTypeDelete(LoginRequiredMixin, DeleteView):
 
 class RideCreate(LoginRequiredMixin, CreateView):
     model = Ride
-    fields = ['bike', 'date', 'description', 'distance', 'distance_units',
-              'ascent', 'ascent_units']
+    form_class = RideForm
 
     def get_initial(self):
         initial = super(RideCreate, self).get_initial()
@@ -317,8 +317,7 @@ class RideCreate(LoginRequiredMixin, CreateView):
 
 class RideUpdate(LoginRequiredMixin, UpdateView):
     model = Ride
-    fields = ['bike', 'date', 'description', 'distance', 'distance_units',
-              'ascent', 'ascent_units']
+    form_class = RideForm
 
     def dispatch(self, request, *args, **kwargs):
         if not Ride.objects.filter(pk=kwargs['pk'],

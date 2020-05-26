@@ -3,7 +3,7 @@ from django.forms import modelformset_factory
 import datetime as dt
 import logging
 
-from .models import Component
+from .models import Component, Ride
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -31,3 +31,11 @@ class RideSelectionForm(forms.Form):
 ComponentFormSet = modelformset_factory(
     Component,
     fields=('bike', 'subcomponent_of', 'name', 'type'))
+
+
+class RideForm(forms.ModelForm):
+    class Meta:
+        model = Ride
+        fields = ['bike', 'date', 'distance', 'distance_units',
+                  'ascent', 'ascent_units', 'description', ]
+        widgets = {'description': forms.Textarea()}

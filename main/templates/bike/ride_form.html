@@ -14,10 +14,35 @@
 {% block content %}
 <h1>Ride details:</h1>
 <form method='POST'>
-<table class="table">
-{{ form }}
 {% csrf_token %}
+{{ form.non_field_errors }}
+{% for hidden in form.hidden_fields %}
+{{ hidden.errors }}
+{{ hidden }}
+{% endfor %}
+
+<table class="table">
+{% for field in form.visible_fields %}
+  {% if field.name == 'distance_units' or field.name == 'ascent_units' %}
+  {# skip - handled elsewhere #}
+  {% else %}
+  <div class="fieldWrapper">
+    <tr><th>{{ field.label_tag }}</th>
+    <td>{{ field.errors }}
+    {{ field }}
+    {% if field.name == 'distance' %}
+      {{ form.distance_units.errors }}
+      {{ form.distance_units }}
+    {% elif field.name == 'ascent' %}
+      {{ form.ascent_units.errors }}
+      {{ form.ascent_units }}
+    </td></tr>
+    {% endif %}
+  </div>
+  {% endif %}
+{% endfor %}
 </table>
+
 
 {% if ride %}
   {% url 'bike:ride' ride.id as save_url %}
