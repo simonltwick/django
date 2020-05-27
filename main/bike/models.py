@@ -150,10 +150,7 @@ class ComponentType(models.Model):
     subtype_of = models.ForeignKey('ComponentType', related_name='subtypes',
                                    on_delete=models.PROTECT,
                                    blank=True, null=True)
-    maintenance_schedule = models.ManyToManyField('MaintenanceSchedule')
-    maintenance_interval = models.PositiveIntegerField(null=True, blank=True)
-    maint_interval_units = models.PositiveSmallIntegerField(
-        choices=IntervalUnits.CHOICES, null=True, blank=True)
+    maintenance_type = models.ManyToManyField('MaintenanceType')
 
     def __str__(self):
         return str(self.type)
@@ -195,10 +192,25 @@ class Component(models.Model):
         return reverse('bike:component', kwargs={'pk': self.id})
 
 
-class MaintenanceSchedule(models.Model):
+class MaintenanceType(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE,
+                             related_name='maintenance_types')
     component_type = models.ForeignKey(ComponentType, on_delete=models.CASCADE)
-    activity = models.CharField(max_length=100)
-    reference_info = models.CharField(max_length=300)
+    activity = models.CharField(max_length=200)
+    reference_info = models.CharField(max_length=300, blank=True, null=True)
+    recurring = models.BooleanField(default=False)
+    maintenance_interval = models.PositiveIntegerField(null=True, blank=True)
+    maint_interval_units = models.PositiveSmallIntegerField(
+        choices=IntervalUnits.CHOICES, null=True, blank=True)
+
+    class Meta:
+        unique_together = ['component_type', 'activity']
+
+    def __str__(self):
+        return f'{self.activity} - {self.component_type}'
+
+    def get_absolute_url(self):
+        return reverse('bike:maint_type', kwargs={'pk': self.id})
 
 
 class MaintenanceAction(DistanceMixin):
@@ -210,9 +222,8 @@ class MaintenanceAction(DistanceMixin):
     component = models.ForeignKey(
         Component, on_delete=models.CASCADE, null=True, blank=True,
         help_text='you only need to specify one of bike or component.')
-    activity_type = models.ForeignKey(MaintenanceSchedule,
-                                      on_delete=models.SET_NULL,
-                                      blank=True, null=True)
+    maint_type = models.ForeignKey(MaintenanceType, on_delete=models.SET_NULL,
+                                   blank=True, null=True)
     description = models.CharField(max_length=100, blank=True, null=True)
     due_date = models.DateField(null=True, blank=True,
                                 default=date.today)
@@ -222,7 +233,7 @@ class MaintenanceAction(DistanceMixin):
                                              null=True, blank=True)
 
     class Meta:
-        unique_together = ('user', 'bike', 'component', 'activity_type',
+        unique_together = ('user', 'bike', 'component', 'maint_type',
                            'description', 'due_date', 'distance')
 
     def __str__(self):

@@ -1,0 +1,29 @@
+{% extends 'bike/base.html' %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
+{% endblock %}
+
+{% block content %}
+{% load static %}
+
+<h1>Maintenance Types</h1>
+{% for maint in object_list %}
+{% if forloop.first %}
+<ul>
+{% endif %}
+
+<li><a href="{% url 'bike:maint_type' maint.id %}">{{ maint }}</a></li>
+
+{% if forloop.last %}
+</ul>
+{% endif %}
+{% empty %}
+<p>No maintenance types found :-(</p>
+{% endfor %}
+
+<p><a class="btn btn-success" href="{% url 'bike:maint_type_new' %}">
+New maintenance type</a></p>
+
+{% endblock%}

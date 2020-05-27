@@ -15,7 +15,7 @@ import logging
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
-    DistanceUnits
+    DistanceUnits, MaintenanceType,
     )
 from .forms import RideSelectionForm, RideForm
 
@@ -241,25 +241,21 @@ def component_types(request):
 
 class ComponentTypeCreate(LoginRequiredMixin, CreateView):
     model = ComponentType
-    fields = ['type', 'subtype_of', 'description', 'maintenance_interval',
-              'maint_interval_units']
+    fields = ['type', 'subtype_of', 'description']
 
     def form_valid(self, form):
         form.instance.user = self.request.user
         return super(ComponentTypeCreate, self).form_valid(form)
 
     def get_success_url(self):
-        url = super(ComponentTypeCreate, self).get_success_url()
-        success_url = self.request.GET.get('success')
-        if success_url:
-            url += f'?success={success_url}'
-        return url
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        return super(ComponentTypeCreate, self).get_success_url()
 
 
 class ComponentTypeUpdate(LoginRequiredMixin, UpdateView):
     model = ComponentType
-    fields = ['type', 'subtype_of', 'description', 'maintenance_interval',
-              'maint_interval_units']
+    fields = ['type', 'subtype_of', 'description', ]
 
     def dispatch(self, request, *args, **kwargs):
         if not ComponentType.objects.filter(pk=kwargs['pk'],
@@ -410,7 +406,7 @@ class MaintActionList(LoginRequiredMixin, ListView):
 
 class MaintActionCreate(LoginRequiredMixin, CreateView):
     model = MaintenanceAction
-    fields = ['bike', 'component', 'activity_type', 'description', 'due_date',
+    fields = ['bike', 'component', 'maint_type', 'description', 'due_date',
               'distance', 'distance_units', 'completed', 'completed_date',
               'completed_distance']
 
@@ -437,6 +433,11 @@ class MaintActionCreate(LoginRequiredMixin, CreateView):
         obj = form.save(commit=False)
         obj.user = self.request.user
         return super(MaintActionCreate, self).form_valid(form)
+
+    def get_success_url(self):
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        return super(MaintActionCreate, self).get_success_url()
 
 
 class MaintActionUpdate(LoginRequiredMixin, UpdateView):
@@ -466,6 +467,76 @@ class MaintActionDelete(LoginRequiredMixin, DeleteView):
             return HttpResponse("Unauthorised maint. action", status=401)
         return super(
             MaintActionDelete, self).dispatch(request, *args, **kwargs)
+
+
+class MaintTypeList(LoginRequiredMixin, ListView):
+    model = MaintenanceType
+    ordering = ('component_type', 'recurring', 'activity',)
+
+    def get_queryset(self):
+        return MaintenanceType.objects.filter(user=self.request.user)
+
+
+class MaintTypeCreate(LoginRequiredMixin, CreateView):
+    model = MaintenanceType
+    fields = ('component_type', 'activity', 'reference_info', 'recurring',
+              'maintenance_interval', 'maint_interval_units')
+
+    def get_form(self, *args, **kwargs):
+        form = super(MaintTypeCreate, self).get_form(*args, **kwargs)
+        form.fields['component_type'].queryset = \
+            self.request.user.component_types
+        return form
+
+    def get_initial(self):
+        initial = super(MaintTypeCreate, self).get_initial()
+        ctype_id = self.request.GET.get('component_type')
+        if ctype_id:
+            ctype = get_object_or_404(ComponentType, user=self.request.user,
+                                      pk=ctype_id)
+            # copy, so we don't accidentally change a mutable dict
+            initial = initial.copy()
+            initial['component_type'] = ctype
+        return initial
+
+    def form_valid(self, form):
+        obj = form.save(commit=False)
+        obj.user = self.request.user
+        return super(MaintTypeCreate, self).form_valid(form)
+
+    def get_success_url(self):
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        return super(MaintTypeCreate, self).get_success_url()
+
+
+class MaintTypeUpdate(LoginRequiredMixin, UpdateView):
+    model = MaintenanceType
+    fields = MaintTypeCreate.fields
+
+    def get_success_url(self):
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        return super(MaintTypeUpdate, self).get_success_url()
+
+    def dispatch(self, request, *args, **kwargs):
+        if not MaintenanceType.objects.filter(
+                pk=kwargs['pk'], user=request.user).exists():
+            return HttpResponse("Unauthorised maint. type", status=401)
+        return super(
+            MaintTypeUpdate, self).dispatch(request, *args, **kwargs)
+
+
+class MaintTypeDelete(LoginRequiredMixin, DeleteView):
+    model = MaintenanceType
+    success_url = reverse_lazy('bike:maint_types')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not MaintenanceType.objects.filter(
+                pk=kwargs['pk'], user=request.user).exists():
+            return HttpResponse("Unauthorised maint. type", status=401)
+        return super(
+            MaintTypeDelete, self).dispatch(request, *args, **kwargs)
 
 
 # TODO: odometer display / entry / adjustment rides

@@ -4,7 +4,8 @@ from django.contrib.auth.hashers import make_password
 from django.urls import reverse
 
 from .models import (
-    Bike, ComponentType, Ride, Component, MaintenanceAction, DistanceUnits
+    Bike, ComponentType, Ride, Component, MaintenanceAction, DistanceUnits,
+    MaintenanceType,
     )
 
 
@@ -64,12 +65,27 @@ class BikeUrlTest(TestCase):
         maint = MaintenanceAction.objects.create(
             bike=self.bike, user=self.user)
         maint.save()
-        self.try_url(reverse('bike:maint_actions'))
+        self.try_url(reverse('bike:maint_actions'),
+                     context={'object_list': [maint]})
         self.try_url(reverse('bike:maint', kwargs={'pk': maint.id}),
                      context={'maintenanceaction': maint})
         self.try_url(reverse('bike:maint_delete',
-                             kwargs={'pk': maint.id}))
+                             kwargs={'pk': maint.id}),
+                     context={'maintenanceaction': maint})
         self.try_url(reverse('bike:maint_new'),)
+
+    def test_maint_type(self):
+        maint = MaintenanceType.objects.create(
+            user=self.user, component_type=self.ct)
+        maint.save()
+        self.try_url(reverse('bike:maint_types'),
+                     context={'object_list': [maint]})
+        self.try_url(reverse('bike:maint_type', kwargs={'pk': maint.id}),
+                     context={'maintenancetype': maint})
+        self.try_url(reverse('bike:maint_type_delete',
+                             kwargs={'pk': maint.id}),
+                     context={'maintenancetype': maint})
+        self.try_url(reverse('bike:maint_type_new'),)
 
     def test_mileage(self):
         self.try_url(

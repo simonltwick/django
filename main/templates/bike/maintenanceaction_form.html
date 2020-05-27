@@ -25,6 +25,11 @@
   {% if maintenanceaction %}
   <a  class="btn btn-danger" href="{% url 'bike:maint_delete' maintenanceaction.id %}">
   Delete</a>
+  <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?component_type={{ maintenanceaction.component.type_id }}&next={% url 'bike:maint' maintenanceaction.id %}">
+  New maint. type</a>
+{% else %}
+  <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?next={% url 'bike:maint_new' %}">
+  New maint. type</a>
   {% endif %}
 
   </p>

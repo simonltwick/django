@@ -1,0 +1,32 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ maintenancetype }} 
+{% endblock %}
+
+{% block breadcrumbs %}
+{% load breadcrumb %}
+> {% breadcrumb_url "Maintenance Type" 'bike:maint_type' maintenancetype.id %}
+> {% breadcrumb_url "Delete" 'bike:maint_type_delete' maintenancetype.id %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ maintenancetype }}</h1>
+	<p class="errormsg">This maintenance type will be deleted.  Any linked
+	maintenance actions will no longer be connected to a maintenance type or
+	schedule</p>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	<table class="table">
+	{{ form }}
+	</table>
+	<p>
+	<input type="submit" class="btn btn-danger" value="Delete">
+	</p>
+</form>
+
+
+{% endblock %}
