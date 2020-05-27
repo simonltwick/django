@@ -2,7 +2,7 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-</li><li>{% breadcrumb_url "Change password" 'admin:password_change' %}
+> {% breadcrumb_url "Bikes" 'bike:bikes' %}
 {% endblock %}
 
 {% block content %}
@@ -12,13 +12,15 @@
 {% for bike in bikes %}
 {% if forloop.first %}
 <table class="table">
-<tr><th></th><th>month</th><th>year</th><th>total</th><th>units</th>
+<tr><th></th><th>last ride</th><th>month</th><th>year</th><th>total</th><th>units</th>
     <th>maint</th>
 </tr>
 {% endif %}
 
 <tr>
   <td><a href="{% url 'bike:bike' bike.id %}">{{ bike.name }}</a>
+  </td>
+  <td>{{ bike.last_ridden|default:"" }}</td>
     {% if bike.mileage %}
     {# loop through all mileages units for each of 4  columns #}
     {% with mileage=bike.mileage %}

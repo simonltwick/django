@@ -1,6 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Max
 from django import forms
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
@@ -39,6 +39,7 @@ def bikes(request):
         Q(rides__date__month=today.month) & Q(rides__date__year=today.year)))
     bikes = (Bike.objects  # .values('id', 'name', 'rides__distance_units')
              .filter(owner=request.user)
+             .annotate(last_ridden=Max('rides__date'))
              .order_by('id'))
     maint = bikes.prefetch_related('maint_actions')
     mileage = (bikes
