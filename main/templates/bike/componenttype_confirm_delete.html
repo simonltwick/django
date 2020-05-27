@@ -6,7 +6,6 @@ Confirm Delete -
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Component types" 'bike:component_types' %}
 > {% breadcrumb_url "Component type" 'bike:component_type' componenttype.id %}
 > {% breadcrumb_url "Delete" 'bike:component_type_delete' componenttype.id %}
 {% endblock %}

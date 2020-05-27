@@ -62,12 +62,7 @@
     <div class="col-md-6">
     {% load breadcrumb %}
     <ul class="bike-breadcrumb">
-    <li>{% breadcrumb_url 'Home' 'bike:home' %}</li>
-    {% if bike_id %}
-    <li>{% breadcrumb_url 'Bike' 'bike:bike' bike_id %}
-    {% elif bike.id %}
-    <li>{% breadcrumb_url 'Bike' 'bike:bike' bike.id %}
-    {% endif %}
+    <li>{% breadcrumb_url 'Home' 'bike:home' %}
     {% block breadcrumbs %}
     {% endblock %}
     </li>

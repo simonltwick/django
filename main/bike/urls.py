@@ -20,15 +20,6 @@ urlpatterns = [
     path('bike/<int:pk>/delete', views.BikeDelete.as_view(),
          name='bike_delete'),
 
-    path('components', views.components, name='components'),
-    path('component/new', views.ComponentCreate.as_view(),
-         name='component_new'),
-    path('component', views.ComponentUpdate.as_view(), name='component'),
-    path('component/<int:pk>', views.ComponentUpdate.as_view(),
-         name='component'),
-    path(r'component/<int:pk>/delete', views.ComponentDelete.as_view(),
-         name='component_delete'),
-
     path('maint', views.MaintActionList.as_view(), name='maint_actions'),
     path('maint/new', views.MaintActionCreate.as_view(), name='maint_new'),
     path('maint/<int:pk>', views.MaintActionUpdate.as_view(), name='maint'),
@@ -50,6 +41,15 @@ urlpatterns = [
          name='mileage'),
     path('mileage/<int:year>/<int:month>',
          views.RideMonthArchiveView.as_view(), name='rides_month'),
+
+    path('components', views.components, name='components'),
+    path('component/new', views.ComponentCreate.as_view(),
+         name='component_new'),
+    path('component', views.ComponentUpdate.as_view(), name='component'),
+    path('component/<int:pk>', views.ComponentUpdate.as_view(),
+         name='component'),
+    path(r'component/<int:pk>/delete', views.ComponentDelete.as_view(),
+         name='component_delete'),
 
     path('component_types', views.component_types, name='component_types'),
     path('component_type/new', views.ComponentTypeCreate.as_view(),

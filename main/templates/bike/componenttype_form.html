@@ -3,7 +3,6 @@
 
 {% block breadcrumbs %}
 {% load breadcrumb %}
-> {% breadcrumb_url "Component types" 'bike:component_types' %}
 {% if componenttype %}
 > {% breadcrumb_url "Component type" 'bike:component_type' componenttype.id %}
 {% else %}

@@ -26,7 +26,7 @@
   <a  class="btn btn-danger" href="{% url 'bike:component_delete' component.id %}">
   Delete</a>
   {% else %}
-  <a class="btn btn-secondary" href="{% url 'bike:component_type_new' %}?next={% url 'bike_component' component.id %}">
+  <a class="btn btn-secondary" href="{% url 'bike:component_type_new' %}?next={% url 'bike:component_new' %}">
   Add component type
   </a>
   {% endif %}
