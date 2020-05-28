@@ -4,6 +4,11 @@
 	margin-bottom: 10px;
 }
 
+.help {
+	font-size: smaller;
+	font-weight: normal;
+}
+
 /* Style the list */
 ul.bike-breadcrumb {
   padding: 10px 16px;

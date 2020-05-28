@@ -123,6 +123,11 @@ class BikeUrlTest(TestCase):
                                      'year': self.ride.date.year}),
                      context={'object_list': [self.ride]})
 
+    def test_odometer(self):
+        self.try_url(reverse('bike:odometer_readings'))
+        self.try_url(reverse('bike:odometer_readings',
+                             kwargs={'bike_id': self.bike.id}))
+
     def test_component_type(self):
         ct = self.ct
         self.try_url(reverse('bike:component_types'))

@@ -42,6 +42,11 @@ urlpatterns = [
     path('mileage/<int:year>/<int:month>',
          views.RideMonthArchiveView.as_view(), name='rides_month'),
 
+    path('odometer/readings/<int:bike_id>', views.odometer_readings_new,
+         name='odometer_readings'),
+    path('odometer/readings', views.odometer_readings_new,
+         name='odometer_readings'),
+
     path('components', views.components, name='components'),
     path('component/new', views.ComponentCreate.as_view(),
          name='component_new'),

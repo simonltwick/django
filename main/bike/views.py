@@ -15,9 +15,9 @@ import logging
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
-    DistanceUnits, MaintenanceType,
+    DistanceUnits, MaintenanceType, Odometer,
     )
-from .forms import RideSelectionForm, RideForm
+from .forms import RideSelectionForm, RideForm, OdometerFormSet
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -62,6 +62,47 @@ def bikes(request):
             bike.mileage = [entry]
     return render(request, 'bike/bikes.html',
                   context={'bikes': maint})
+
+
+@login_required
+def odometer_readings_new(request, bike_id=None):
+    """ enter new odometer readings for one or all bikes """
+    bikes = (Bike.objects.filter(owner=request.user)
+             .annotate(last_ride=Max('rides__date'))
+             .order_by('-last_ride'))
+    if bike_id is not None:
+        bikes = bikes.filter(pk=bike_id, owner=request.user)
+    if not bikes.exists():
+        return HttpResponse(
+            "No bikes found." if bike_id is None else "Bike not found.",
+            status=404)
+    if request.method == 'POST':
+        formset = OdometerFormSet(request.POST)
+        if formset.is_valid():
+            # want to only validate & save forms with odo reading entered
+            # ?custom validation & save: ignore unchanged forms even if invalid
+            formset.save()
+            next_url = request.GET.get('next') or reverse('bike:home')
+            return HttpResponseRedirect(next_url)
+    else:
+        # Initial GET.  Populate the formset, one form for each bike
+        initial_values = [{'bike': bike} for bike in bikes]
+        try:
+            preferences = Preferences.objects.get(user=request.user)
+            for i in initial_values:
+                i['distance_units'] = preferences.distance_units
+        except Preferences.DoesNotExist:
+            pass
+        formset = OdometerFormSet(queryset=Odometer.objects.none(),
+                                  initial=initial_values)
+        formset.extra = len(initial_values)
+        user_bikes = request.user.bikes  # initialise the choice field
+        for form in formset:
+            form.fields['bike'].queryset = user_bikes
+            # OR:
+            form.fields['bike'].widget.attrs['readonly'] = True
+    return render(request, 'bike/odometer_readings.html',
+                  context={'formset': formset, 'bike_id': bike_id})
 
 
 class PreferencesCreate(LoginRequiredMixin, CreateView):

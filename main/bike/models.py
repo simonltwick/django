@@ -3,9 +3,10 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Func, Sum
 from django.urls import reverse
+from django.utils import timezone
 
 from collections import defaultdict
-from datetime import date
+from datetime import date, time
 from enum import IntEnum
 
 
@@ -43,6 +44,13 @@ class DistanceMixin(models.Model):
     @property
     def distance_units_display(self):
         return self.get_distance_units_display().lower()
+
+
+class DistanceRequiredMixin(DistanceMixin):
+    distance = models.DecimalField(max_digits=7, decimal_places=2)
+
+    class Meta:
+        abstract = True
 
 
 class AscentUnits:
@@ -126,11 +134,22 @@ class Ride(DistanceMixin):
         return monthly_mileage
 
 
-class Odometer(DistanceMixin):
-    date = models.DateField(default=date.today)
+class Odometer(DistanceRequiredMixin):
+    initial = models.BooleanField(
+        default=False, help_text="Only tick this for the initial value of new "
+        "odometer or after resetting the odometer reading.")
+    comment = models.CharField(max_length=100, null=True, blank=True)
     bike = models.ForeignKey(Bike, on_delete=models.CASCADE,
                              related_name='odometer_readings')
-    comment = models.CharField(max_length=100)
+    reading_time = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = 'Odometer reading'
+
+    def __str__(self):
+        return (f"{self.bike} odometer "
+                f"{self.distance} {self.distance_units_display}"
+                f" on {self.reading_time.date()}")
 
 
 class IntervalUnits:
@@ -237,7 +256,7 @@ class MaintenanceAction(DistanceMixin):
                            'description', 'due_date', 'distance')
 
     def __str__(self):
-        return f"{self.description or self.activity_type}"
+        return f"{self.description or self.maint_type}"
 
     def get_absolute_url(self):
         return reverse('bike:maint', kwargs={'pk': self.id})

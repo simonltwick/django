@@ -3,7 +3,7 @@ from django.forms import modelformset_factory
 import datetime as dt
 import logging
 
-from .models import Component, Ride
+from .models import Component, Ride, Odometer
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -39,3 +39,44 @@ class RideForm(forms.ModelForm):
         fields = ['bike', 'date', 'distance', 'distance_units',
                   'ascent', 'ascent_units', 'description', ]
         widgets = {'description': forms.Textarea()}
+
+
+class OdometerForm(forms.ModelForm):
+    model = Odometer
+    # fields are defined in OdometerFormSet factory call
+
+    # specialised handling of is_valid and save: forms with no distance data
+    # are ignored (no validation, and no save)
+    def distance_data(self):
+        """ return the _raw_ distance data, if any """
+        return self['distance'].value()
+
+    def is_valid(self):
+        if self.distance_data():
+            return super(OdometerForm, self).is_valid()
+        return True  # an empty form is valid, but won't be saved
+
+    def save(self, *args, **kwargs):
+        if self.distance_data():
+            return super(OdometerForm, self).save(*args, **kwargs)
+
+
+class BaseOdometerFormSet(forms.BaseModelFormSet):
+    def clean(self):
+        """ check that at least one formset has a distance entered """
+        distance_entries = sum(
+            1 for form in self
+            if form.cleaned_data.get('distance') is not None)
+        if not distance_entries:
+            raise forms.ValidationError(
+                "You must enter at least one odometer reading.")
+
+
+OdometerFormSet = modelformset_factory(
+    Odometer,
+    formset=BaseOdometerFormSet,
+    form=OdometerForm,
+    fields=['bike', 'distance', 'distance_units', 'initial', 'comment',
+            'reading_time'],
+    extra=1  # overridden in view
+    )
