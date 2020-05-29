@@ -1,33 +1,24 @@
 
-.masthead {
-	background-color: deepskyblue;
-	margin-bottom: 10px;
-}
-
 .help {
 	font-size: smaller;
 	font-weight: normal;
 }
 
-/* Style the list */
+/* Style the breadcrumb list */
 ul.bike-breadcrumb {
   padding: 10px 16px;
   list-style: none;
 }
 
-ul.navbar-nav, li.nav-item {
-	display: inline-block;
-}
-
 /* Display list items side by side */
 ul.bike-breadcrumb li {
   display: inline;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 ul.bike-breadcrumb li a {
 	color: gold;
-	font-weight: bold;
+	/*font-weight: bold;*/
 }
 
 /* Add a slash symbol (/) before/behind each list item */

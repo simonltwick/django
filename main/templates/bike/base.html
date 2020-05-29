@@ -17,10 +17,12 @@
 	<!-- Latest compiled JavaScript -->
 	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
 
-    <!-- FontAwesome icons: see https://www.w3schools.com/icons/default.asp -->
+    <!-- Iconic icons (recommended for use with Bootstrap 4) -->
+	<link href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome icons: see https://www.w3schools.com/icons/default.asp
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.0/css/all.css"
     integrity="sha384-lZN37f5QGtY3VHgisS14W3ExzMWZxybE1SJSEsQp9S+oqd12jhcu+A56Ebc1zFSJ"
-    crossorigin="anonymous">
+    crossorigin="anonymous">  -->
 
 	{% load static %}
     <link rel="stylesheet" href="{% static 'bike.css' %}" type="text/css">
@@ -38,56 +40,96 @@
 <body>
 <div class="container-fluid masthead">
 
-<!-- <div class="masthead">  -->
-  
-  {% block banner %}
-  <h3 class="text-center pt-4">🚲 🚲 🚲 Bike 🚲 🚲 🚲</h3>
-  {% endblock %}
 
+  <nav class="navbar navbar-expand-sm navbar-dark bg-primary">
+    <a class="navbar-brand text-warning" href="{% url 'bike:home' %}">Bike 🚲</a>
 
-  <nav class="navbar">
-  <ul class="navbar-nav">
-    <li class="nav-item"><a class="nav-link" href="{% url 'bike:home' %}">Home</a></li>
-    <li class="nav-item"><a class="nav-link" href="{% url 'bike:bikes' %}">Bikes</a></li>
-    <li class="nav-item"><a class="nav-link" href="{% url 'bike:rides' %}">Rides</a></li>
-    <li class="nav-item"><a class="nav-link" href="{% url 'bike:mileage' %}">Mileage</a></li>
-    <li class="nav-item"><a class="nav-link" href="{% url 'bike:odometer_readings' %}">Odometer</a></li>
-    <li class="nav-item"><a class="nav-link" href="{% url 'bike:maint_actions' %}">Maintenance</a></li>
-	<li class="nav-item"><a class="nav-link" href="{% url 'bike:maint_types' %}">Maintenance types</a></li>
-    <li class="nav-item"><a class="nav-link" href="{% url 'bike:components' %}">Components</a></li>
-	<li class="nav-item"><a class="nav-link" href="{% url 'bike:component_types' %}">Component types</a></li>
-  </ul>
+	<!-- Toggler/collapsible Button -->
+    <button class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#collapsibleNavbar">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="collapsibleNavbar">
+    <ul class="navbar-nav">
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
+	       role="button" data-toggle="dropdown"
+		   aria-haspopup="true" aria-expanded="false">
+          Bikes
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+          <a class="dropdown-item" href="{% url 'bike:bikes' %}">Bikes</a>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="{% url 'bike:components' %}">Components</a>
+          <a class="dropdown-item" href="{% url 'bike:component_types' %}">Component types</a>
+        </div>
+      </li>
+	  <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
+	       role="button" data-toggle="dropdown"
+		   aria-haspopup="true" aria-expanded="false">
+          Rides
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+          <a class="dropdown-item" href="{% url 'bike:rides' %}">Rides</a>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="{% url 'bike:mileage' %}">Mileage</a>
+          <a class="dropdown-item" href="{% url 'bike:odometer_readings' %}">Odometer</a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
+	       role="button" data-toggle="dropdown"
+		   aria-haspopup="true" aria-expanded="false">
+          <span class="oi oi-wrench"></span>
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+          <a class="dropdown-item" href="{% url 'bike:maint_actions' %}">Upcoming Maintenance</a>
+          <a class="dropdown-item" href="{% url 'bike:maint_types' %}">Maintenance types</a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
+	       role="button" data-toggle="dropdown"
+		   aria-haspopup="true" aria-expanded="false">
+          <span class="oi oi-cog"></span>
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+          <a class="dropdown-item" href="{% url 'bike:preferences' %}">
+		  Units preferences</a>
+          <a class="dropdown-item" href="{% url 'admin:password_change' %}">
+		  Change password</a>
+        </div>
+      </li>
+
+      {% block help %}
+      <li class="nav-item"><a class="nav-link" target="_blank"
+		  href = "https://app.gitbook.com/@simon-lambourn/s/bike/">
+      ?</a></li>
+      {% endblock %}
+
+      {% if user.is_authenticated %}
+      <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">
+	  <span class="oi oi-account-logout"></span></a></li>
+      {% endif %}
+
+      {% if user.is_superuser %}
+      <li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}bike">
+	  Admin</a></li>
+      {% endif %}
+
+    </ul>
+    </div>
   </nav>
 
   <div class="row container">
-    <div class="col-md-6">
-    {% load breadcrumb %}
-    <ul class="bike-breadcrumb">
-    <li>{% breadcrumb_url 'Home' 'bike:home' %}
+    <ul class="bike-breadcrumb"><li>
     {% block breadcrumbs %}
     {% endblock %}
-    </li>
-    </ul>
-    </div>
-    <div class="col-md-6">
-    <ul class="bike-breadcrumb text-right">
-    {% block help %}
-    <li><a href = "https://app.gitbook.com/@simon-lambourn/s/bike/" target="_blank">
-    Help</a></li>
-    {% endblock %}
-
-    {% if user.is_superuser %}
-    <li><a href="{% url 'admin:index' %}bike">Admin</a></li>
-    {% endif %}
-
-    {% if user.is_authenticated %}
-    <li>{% breadcrumb_url 'Logout' 'logout' %}</li>
-    {% endif %}
-    </ul>
-    </div>
+    </li></ul>
 
   </div>
- <!--  </div>  -->
 </div>
 
 
@@ -96,7 +138,9 @@
 {% block content %}
 {% endblock %}
 
-<p style="color: grey;"><small>&copy Simon Lambourn 2020</small></p>
+</div>
+<div class="container">
+  <p class="small text-muted float-right">&copy Simon Lambourn 2020</p>
 </div>
 </body>
 </html>
