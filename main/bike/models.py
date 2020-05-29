@@ -1,13 +1,16 @@
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Func, Sum
+from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 
 from collections import defaultdict
-from datetime import date, time
+from datetime import date
 from enum import IntEnum
+import logging
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 class Bike(models.Model):
@@ -30,6 +33,33 @@ class DistanceUnits(IntEnum):
     @classmethod
     def choices(cls):
         return [(key.value, key.name) for key in cls]
+
+    @classmethod
+    def sum(cls, distances_list, target_units):
+        """ sum a list of distances (with units), and convert to target_units
+        distance_list is a list of dicts [{'distance': d, 'distance_units': x}]
+        where x is a DistanceUnits instance
+        """
+        distances = defaultdict(lambda: 0)
+        for item in distances_list:
+            distances[item['distance_units']] += item['distance']
+        # log.info("distances=%s", list(distances.items()))
+        total_distance = sum(cls.convert(distance, from_units=units,
+                                         to_units=target_units)
+                             for units, distance in distances.items())
+        return total_distance
+
+    @classmethod
+    def convert(cls, distance, from_units, to_units):
+        if from_units == to_units:
+            return distance
+        factors = {DistanceUnits.MILES: {DistanceUnits.MILES: 1,
+                                         DistanceUnits.KILOMETRES: 1.60934},
+                   DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 0.621371,
+                                              DistanceUnits.KILOMETRES: 1}}
+        # log.info("convert %s from %s to %s", distance, from_units, to_units)
+        factor = factors[from_units][to_units]
+        return distance * factor
 
 
 class DistanceMixin(models.Model):
@@ -80,7 +110,10 @@ class Preferences(models.Model):
 class Ride(DistanceMixin):
     rider = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='rides')
-    date = models.DateField(default=date.today)
+    date = models.DateTimeField(default=timezone.now)
+    is_adjustment = models.BooleanField(
+        default=False, help_text="If true, signifies this is not a real ride"
+        " but a ride distance adjustment between odometer readings.")
     description = models.CharField(max_length=400, null=True, blank=True)
     ascent = models.DecimalField(max_digits=7, decimal_places=2,
                                  null=True, blank=True)
@@ -135,21 +168,92 @@ class Ride(DistanceMixin):
 
 
 class Odometer(DistanceRequiredMixin):
+    rider = models.ForeignKey(User, on_delete=models.CASCADE)
     initial = models.BooleanField(
         default=False, help_text="Only tick this for the initial value of new "
         "odometer or after resetting the odometer reading.")
     comment = models.CharField(max_length=100, null=True, blank=True)
     bike = models.ForeignKey(Bike, on_delete=models.CASCADE,
                              related_name='odometer_readings')
-    reading_time = models.DateTimeField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
+    adjustment_ride = models.OneToOneField(Ride, on_delete=models.PROTECT,
+                                           null=True, blank=True)
 
     class Meta:
         verbose_name = 'Odometer reading'
 
     def __str__(self):
-        return (f"{self.bike} odometer "
+        reset = "reset to " if self.initial else ""
+        return (f"{self.bike} odometer {reset}"
                 f"{self.distance} {self.distance_units_display}"
-                f" on {self.reading_time.date()}")
+                f" on {self.date.date()}")
+
+    def update_adjustment_rides(self):
+        """ create or update adjustment rides between this odo reading and
+        previous/next odo readings, so that the rides mileage totals to the
+        same as the difference between the odo readings.
+        Mileage before a "reset" odo reading is not adjusted """
+        if self.initial:  # after resetting odo: no adjustment ride
+            if self.adjustment_ride:
+                self.adjustment_ride.delete()
+        else:
+            prev_odo = self.previous_odo()
+            if prev_odo:
+                self.update_adjustment_ride(self, prev_odo)
+
+        # update following adjustment ride, if necessary
+        next_odo = self.next_odo()
+        if next_odo and not next_odo.initial:
+            self.update_adjustment_ride(next_odo, self)
+
+    @classmethod
+    def update_adjustment_ride(cls, current_odo, prev_odo):
+        """ create or update the adjustment ride for current_odo """
+        rides_between = Ride.objects.filter(date__gt=prev_odo.date,
+                                            date__lte=current_odo.date,
+                                            bike_id=current_odo.bike_id)
+        distances = list(rides_between.values('distance_units')
+                         .annotate(distance=Sum('distance')))
+        # log.info("update_adjustment_ride: distances=%s", distances)
+        distances.append({'distance_units': prev_odo.distance_units,
+                          'distance': prev_odo.distance})
+        distances.append({'distance_units': current_odo.distance_units,
+                          'distance': -current_odo.distance})
+        # distances is now prev_odo + rides - current_odo, maybe in mixed units
+        # which is the NEGATIVE of what we need for the adjustment ride
+        total_distance = -DistanceUnits.sum(
+            distances, target_units=current_odo.distance_units)
+        log.info("update_adjustment_ride: total_distance=%s", total_distance)
+        adj_ride = current_odo.adjustment_ride
+        if adj_ride is None:
+            adj_ride = Ride(
+                bike=current_odo.bike, rider=current_odo.rider,
+                is_adjustment=True, date=current_odo.date,
+                description="Adjustment for odometer reading")
+        adj_ride.distance = total_distance
+        adj_ride.distance_units = current_odo.distance_units
+        adj_ride.save()
+        # log.info("adj_ride=%s, distance %s", adj_ride, adj_ride.distance)
+        if current_odo.adjustment_ride is None:
+            current_odo.adjustment_ride = adj_ride
+            # log.info("saving current_odo=%s", current_odo)
+            # log.info("current_odo.adjustment_ride=%s",
+            #          current_odo.adjustment_ride)
+            current_odo.save()
+
+    def previous_odo(self):
+        """ return the previous odometer reading for this bike, or None """
+        return (Odometer.objects
+                .filter(bike=self.bike_id, date__lt=self.date)
+                .order_by('-date')
+                .first())
+
+    def next_odo(self):
+        """ return the next odometer reading for this bike, or None """
+        return (Odometer.objects
+                .filter(bike=self.bike_id, date__gt=self.date)
+                .order_by('date')
+                .first())
 
 
 class IntervalUnits:
