@@ -1,9 +1,5 @@
 {% extends 'bike/base.html' %}
 
-{% block title %}
-Confirm Delete for {{ bike.name }} -
-{% endblock %}
-
 {% block breadcrumbs %}
 {% load breadcrumb %}
 > {% breadcrumb_url "Bike" 'bike:bike' bike.id %}

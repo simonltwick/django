@@ -1,16 +1,5 @@
 {% extends 'bike/base.html' %}
 
-
-{% block breadcrumbs %}
-{% load breadcrumb %}
-{% if componenttype %}
-> {% breadcrumb_url "Component type" 'bike:component_type' componenttype.id %}
-{% else %}
-> {% breadcrumb_url "New Component type" 'bike:component_type_new' %}
-{% endif %}
-{% endblock %}
-
-
 {% block content %}
 <h1>Component Type details:</h1>
 <form method='POST'>

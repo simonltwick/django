@@ -4,12 +4,6 @@
 Confirm Delete -
 {% endblock %}
 
-{% block breadcrumbs %}
-{% load breadcrumb %}
-> {% breadcrumb_url "Component type" 'bike:component_type' componenttype.id %}
-> {% breadcrumb_url "Delete" 'bike:component_type_delete' componenttype.id %}
-{% endblock %}
-
 {% block content %}
 
 <h1>Confirm delete for {{ componenttype }}</h1>

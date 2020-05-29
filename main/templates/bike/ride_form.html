@@ -1,16 +1,5 @@
 {% extends 'bike/base.html' %}
 
-
-{% block breadcrumbs %}
-{% load breadcrumb %}
-{% if ride %}
-> {% breadcrumb_url 'Ride' 'bike:ride' ride.id %}
-{% else %}
-> {% breadcrumb_url 'New Ride' 'bike:ride_new' %}
-{% endif %}
-{% endblock %}
-
-
 {% block content %}
 <h1>Ride details:</h1>
 <form method='POST'>

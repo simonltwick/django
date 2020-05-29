@@ -1,16 +1,5 @@
 {% extends 'bike/base.html' %}
 
-
-{% block breadcrumbs %}
-{% load breadcrumb %}
-{% if maintenanceaction %}
-> {% breadcrumb_url "Maintenance Action" 'bike:maint' maintenanceaction.id %}
-{% else %}
-> {% breadcrumb_url "New Maintenance Action" 'bike:maint_new' %}
-{% endif %}
-{% endblock %}
-
-
 {% block content %}
 <h1>Maintenance Action details:</h1>
 <form method='POST'>

@@ -1,16 +1,5 @@
 {% extends 'bike/base.html' %}
 
-
-{% block breadcrumbs %}
-{% load breadcrumb %}
-{% if bike_id %}
-> {% breadcrumb_url 'Odometer Readings' 'bike:odometer_readings' bike_id %}
-{% else %}
-> {% breadcrumb_url 'Odometer Readings' 'bike:odometer_readings' %}
-{% endif %}
-{% endblock %}
-
-
 {% block content %}
 <h1>Odometer readings:</h1>
 <form method='POST'>

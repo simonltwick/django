@@ -1,14 +1,5 @@
 {% extends 'bike/base.html' %}
 
-{% block breadcrumbs %}
-{% load breadcrumb %}
-{% if bike %}
-> {% breadcrumb_url "Mileage" 'bike:mileage' year bike.id %}
-{% else %}
-> {% breadcrumb_url "Mileage" 'bike:mileage' year %}
-{% endif %}
-{% endblock %}
-
 {% block content %}
 {% load month_name %}
 

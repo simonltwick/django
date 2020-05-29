@@ -4,12 +4,6 @@
 Confirm Delete for {{ maintenancetype }} 
 {% endblock %}
 
-{% block breadcrumbs %}
-{% load breadcrumb %}
-> {% breadcrumb_url "Maintenance Type" 'bike:maint_type' maintenancetype.id %}
-> {% breadcrumb_url "Delete" 'bike:maint_type_delete' maintenancetype.id %}
-{% endblock %}
-
 {% block content %}
 
 <h1>Confirm delete for {{ maintenancetype }}</h1>

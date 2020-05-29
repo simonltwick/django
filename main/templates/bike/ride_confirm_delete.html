@@ -4,12 +4,6 @@
 Confirm Delete for {{ ride }} -
 {% endblock %}
 
-{% block breadcrumbs %}
-{% load breadcrumb %}
-> {% breadcrumb_url "Ride" 'bike:ride' ride.id %}
-> {% breadcrumb_url "Delete" 'bike:ride_delete' ride.id %}
-{% endblock %}
-
 {% block content %}
 
 <h1>Confirm delete for {{ ride }}</h1>
