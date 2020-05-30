@@ -63,8 +63,7 @@ class DistanceUnits(IntEnum):
 
 
 class DistanceMixin(models.Model):
-    distance = models.DecimalField(max_digits=7, decimal_places=2,
-                                   null=True, blank=True)
+    distance = models.FloatField(null=True, blank=True)
     distance_units = models.PositiveSmallIntegerField(
         choices=DistanceUnits.choices(), default=DistanceUnits.MILES)
 
@@ -77,7 +76,7 @@ class DistanceMixin(models.Model):
 
 
 class DistanceRequiredMixin(DistanceMixin):
-    distance = models.DecimalField(max_digits=7, decimal_places=2)
+    distance = models.FloatField()
 
     class Meta:
         abstract = True
@@ -115,8 +114,7 @@ class Ride(DistanceMixin):
         default=False, help_text="If true, signifies this is not a real ride"
         " but a ride distance adjustment between odometer readings.")
     description = models.CharField(max_length=400, null=True, blank=True)
-    ascent = models.DecimalField(max_digits=7, decimal_places=2,
-                                 null=True, blank=True)
+    ascent = models.FloatField(null=True, blank=True)
     ascent_units = models.PositiveSmallIntegerField(
         choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
     bike = models.ForeignKey(Bike, on_delete=models.SET_NULL, null=True,
@@ -223,7 +221,7 @@ class Odometer(DistanceRequiredMixin):
         # which is the NEGATIVE of what we need for the adjustment ride
         total_distance = -DistanceUnits.sum(
             distances, target_units=current_odo.distance_units)
-        log.info("update_adjustment_ride: total_distance=%s", total_distance)
+        # log.info("update_adjustment_ride: total_distance=%s", total_distance)
         adj_ride = current_odo.adjustment_ride
         if adj_ride is None:
             adj_ride = Ride(
@@ -352,8 +350,7 @@ class MaintenanceAction(DistanceMixin):
                                 default=date.today)
     completed = models.BooleanField(default=False)
     completed_date = models.DateField(null=True, blank=True)
-    completed_distance = models.DecimalField(max_digits=7, decimal_places=2,
-                                             null=True, blank=True)
+    completed_distance = models.FloatField(null=True, blank=True)
 
     class Meta:
         unique_together = ('user', 'bike', 'component', 'maint_type',
