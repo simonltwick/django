@@ -174,7 +174,7 @@ class Odometer(DistanceRequiredMixin):
     bike = models.ForeignKey(Bike, on_delete=models.CASCADE,
                              related_name='odometer_readings')
     date = models.DateTimeField(default=timezone.now)
-    adjustment_ride = models.OneToOneField(Ride, on_delete=models.PROTECT,
+    adjustment_ride = models.OneToOneField(Ride, on_delete=models.SET_NULL,
                                            null=True, blank=True)
 
     class Meta:
@@ -194,6 +194,7 @@ class Odometer(DistanceRequiredMixin):
         if self.initial:  # after resetting odo: no adjustment ride
             if self.adjustment_ride:
                 self.adjustment_ride.delete()
+                self.refresh_from_db()
         else:
             prev_odo = self.previous_odo()
             if prev_odo:

@@ -48,7 +48,13 @@ class TestDistanceUnits(TestCase):
                               target_units=m), 6.621371, "mixed units sum")
 
 
-class TestOdometer(TestCase):
+class TestOdometerAdjustmentRides(TestCase):
+
+    """ to be written (code AND tests):
+        adding an odo reading automatically calls update_adjustment_rides?
+        adding/deleting ride between two odo readings updates adjustment ride?
+        """
+
     @override_settings(
         PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher', ])
     def setUp(self):
@@ -137,7 +143,71 @@ class TestOdometer(TestCase):
         self.odo2.refresh_from_db()
         self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
         self.assertIsNone(self.odo2.adjustment_ride, 'unchanged')
-        
-    """ to be written:
-        mixed distance units odo/rides/odo
-        changing reset value delete or creates adjustment ride """
+
+    def test_mixed_distance_adjustment_rides1(self):
+        """ mixture of km and miles: odo1 in km """
+        self.odo1.distance_units = DistanceUnits.KILOMETRES
+        self.odo1.distance = 10  # = 6.21371 miles
+        self.odo1.save()
+
+        self.odo1.update_adjustment_rides()
+        self.odo1.refresh_from_db()
+        self.odo2.refresh_from_db()
+        self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
+        expected_distance = 40 - 1 - 6.21371
+        self.assertAlmostEqual(self.odo2.adjustment_ride.distance,
+                               expected_distance, places=3)
+        self.assertEqual(self.odo2.adjustment_ride.distance_units,
+                         DistanceUnits.MILES)
+
+    def test_mixed_distance_adjustment_rides2(self):
+        """ mixture of km and miles: odo2 in km """
+        self.odo2.distance_units = DistanceUnits.KILOMETRES
+        self.odo2.distance = 100  # = 62.1371 miles
+        self.odo2.save()
+
+        self.odo2.update_adjustment_rides()
+        self.odo1.refresh_from_db()
+        self.odo2.refresh_from_db()
+        self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
+        expected_distance = (62.1371 - 1 - 20) * 1.60934
+        self.assertAlmostEqual(self.odo2.adjustment_ride.distance,
+                               expected_distance, places=3)
+        self.assertEqual(self.odo2.adjustment_ride.distance_units,
+                         DistanceUnits.KILOMETRES)
+
+    def test_mixed_distance_adjustment_rides3(self):
+        """ mixture of km and miles: ride in km """
+        self.ride.distance_units = DistanceUnits.KILOMETRES
+        self.ride.distance = 1  # = .621371 miles
+        self.ride.save()
+
+        self.odo1.update_adjustment_rides()
+        self.odo1.refresh_from_db()
+        self.odo2.refresh_from_db()
+        self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
+        expected_distance = 40 - .621371 - 20
+        self.assertAlmostEqual(self.odo2.adjustment_ride.distance,
+                               expected_distance, places=3)
+        self.assertEqual(self.odo2.adjustment_ride.distance_units,
+                         DistanceUnits.MILES)
+
+    def test_alter_odo_initial_setting(self):
+        """ setting Odometer.initial to True deletes the adjustment ride """
+        self.odo1.update_adjustment_rides()
+        self.odo1.refresh_from_db()
+        self.odo2.refresh_from_db()
+        self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
+        self.assertIsNotNone(self.odo2.adjustment_ride)
+
+        self.odo2.initial = True
+        self.odo2.save()
+        self.odo2.update_adjustment_rides()
+        self.assertIsNone(self.odo2.adjustment_ride,
+                          msg="no adjustment ride if initial=True")
+
+        self.odo2.initial = False
+        self.odo2.save()
+        self.odo2.update_adjustment_rides()
+        self.assertIsNotNone(self.odo2.adjustment_ride,
+                             msg="restore adjustment ride if initial=False")
