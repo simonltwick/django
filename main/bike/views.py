@@ -23,15 +23,21 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 
+LOGIN_URL = '/accounts/login?next=/bike/'
 
-@login_required
+
+class BikeLoginRequiredMixin(LoginRequiredMixin):
+    login_url = LOGIN_URL
+
+
+@login_required(login_url=LOGIN_URL)
 def home(request):
     preferences_set = Preferences.objects.filter(user=request.user).exists()
     return render(request, 'bike/home.html',
                   context={'preferences_set': preferences_set})
 
 
-@login_required
+@login_required(login_url=LOGIN_URL)
 def bikes(request):
     today = dt.date.today()
     sum_year = Sum('rides__distance', filter=Q(rides__date__year=today.year))
@@ -64,7 +70,7 @@ def bikes(request):
                   context={'bikes': maint})
 
 
-@login_required
+@login_required(login_url=LOGIN_URL)
 def odometer_readings_new(request, bike_id=None):
     """ enter new odometer readings for one or all bikes """
     bikes = (Bike.objects.filter(owner=request.user)
@@ -105,7 +111,7 @@ def odometer_readings_new(request, bike_id=None):
                   context={'formset': formset, 'bike_id': bike_id})
 
 
-class PreferencesCreate(LoginRequiredMixin, CreateView):
+class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
     model = Preferences
     fields = ['distance_units', 'ascent_units']
 
@@ -115,17 +121,18 @@ class PreferencesCreate(LoginRequiredMixin, CreateView):
         return super(PreferencesCreate, self).form_valid(form)
 
 
-class PreferencesUpdate(LoginRequiredMixin, UpdateView):
+class PreferencesUpdate(BikeLoginRequiredMixin, UpdateView):
     model = Preferences
     fields = ['distance_units', 'ascent_units']
 
     def dispatch(self, request, *args, **kwargs):
-        if 'pk' not in kwargs:
+        if 'pk' not in self.kwargs:
             try:
-                kwargs['pk'] = Preferences.objects.get(user=request.user).pk
+                prefs_pk = Preferences.objects.get(user=request.user).pk
+                self.kwargs['pk'] = prefs_pk
             except Preferences.DoesNotExist:
                 return HttpResponseRedirect(reverse('bike:preferences_new'))
-        elif not Preferences.objects.filter(pk=kwargs['pk'],
+        elif not Preferences.objects.filter(pk=self.kwargs['pk'],
                                             user=request.user).exists():
             return HttpResponse("Unauthorised preferences", status=401)
         return super(PreferencesUpdate, self).dispatch(request, *args,
@@ -137,7 +144,7 @@ class PreferencesUpdate(LoginRequiredMixin, UpdateView):
         return super(PreferencesUpdate, self).get_success_url()
 
 
-class BikeCreate(LoginRequiredMixin, CreateView):
+class BikeCreate(BikeLoginRequiredMixin, CreateView):
     model = Bike
     fields = ['name', 'description']
 
@@ -152,7 +159,7 @@ class BikeCreate(LoginRequiredMixin, CreateView):
         return super(RideCreate, self).get_success_url()
 
 
-class BikeUpdate(LoginRequiredMixin, UpdateView):
+class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
     model = Bike
     fields = ['name', 'description']
 
@@ -180,7 +187,7 @@ class BikeUpdate(LoginRequiredMixin, UpdateView):
         return super(BikeUpdate, self).get_success_url()
 
 
-class BikeDelete(LoginRequiredMixin, DeleteView):
+class BikeDelete(BikeLoginRequiredMixin, DeleteView):
     model = Bike
     fields = ['name', 'description']
     success_url = reverse_lazy('bike:bikes')
@@ -198,7 +205,7 @@ def components(request):
                   context={'components': components})
 
 
-class ComponentCreate(LoginRequiredMixin, CreateView):
+class ComponentCreate(BikeLoginRequiredMixin, CreateView):
     model = Component
     fields = ['type', 'name', 'bike', 'subcomponent_of', 'specification',
               'notes', 'supplier', 'date_acquired']
@@ -240,7 +247,7 @@ class ComponentCreate(LoginRequiredMixin, CreateView):
         return super(ComponentCreate, self).get_success_url()
 
 
-class ComponentUpdate(LoginRequiredMixin, UpdateView):
+class ComponentUpdate(BikeLoginRequiredMixin, UpdateView):
     model = Component
     fields = ['type', 'name', 'bike', 'subcomponent_of', 'specification',
               'notes', 'supplier', 'date_acquired']
@@ -264,7 +271,7 @@ class ComponentUpdate(LoginRequiredMixin, UpdateView):
         return context_data
 
 
-class ComponentDelete(LoginRequiredMixin, DeleteView):
+class ComponentDelete(BikeLoginRequiredMixin, DeleteView):
     model = Component
     success_url = reverse_lazy('bike:components')
 
@@ -281,7 +288,7 @@ def component_types(request):
                   context={'component_types': component_types})
 
 
-class ComponentTypeCreate(LoginRequiredMixin, CreateView):
+class ComponentTypeCreate(BikeLoginRequiredMixin, CreateView):
     model = ComponentType
     fields = ['type', 'subtype_of', 'description']
 
@@ -295,7 +302,7 @@ class ComponentTypeCreate(LoginRequiredMixin, CreateView):
         return super(ComponentTypeCreate, self).get_success_url()
 
 
-class ComponentTypeUpdate(LoginRequiredMixin, UpdateView):
+class ComponentTypeUpdate(BikeLoginRequiredMixin, UpdateView):
     model = ComponentType
     fields = ['type', 'subtype_of', 'description', ]
 
@@ -312,7 +319,7 @@ class ComponentTypeUpdate(LoginRequiredMixin, UpdateView):
         return super(ComponentTypeUpdate, self).get_success_url()
 
 
-class ComponentTypeDelete(LoginRequiredMixin, DeleteView):
+class ComponentTypeDelete(BikeLoginRequiredMixin, DeleteView):
     model = ComponentType
     success_url = reverse_lazy('bike:component_types')
 
@@ -324,7 +331,7 @@ class ComponentTypeDelete(LoginRequiredMixin, DeleteView):
             request, *args, **kwargs)
 
 
-class RideCreate(LoginRequiredMixin, CreateView):
+class RideCreate(BikeLoginRequiredMixin, CreateView):
     model = Ride
     form_class = RideForm
 
@@ -353,7 +360,7 @@ class RideCreate(LoginRequiredMixin, CreateView):
         return super(RideCreate, self).get_success_url()
 
 
-class RideUpdate(LoginRequiredMixin, UpdateView):
+class RideUpdate(BikeLoginRequiredMixin, UpdateView):
     model = Ride
     form_class = RideForm
 
@@ -374,7 +381,7 @@ class RideUpdate(LoginRequiredMixin, UpdateView):
         return super(RideUpdate, self).get_success_url()
 
 
-class RideDelete(LoginRequiredMixin, DeleteView):
+class RideDelete(BikeLoginRequiredMixin, DeleteView):
     model = Ride
     success_url = reverse_lazy('bike:rides')
 
@@ -385,7 +392,7 @@ class RideDelete(LoginRequiredMixin, DeleteView):
         return super(RideDelete, self).dispatch(request, *args, **kwargs)
 
 
-@login_required
+@login_required(login_url=LOGIN_URL)
 def rides(request):
     # TODO: implement search rides with QuerySet.(description_icontains=xx)
     # TODO: search for year/month with Queryset.filter(date__year=xx)
@@ -437,7 +444,7 @@ def csv_data_response(_request, filename, queryset, fields):
     return response
 
 
-class MaintActionList(LoginRequiredMixin, ListView):
+class MaintActionList(BikeLoginRequiredMixin, ListView):
     model = MaintenanceAction
     ordering = ('bike', 'component', 'distance', 'due_date')
 
@@ -446,7 +453,7 @@ class MaintActionList(LoginRequiredMixin, ListView):
             user=self.request.user, completed=False)
 
 
-class MaintActionCreate(LoginRequiredMixin, CreateView):
+class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceAction
     fields = ['bike', 'component', 'maint_type', 'description', 'due_date',
               'distance', 'distance_units', 'completed', 'completed_date',
@@ -482,7 +489,7 @@ class MaintActionCreate(LoginRequiredMixin, CreateView):
         return super(MaintActionCreate, self).get_success_url()
 
 
-class MaintActionUpdate(LoginRequiredMixin, UpdateView):
+class MaintActionUpdate(BikeLoginRequiredMixin, UpdateView):
     model = MaintenanceAction
     fields = MaintActionCreate.fields
 
@@ -499,7 +506,7 @@ class MaintActionUpdate(LoginRequiredMixin, UpdateView):
             MaintActionUpdate, self).dispatch(request, *args, **kwargs)
 
 
-class MaintActionDelete(LoginRequiredMixin, DeleteView):
+class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
     model = MaintenanceAction
     success_url = reverse_lazy('bike:maint_actions')
 
@@ -511,7 +518,7 @@ class MaintActionDelete(LoginRequiredMixin, DeleteView):
             MaintActionDelete, self).dispatch(request, *args, **kwargs)
 
 
-class MaintTypeList(LoginRequiredMixin, ListView):
+class MaintTypeList(BikeLoginRequiredMixin, ListView):
     model = MaintenanceType
     ordering = ('component_type', 'recurring', 'activity',)
 
@@ -519,7 +526,7 @@ class MaintTypeList(LoginRequiredMixin, ListView):
         return MaintenanceType.objects.filter(user=self.request.user)
 
 
-class MaintTypeCreate(LoginRequiredMixin, CreateView):
+class MaintTypeCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceType
     fields = ('component_type', 'activity', 'reference_info', 'recurring',
               'maintenance_interval', 'maint_interval_units')
@@ -552,7 +559,7 @@ class MaintTypeCreate(LoginRequiredMixin, CreateView):
         return super(MaintTypeCreate, self).get_success_url()
 
 
-class MaintTypeUpdate(LoginRequiredMixin, UpdateView):
+class MaintTypeUpdate(BikeLoginRequiredMixin, UpdateView):
     model = MaintenanceType
     fields = MaintTypeCreate.fields
 
@@ -569,7 +576,7 @@ class MaintTypeUpdate(LoginRequiredMixin, UpdateView):
             MaintTypeUpdate, self).dispatch(request, *args, **kwargs)
 
 
-class MaintTypeDelete(LoginRequiredMixin, DeleteView):
+class MaintTypeDelete(BikeLoginRequiredMixin, DeleteView):
     model = MaintenanceType
     success_url = reverse_lazy('bike:maint_types')
 
@@ -583,7 +590,7 @@ class MaintTypeDelete(LoginRequiredMixin, DeleteView):
 
 # TODO: odometer display / entry / adjustment rides
 # TODO: use Rides.objects.dates(date, "year"/ "month"), to get available yy/mm
-@login_required
+@login_required(login_url=LOGIN_URL)
 def mileage(request, year=None, bike_id=None):
     # odometer and recent mileage stuff for bikes / a bike ...
     """ show a monthly summary of mileage, with detail if requested """
@@ -601,7 +608,7 @@ def mileage(request, year=None, bike_id=None):
                            'year': year})
 
 
-class RideMonthArchiveView(LoginRequiredMixin, MonthArchiveView):
+class RideMonthArchiveView(BikeLoginRequiredMixin, MonthArchiveView):
     """ called with kwargs year=None, bike_id=None, detail=False """
     make_object_list = True
     date_field = 'date'

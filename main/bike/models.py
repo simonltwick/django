@@ -124,7 +124,7 @@ class Ride(DistanceMixin):
         unique_together = ('rider', 'date', 'bike', 'description')
 
     def __str__(self):
-        return f"{self.date}: {self.description}"
+        return f"{self.date.date()}: {self.description}"
 
     def get_absolute_url(self):
         return reverse('bike:ride', kwargs={'pk': self.id})

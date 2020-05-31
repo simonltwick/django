@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from ..models import (
     Bike, ComponentType, Ride, Component, MaintenanceAction, DistanceUnits,
-    MaintenanceType,
+    MaintenanceType, Preferences,
     )
 
 
@@ -34,15 +34,6 @@ class BikeUrlTest(TestCase):
     def test_home(self):
         self.try_url(reverse('bike:home'), context={'preferences_set': False})
 
-    def test_ride(self):
-        rid = self.ride.id
-        self.try_url(reverse('bike:rides'), context={'rides': [self.ride]})
-        self.try_url(reverse('bike:ride', kwargs={'pk': rid}),
-                     context={'ride': self.ride})
-        self.try_url(reverse('bike:ride_delete', kwargs={'pk': rid}),
-                     context={'ride': self.ride})
-        self.try_url(reverse('bike:ride_new'))
-
     def test_bike(self):
         bid = self.bike.id
         self.try_url(reverse('bike:bikes'))
@@ -51,15 +42,14 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:bike_delete', kwargs={'pk': bid}))
         self.try_url(reverse('bike:bike_new'),)
 
-    def test_component(self):
-        comp = Component.objects.create(type=self.ct, name='Test component',
-                                        owner=self.user)
-        self.try_url(reverse('bike:components'))
-        self.try_url(reverse('bike:component', kwargs={'pk': comp.id}),
-                     context={'component': comp})
-        self.try_url(reverse('bike:component_delete', kwargs={'pk': comp.id}),
-                     context={'component': comp})
-        self.try_url(reverse('bike:component_new'),)
+    def test_ride(self):
+        rid = self.ride.id
+        self.try_url(reverse('bike:rides'), context={'rides': [self.ride]})
+        self.try_url(reverse('bike:ride', kwargs={'pk': rid}),
+                     context={'ride': self.ride})
+        self.try_url(reverse('bike:ride_delete', kwargs={'pk': rid}),
+                     context={'ride': self.ride})
+        self.try_url(reverse('bike:ride_new'))
 
     def test_maint_action(self):
         maint = MaintenanceAction.objects.create(
@@ -128,6 +118,16 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:odometer_readings',
                              kwargs={'bike_id': self.bike.id}))
 
+    def test_component(self):
+        comp = Component.objects.create(type=self.ct, name='Test component',
+                                        owner=self.user)
+        self.try_url(reverse('bike:components'))
+        self.try_url(reverse('bike:component', kwargs={'pk': comp.id}),
+                     context={'component': comp})
+        self.try_url(reverse('bike:component_delete', kwargs={'pk': comp.id}),
+                     context={'component': comp})
+        self.try_url(reverse('bike:component_new'),)
+
     def test_component_type(self):
         ct = self.ct
         self.try_url(reverse('bike:component_types'))
@@ -136,6 +136,15 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:component_type_delete',
                              kwargs={'pk': ct.id}))
         self.try_url(reverse('bike:component_type_new'),)
+
+    def test_preferences(self):
+        prefs = Preferences(user=self.user)
+        prefs.save()
+        self.try_url(reverse('bike:preferences_new'))
+        self.try_url(reverse('bike:preferences'),
+                     context={'preferences': prefs})
+        self.try_url(reverse('bike:preferences', kwargs={'pk': prefs.pk}),
+                     context={'preferences': prefs})
 
     def try_url(self, url, status=200, context=None, redirect=None):
         follow = redirect is not None
