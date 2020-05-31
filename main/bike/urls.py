@@ -74,7 +74,7 @@ urlpatterns = [
          name='preferences'),
 
     path('login', auth_views.LoginView.as_view(
-        template_name='bike/login.html'), name='bike_login'),
+        template_name='bike/login.html'), name='login'),
     path('password_reset/', auth_views.PasswordResetView.as_view(),
          name='bike_password_reset'),
     path('admin/password_reset/done/?next=/bike/home',
