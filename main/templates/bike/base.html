@@ -24,6 +24,12 @@
     integrity="sha384-lZN37f5QGtY3VHgisS14W3ExzMWZxybE1SJSEsQp9S+oqd12jhcu+A56Ebc1zFSJ"
     crossorigin="anonymous">  -->
 
+<script>  /* initialise tooltips */
+  $(document).ready(function(){
+    $('[data-toggle="tooltip"]').tooltip();
+  });
+</script>
+
 	{% load static %}
     <link rel="stylesheet" href="{% static 'bike.css' %}" type="text/css">
 
@@ -42,7 +48,8 @@
 
 
   <nav class="navbar navbar-expand-sm navbar-dark bg-primary">
-    <a class="navbar-brand text-warning" href="{% url 'bike:home' %}">Bike 🚲</a>
+    <a class="navbar-brand text-warning" href="{% url 'bike:home' %}"
+	   data-toggle="tooltip" title="Home">Bike 🚲</a>
     {% block navbar %}
 	<!-- Toggler/collapsible Button -->
     <button class="navbar-toggler" type="button" data-toggle="collapse"
@@ -80,6 +87,7 @@
       </li>
       <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
+		   data-toggle="tooltip" title="Maintenance"
 	       role="button" data-toggle="dropdown"
 		   aria-haspopup="true" aria-expanded="false">
           <span class="oi oi-wrench"></span>
@@ -91,6 +99,7 @@
       </li>
       <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
+           data-toggle="tooltip" title="Settings"
 	       role="button" data-toggle="dropdown"
 		   aria-haspopup="true" aria-expanded="false">
           <span class="oi oi-cog"></span>
@@ -98,25 +107,33 @@
         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
           <a class="dropdown-item" href="{% url 'bike:preferences' %}">
 		  Units preferences</a>
-          <a class="dropdown-item" href="{% url 'admin:password_change' %}">
+          <a class="dropdown-item" href="{% url 'admin:password_change' %}?next={% url 'bike:home' %}">
 		  Change password</a>
+          {# ?next= doesn't work on password change %}
         </div>
       </li>
 
       {% block help %}
-      <li class="nav-item"><a class="nav-link" target="_blank"
-		  href = "https://app.gitbook.com/@simon-lambourn/s/bike/">
+      <li class="nav-item">
+		<a class="nav-link" target="_blank"
+           data-toggle="tooltip" title="Help"
+		   href = "https://app.gitbook.com/@simon-lambourn/s/bike/">
       ?</a></li>
       {% endblock %}
 
       {% if user.is_authenticated %}
-      <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">
-	  <span class="oi oi-account-logout"></span></a></li>
+      <li class="nav-item">
+		<a class="nav-link" href="{% url 'logout' %}?next={% url 'bike:home' %}"
+		   data-toggle="tooltip" title="Logout">
+	      <span class="oi oi-account-logout"></span>
+		</a>
+	  </li>
       {% endif %}
 
       {% if user.is_superuser %}
-      <li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}bike">
-	  Admin</a></li>
+      <li class="nav-item">
+		<a class="nav-link" href="{% url 'admin:index' %}bike">Admin</a>
+	  </li>
       {% endif %}
 
     </ul>
