@@ -43,7 +43,7 @@
 
   <nav class="navbar navbar-expand-sm navbar-dark bg-primary">
     <a class="navbar-brand text-warning" href="{% url 'bike:home' %}">Bike 🚲</a>
-
+    {% block navbar %}
 	<!-- Toggler/collapsible Button -->
     <button class="navbar-toggler" type="button" data-toggle="collapse"
             data-target="#collapsibleNavbar">
@@ -121,6 +121,7 @@
 
     </ul>
     </div>
+    {% endblock %}
   </nav>
 
   <div class="row container">

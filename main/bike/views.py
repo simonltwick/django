@@ -1,7 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum, Q, Max
-from django import forms
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -23,7 +22,7 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 
-LOGIN_URL = '/accounts/login?next=/bike/'
+LOGIN_URL = '/bike/login?next=/bike'
 
 
 class BikeLoginRequiredMixin(LoginRequiredMixin):

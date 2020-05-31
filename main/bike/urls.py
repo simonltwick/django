@@ -73,9 +73,11 @@ urlpatterns = [
     path('preferences/<int:pk>', views.PreferencesUpdate.as_view(),
          name='preferences'),
 
-    path('admin/password_reset/', auth_views.PasswordResetView.as_view(),
-         name='admin_password_reset'),
-    path('admin/password_reset/done/',
+    path('login', auth_views.LoginView.as_view(
+        template_name='bike/login.html'), name='bike_login'),
+    path('password_reset/', auth_views.PasswordResetView.as_view(),
+         name='bike_password_reset'),
+    path('admin/password_reset/done/?next=/bike/home',
          auth_views.PasswordResetDoneView.as_view()),
     path('reset/<uidb64>/<token>/',
          auth_views.PasswordResetConfirmView.as_view(),
