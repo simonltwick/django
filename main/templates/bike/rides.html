@@ -21,7 +21,8 @@
 {% endif %}
 
 <li>{{ ride.date }} {{ ride.bike }}
-  <a href="{% url 'bike:ride' ride.id %}">{{ ride.description }}</a>
+  <a href="{% url 'bike:ride' ride.id %}">
+  {{ ride.description|truncatechars:40 }}</a>
   {{ ride.distance }} {{ ride.get_distance_units_display }}</li>
 
 {% if forloop.last %}

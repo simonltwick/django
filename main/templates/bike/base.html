@@ -68,8 +68,13 @@
         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
           <a class="dropdown-item" href="{% url 'bike:bikes' %}">Bikes</a>
           <div class="dropdown-divider"></div>
-          <a class="dropdown-item" href="{% url 'bike:components' %}">Components</a>
-          <a class="dropdown-item" href="{% url 'bike:component_types' %}">Component types</a>
+          <a class="dropdown-item" href="{% url 'bike:components' %}">
+		  Components</a>
+          <a class="dropdown-item" href="{% url 'bike:component_types' %}">
+		  Component types</a>
+		  <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="{% url 'bike:odometer_readings' %}">
+		  Odometer</a>
         </div>
       </li>
 	  <li class="nav-item dropdown">
@@ -82,7 +87,8 @@
           <a class="dropdown-item" href="{% url 'bike:rides' %}">Rides</a>
           <div class="dropdown-divider"></div>
           <a class="dropdown-item" href="{% url 'bike:mileage' %}">Mileage</a>
-          <a class="dropdown-item" href="{% url 'bike:odometer_readings' %}">Odometer</a>
+          <a class="dropdown-item" href="{% url 'bike:odometer_readings' %}">
+		  Odometer</a>
         </div>
       </li>
       <li class="nav-item dropdown">
@@ -93,8 +99,10 @@
           <span class="oi oi-wrench"></span>
         </a>
         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-          <a class="dropdown-item" href="{% url 'bike:maint_actions' %}">Upcoming Maintenance</a>
-          <a class="dropdown-item" href="{% url 'bike:maint_types' %}">Maintenance types</a>
+          <a class="dropdown-item" href="{% url 'bike:maint_actions' %}">
+		  Upcoming Maintenance</a>
+          <a class="dropdown-item" href="{% url 'bike:maint_types' %}">
+		  Maintenance types</a>
         </div>
       </li>
       <li class="nav-item dropdown">
@@ -107,7 +115,8 @@
         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
           <a class="dropdown-item" href="{% url 'bike:preferences' %}">
 		  Units preferences</a>
-          <a class="dropdown-item" href="{% url 'admin:password_change' %}?next={% url 'bike:home' %}">
+          <a class="dropdown-item"
+			 href="{% url 'admin:password_change' %}?next={% url 'bike:home' %}">
 		  Change password</a>
           {# ?next= doesn't work on password change %}
         </div>
