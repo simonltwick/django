@@ -91,7 +91,8 @@ def odometer_readings_new(request, bike_id=None):
             return HttpResponseRedirect(next_url)
     else:
         # Initial GET.  Populate the formset, one form for each bike
-        initial_values = [{'bike': bike} for bike in bikes]
+        initial_values = [{'bike': bike, 'rider': request.user}
+                          for bike in bikes]
         try:
             preferences = Preferences.objects.get(user=request.user)
             for i in initial_values:

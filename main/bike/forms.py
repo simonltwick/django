@@ -76,7 +76,7 @@ OdometerFormSet = modelformset_factory(
     Odometer,
     formset=BaseOdometerFormSet,
     form=OdometerForm,
-    fields=['bike', 'distance', 'distance_units', 'initial', 'comment',
-            'date'],
+    fields=['rider', 'bike', 'distance', 'distance_units', 'initial',
+            'comment', 'date'],
     extra=1  # overridden in view
     )
