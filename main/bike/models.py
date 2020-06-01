@@ -32,7 +32,7 @@ class DistanceUnits(IntEnum):
 
     @classmethod
     def choices(cls):
-        return [(key.value, key.name) for key in cls]
+        return [(key.value, key.name.lower()) for key in cls]
 
     @classmethod
     def sum(cls, distances_list, target_units):
