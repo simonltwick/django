@@ -164,7 +164,7 @@ class Team(models.Model, GameLevel):
         User, through='TeamInvitation',
         through_fields=['team', 'invitee_username'])
     level = models.PositiveSmallIntegerField(choices=GameLevel.CHOICES,
-                                default=GameLevel.BASIC)
+                                             default=GameLevel.BASIC)
     # games = reverse FK
 
     def __str__(self):
@@ -619,6 +619,7 @@ class Game(models.Model, GameLevel):
                 raise ValueError(
                     f"Invalid game status requested: {req_status}")
             # TODO: if multiple teams, set TeamGameStatus + work out what to do
+            # use update() to set TeamGameStatus of all entities
             self.save()
         log.info("Game.request_play_status(%s). returning %s",
                  req_status, self.play_status_title)
@@ -632,6 +633,9 @@ class Game(models.Model, GameLevel):
         for line in self.lines.all():
             line.try_resolve_incidents()
             line.update_trains(self)
+        """ TODO:
+            or use self.current_time = F('current_time') + F('tick_interval)
+            then self.refresh_from_db()  (performs addition in SQL) """
         self.current_time += self.tick_interval
         self.save()
         # update scoreboard
@@ -1051,6 +1055,7 @@ class LocationType:
     CHOICES = ((DEPOT, 'Depot'), (TRACK, 'Track'), (STATION, 'Station'))
 
 
+# TODO: consider OneToOne relation for station traffic info
 class PlaceTemplate(models.Model, LocationType):
     line = models.ForeignKey(LineTemplate, related_name='places',
                              on_delete=models.CASCADE)
