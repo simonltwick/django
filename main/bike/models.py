@@ -129,6 +129,11 @@ class Ride(DistanceMixin):
     def get_absolute_url(self):
         return reverse('bike:ride', kwargs={'pk': self.id})
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # allow updating of odometer adjustment ride, if any
+        Odometer.ride_updated(self)
+
     @property
     def ascent_units_display(self):
         return self.get_ascent_units_display()
@@ -186,6 +191,22 @@ class Odometer(DistanceRequiredMixin):
                 f"{self.distance} {self.distance_units_display}"
                 f" on {self.date.date()}")
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.update_adjustment_rides()
+
+    @classmethod
+    def ride_updated(cls, ride):
+        """ called when a ride is saved, to allow adjustment of following
+        odometer adjustment ride, if any.  Most times there will be none """
+        next_odo = cls.next_odo(ride.bike_id, ride.date)
+        if next_odo is None:
+            return
+        prev_odo = cls.previous_odo(ride.bike_id, ride.date)
+        if prev_odo is None:
+            return
+        cls.update_adjustment_ride(next_odo, prev_odo)
+
     def update_adjustment_rides(self):
         """ create or update adjustment rides between this odo reading and
         previous/next odo readings, so that the rides mileage totals to the
@@ -196,24 +217,25 @@ class Odometer(DistanceRequiredMixin):
                 self.adjustment_ride.delete()
                 self.refresh_from_db()
         else:
-            prev_odo = self.previous_odo()
+            prev_odo = self.previous_odo(self.bike_id, self.date)
             if prev_odo:
                 self.update_adjustment_ride(self, prev_odo)
 
         # update following adjustment ride, if necessary
-        next_odo = self.next_odo()
+        next_odo = self.next_odo(self.bike_id, self.date)
         if next_odo and not next_odo.initial:
             self.update_adjustment_ride(next_odo, self)
 
     @classmethod
     def update_adjustment_ride(cls, current_odo, prev_odo):
         """ create or update the adjustment ride for current_odo """
-        rides_between = Ride.objects.filter(date__gt=prev_odo.date,
+        rides_between = Ride.objects.filter(bike_id=current_odo.bike_id,
+                                            date__gt=prev_odo.date,
                                             date__lte=current_odo.date,
-                                            bike_id=current_odo.bike_id)
+                                            is_adjustment=False)
         distances = list(rides_between.values('distance_units')
                          .annotate(distance=Sum('distance')))
-        # log.info("update_adjustment_ride: distances=%s", distances)
+        # log.info("update_adjustment_ride: ride distances=%s", distances)
         distances.append({'distance_units': prev_odo.distance_units,
                           'distance': prev_odo.distance})
         distances.append({'distance_units': current_odo.distance_units,
@@ -227,8 +249,9 @@ class Odometer(DistanceRequiredMixin):
         if adj_ride is None:
             adj_ride = Ride(
                 bike=current_odo.bike, rider=current_odo.rider,
-                is_adjustment=True, date=current_odo.date,
+                is_adjustment=True,
                 description="Adjustment for odometer reading")
+        adj_ride.date = current_odo.date
         adj_ride.distance = total_distance
         adj_ride.distance_units = current_odo.distance_units
         adj_ride.save()
@@ -240,17 +263,19 @@ class Odometer(DistanceRequiredMixin):
             #          current_odo.adjustment_ride)
             current_odo.save()
 
-    def previous_odo(self):
+    @classmethod
+    def previous_odo(cls, bike_id, date):
         """ return the previous odometer reading for this bike, or None """
         return (Odometer.objects
-                .filter(bike=self.bike_id, date__lt=self.date)
+                .filter(bike=bike_id, date__lt=date)
                 .order_by('-date')
                 .first())
 
-    def next_odo(self):
+    @classmethod
+    def next_odo(cls, bike_id, date):
         """ return the next odometer reading for this bike, or None """
         return (Odometer.objects
-                .filter(bike=self.bike_id, date__gt=self.date)
+                .filter(bike=bike_id, date__gt=date)
                 .order_by('date')
                 .first())
 
