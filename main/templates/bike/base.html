@@ -78,12 +78,12 @@
         </div>
       </li>
 	  <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2"
 	       role="button" data-toggle="dropdown"
 		   aria-haspopup="true" aria-expanded="false">
           Rides
         </a>
-        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
           <a class="dropdown-item" href="{% url 'bike:rides' %}">Rides</a>
           <div class="dropdown-divider"></div>
           <a class="dropdown-item" href="{% url 'bike:mileage' %}">Mileage</a>
@@ -92,13 +92,13 @@
         </div>
       </li>
       <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
-		   data-toggle="tooltip" title="Maintenance"
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown3"
 	       role="button" data-toggle="dropdown"
 		   aria-haspopup="true" aria-expanded="false">
-          <span class="oi oi-wrench"></span>
+   	   	   <span class="oi oi-wrench"
+				 data-toggle="tooltip" title="Maintenance"></span> 
         </a>
-        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown3">
           <a class="dropdown-item" href="{% url 'bike:maint_actions' %}">
 		  Upcoming Maintenance</a>
           <a class="dropdown-item" href="{% url 'bike:maint_types' %}">
@@ -106,19 +106,19 @@
         </div>
       </li>
       <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
-           data-toggle="tooltip" title="Settings"
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown4"
 	       role="button" data-toggle="dropdown"
 		   aria-haspopup="true" aria-expanded="false">
-          <span class="oi oi-cog"></span>
+          <span class="oi oi-cog"
+				data-toggle="tooltip" title="Settings"></span>
         </a>
-        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown4">
           <a class="dropdown-item" href="{% url 'bike:preferences' %}">
 		  Units preferences</a>
           <a class="dropdown-item"
 			 href="{% url 'admin:password_change' %}?next={% url 'bike:home' %}">
 		  Change password</a>
-          {# ?next= doesn't work on password change %}
+          {# ?next= doesn't work on password change #}
         </div>
       </li>
 
