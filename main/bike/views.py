@@ -400,7 +400,7 @@ def rides(request):
         form = RideSelectionForm(
             request.POST, bikes=Bike.objects.filter(owner=request.user).all())
         if form.is_valid():
-            rides = Ride.objects.filter(rider=request.user)
+            rides = Ride.objects.filter(rider=request.user, distance__ne=0)
             bike = form.cleaned_data['bike']
             if bike:
                 rides = rides.filter(bike=bike)

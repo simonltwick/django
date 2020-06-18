@@ -16,18 +16,23 @@
 
 <h3>Rides</h3>
 {% for ride in rides %}
+
 {% if forloop.first %}
-<ul>
+  <table class="table">
+  <tr><th>date</th><th>bike</th><th>ride</th><th>distance</th></tr>
 {% endif %}
 
-<li>{{ ride.date }} {{ ride.bike }}
-  <a href="{% url 'bike:ride' ride.id %}">
-  {{ ride.description|truncatechars:40 }}</a>
-  {{ ride.distance }} {{ ride.get_distance_units_display }}</li>
+<tr>
+  <td>{{ ride.date }}</td><td>{{ ride.bike }}</td>
+  <td><a href="{% url 'bike:ride' ride.id %}">
+    {{ ride.description|truncatechars:40 }}</a></td>
+  <td>{{ ride.distance|floatformat }} {{ ride.get_distance_units_display }}</td>
+</tr>
 
 {% if forloop.last %}
-</ul>
+  </table>
 {% endif %}
+
 {% empty %}
 <p>No rides found :-(</p>
 {% endfor %}
