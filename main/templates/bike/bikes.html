@@ -36,7 +36,7 @@
     {% else %}
     <td></td><td></td><td></td><td></td>
     {% endif %}
-  <td>{% for maint in bike.maint_actions.all %}
+  <td>{% for maint in bike.maint_upcoming %}
       {% if forloop.first %}<ul>{% endif %}
       <li><a href="{% url 'bike:maint' maint.id %}">{{ maint }}</a></li>
       {% if forloop.last %}</ul>{% endif %}

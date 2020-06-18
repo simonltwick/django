@@ -46,7 +46,10 @@ def bikes(request):
              .filter(owner=request.user)
              .annotate(last_ridden=Max('rides__date'))
              .order_by('id'))
-    maint = bikes.prefetch_related('maint_actions')
+    maint = (MaintenanceAction.objects
+             .filter(user=request.user, bike__isnull=False, completed=False)
+             .order_by('bike_id')
+             .all())
     mileage = (bikes
                .values('id', 'rides__distance_units')
                .filter(rides__distance_units__isnull=False)
@@ -55,8 +58,8 @@ def bikes(request):
                          distance_year=sum_year)
                )
     # mileage is a queryset of dicts, one for each bike/distance_unit combo
-    # add mileages to bike entries
-    bikes_by_id = {bike.id: bike for bike in maint}
+    # add mileage details to bike entries
+    bikes_by_id = {bike.id: bike for bike in bikes}
     for entry in mileage:
         bike = bikes_by_id[entry['id']]
         entry['distance_units'] = DistanceUnits(  # km or miles
@@ -65,8 +68,16 @@ def bikes(request):
             bike.mileage.append(entry)
         else:
             bike.mileage = [entry]
-    return render(request, 'bike/bikes.html',
-                  context={'bikes': maint})
+    log.info("maint=%s", maint)
+    # add maint details to bike entries
+    for entry in maint:
+        bike = bikes_by_id[entry.bike_id]
+        log.info("maint %s for bike %s", maint, bike)
+        try:
+            bike.maint_upcoming.append(entry)
+        except AttributeError:
+            bike.maint_upcoming = [entry]
+    return render(request, 'bike/bikes.html', context={'bikes': bikes})
 
 
 @login_required(login_url=LOGIN_URL)
