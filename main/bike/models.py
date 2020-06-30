@@ -6,9 +6,11 @@ from django.urls import reverse
 from django.utils import timezone
 
 from collections import defaultdict
-from datetime import date
+import datetime as dt
 from enum import IntEnum
 import logging
+from typing import Optional
+
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
@@ -18,12 +20,32 @@ class Bike(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='bikes')
     description = models.CharField(max_length=200)
+    current_odo = models.FloatField(
+        default=0, help_text="calculated current odometer, in distance units"
+        " from preferences.")
 
     def get_absolute_url(self):
         return reverse('bike:bike', kwargs={'pk': self.id})
 
     def __str__(self):
         return self.name
+
+    def update_current_odo(self):
+        last_odo = Odometer.previous_odo(self.id, timezone.now())
+        date_after = last_odo.date if last_odo else None
+        log.info("update_current_odo: date_after=%s", date_after)
+        distance_since = Ride.distance_after(date_after, self)
+        log.info("update_current_odo: distance_since=%s", distance_since)
+        distances = [(entry['distance'], entry['distance_units'])
+                     for entry in distance_since]
+        log.info("update_current_odo: distance_since(2)=%s", distance_since)
+        if last_odo:
+            distances.append({'distance': last_odo.distance,
+                              'distance_units': last_odo.distance_units})
+        log.info("update_current_odo: distance_since(3)=%s", distance_since)
+        target_units = self.owner.preferences.distance_units
+        self.current_odo = DistanceUnits.sum(distances, target_units)
+        log.info("update_current_odo: current_odo=%s", self.current_odo)
 
 
 class DistanceUnits(IntEnum):
@@ -40,6 +62,8 @@ class DistanceUnits(IntEnum):
         distance_list is a list of dicts [{'distance': d, 'distance_units': x}]
         where x is a DistanceUnits instance
         """
+        log.info("DistanceUnits.sum(%s, target_units=%s", distances_list,
+                 target_units)
         distances = defaultdict(lambda: 0)
         for item in distances_list:
             distances[item['distance_units']] += item['distance']
@@ -148,6 +172,26 @@ class Ride(DistanceMixin):
             raise ValidationError(validation_errors)
 
     @classmethod
+    def distance_after(cls, when: Optional[dt.datetime], bike=None):
+        """ return ride distance after a datetime, in mixed distance_units, on
+        bike=bike if given, else for all bikes
+        Result is a list of dicts with bike_id, distance_units, distance """
+        log.info("Ride.distance_after(when=%s, bike=%s", when, bike)
+        query = Ride.objects
+        log.info("distance_after(1). query=%s", query)
+        if bike is not None:
+            query = query.filter(bike=bike)
+            log.info("distance_after(2). query=%s", query)
+        if when is not None:
+            query = query.filter(date__gt=when)
+            log.info("distance_after(3). query=%s", query)
+        return (query
+                .order_by('bike_id', 'distance_units')
+                .values('bike_id', 'distance_units')
+                .annotate(distance=Sum('distance'))
+                )
+
+    @classmethod
     def mileage_by_month(cls, user, year, bike=None):
         """ return total mileage by month, for a given year [and bike]
         Also return the detailed data, grouped by month, if detail=True """
@@ -249,11 +293,12 @@ class Odometer(DistanceRequiredMixin):
         if adj_ride is None:
             adj_ride = Ride(
                 bike=current_odo.bike, rider=current_odo.rider,
-                is_adjustment=True,
-                description="Adjustment for odometer reading")
+                is_adjustment=True)
         adj_ride.date = current_odo.date
         adj_ride.distance = total_distance
         adj_ride.distance_units = current_odo.distance_units
+        adj_ride.description = "Adjustment for odometer reading %0.1f %s" % (
+            current_odo.distance, prev_odo.distance_units_display)
         adj_ride.save()
         # log.info("adj_ride=%s, distance %s", adj_ride, adj_ride.distance)
         if current_odo.adjustment_ride is None:
@@ -328,7 +373,8 @@ class Component(models.Model):
     # fk maintenance history
     # fk component history
     # fk subcomponent history
-    date_acquired = models.DateField(default=date.today, null=True, blank=True)
+    date_acquired = models.DateField(default=dt.date.today, null=True,
+                                     blank=True)
     supplier = models.CharField(max_length=200, null=True, blank=True)
     notes = models.CharField(max_length=400, null=True, blank=True)
 
@@ -373,7 +419,7 @@ class MaintenanceAction(DistanceMixin):
                                    blank=True, null=True)
     description = models.CharField(max_length=100, blank=True, null=True)
     due_date = models.DateField(null=True, blank=True,
-                                default=date.today)
+                                default=dt.date.today)
     completed = models.BooleanField(default=False)
     completed_date = models.DateField(null=True, blank=True)
     completed_distance = models.FloatField(null=True, blank=True)
@@ -390,7 +436,7 @@ class MaintenanceAction(DistanceMixin):
 
 
 class ComponentChange(DistanceMixin):
-    date = models.DateField(default=date.today, null=True, blank=True)
+    date = models.DateField(default=dt.date.today, null=True, blank=True)
     changed_component = models.ForeignKey(Component, on_delete=models.CASCADE,
                                           related_name='component_history')
     parent_component = models.ForeignKey(Component, on_delete=models.CASCADE,
