@@ -15,6 +15,12 @@
   {% if forloop.last %}</ul>{% endif %}
 {% endfor %}
 
+{% for action in maint_history %}
+  {% if forloop.first %}<h3>Maintenance history</h3><ul>{% endif %}
+  <li>{{ action.date }}<a href="{% url 'bike:maint' action.id %}">
+    {{ action }}</a></li>
+  {% if forloop.last %}</ul>{% endif %}
+{% endfor %}
  
 {% for subcomponent in components %}
   {% if forloop.first %}

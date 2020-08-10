@@ -157,6 +157,8 @@ class Ride(DistanceMixin):
         super().save(*args, **kwargs)
         # allow updating of odometer adjustment ride, if any
         Odometer.ride_updated(self)
+        if not self.is_adjustment:
+            self.bike.update_current_odo()
 
     @property
     def ascent_units_display(self):
@@ -385,16 +387,22 @@ class Component(models.Model):
         return reverse('bike:component', kwargs={'pk': self.id})
 
 
-class MaintenanceType(models.Model):
+class MaintIntervalMixin(models.Model):
+    maintenance_interval = models.PositiveIntegerField(null=True, blank=True)
+    maint_interval_units = models.PositiveSmallIntegerField(
+        choices=IntervalUnits.CHOICES, null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+
+class MaintenanceType(MaintIntervalMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_types')
     component_type = models.ForeignKey(ComponentType, on_delete=models.CASCADE)
     activity = models.CharField(max_length=200)
     reference_info = models.CharField(max_length=300, blank=True, null=True)
     recurring = models.BooleanField(default=False)
-    maintenance_interval = models.PositiveIntegerField(null=True, blank=True)
-    maint_interval_units = models.PositiveSmallIntegerField(
-        choices=IntervalUnits.CHOICES, null=True, blank=True)
 
     class Meta:
         unique_together = ['component_type', 'activity']
@@ -406,7 +414,9 @@ class MaintenanceType(models.Model):
         return reverse('bike:maint_type', kwargs={'pk': self.id})
 
 
-class MaintenanceAction(DistanceMixin):
+class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
+    # distance, distance_units - DistanceMixin
+    # maintenance_interval, maint_interval_units - MaintIntervalMixin
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_actions')
     bike = models.ForeignKey(Bike, related_name="maint_actions",
@@ -433,6 +443,45 @@ class MaintenanceAction(DistanceMixin):
 
     def get_absolute_url(self):
         return reverse('bike:maint', kwargs={'pk': self.id})
+
+    @classmethod
+    def history(cls, bike_id=None, component_id=None, order_by='-date'):
+        """ return a list of maintenance actions and a list of completion dates
+        ordered by either date or maint action.
+        """
+        if order_by not in {'-date', 'action_id'}:
+            raise ValueError(f"order_by: invalid value '{order_by}'")
+        actions = MaintenanceAction.objects
+        if bike_id is not None:
+            actions = actions.filter(bike_id=bike_id)
+        if component_id is not None:
+            actions = actions.filter(component_id=component_id)
+        history = (MaintenanceActionHistory.objects
+                   .filter(action__in=actions)
+                   .select_related('action')  # populate action objects
+                   .order_by(order_by)
+                   .all())
+        return history
+
+
+class MaintenanceActionHistory(DistanceMixin):
+    # distance, distance_units - DistanceMixin
+    action = models.ForeignKey(MaintenanceAction, on_delete=models.PROTECT,
+                               related_name="maintenance_action")
+    date = models.DateField(null=True, blank=True)
+
+    def clean(self):
+        if self.completed_date is None and self.completed_distance is None:
+            raise ValidationError(
+                "Either completion date or distance is required.")
+
+    class Meta:
+        verbose_name_plural = "Maintenance action history"
+
+    def __str__(self):
+        when = self.date or f"{self.distance} {self.distance_units.display}"
+        return f"{self.action} on {when}"
+
 
 
 class ComponentChange(DistanceMixin):

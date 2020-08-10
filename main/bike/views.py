@@ -184,7 +184,10 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
         context = super(BikeUpdate, self).get_context_data(**kwargs)
         pk = self.kwargs['pk']
         context['components'] = Component.objects.filter(bike_id=pk)
-        context['maint'] = MaintenanceAction.objects.filter(bike_id=pk)
+        context['maint'] = MaintenanceAction.objects.filter(
+            bike_id=pk, completed=False)
+        if pk is not None:
+            context['maint_history'] = MaintenanceAction.history(bike_id=pk)
         return context
 
     def form_valid(self, form):
