@@ -33,19 +33,13 @@ class Bike(models.Model):
     def update_current_odo(self):
         last_odo = Odometer.previous_odo(self.id, timezone.now())
         date_after = last_odo.date if last_odo else None
-        log.info("update_current_odo: date_after=%s", date_after)
         distance_since = Ride.distance_after(date_after, self)
-        log.info("update_current_odo: distance_since=%s", distance_since)
-        distances = [(entry['distance'], entry['distance_units'])
-                     for entry in distance_since]
-        log.info("update_current_odo: distance_since(2)=%s", distance_since)
+        distances = list(distance_since)  # also contains bike_id, but ignored
         if last_odo:
             distances.append({'distance': last_odo.distance,
                               'distance_units': last_odo.distance_units})
-        log.info("update_current_odo: distance_since(3)=%s", distance_since)
         target_units = self.owner.preferences.distance_units
         self.current_odo = DistanceUnits.sum(distances, target_units)
-        log.info("update_current_odo: current_odo=%s", self.current_odo)
 
 
 class DistanceUnits(IntEnum):
