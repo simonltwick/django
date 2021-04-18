@@ -11,7 +11,7 @@
 		  <a href="{% url 'bike:rides_month' year month %}">
 		    {{ month|month_name }}</a></th>
           {% for mileage_units, miles in month_summary.items %}
-            <td>{{ miles }} {{ mileage_units }}</td>
+            <td>{{ miles|floatformat }} {{ mileage_units }}</td>
           {% empty %} -
           {% endfor %}
         </tr>
