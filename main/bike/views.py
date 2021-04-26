@@ -11,6 +11,7 @@ from django.views.generic.dates import MonthArchiveView
 import csv
 import datetime as dt
 import logging
+from typing import List, Tuple, Optional
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
@@ -604,14 +605,16 @@ class MaintTypeDelete(BikeLoginRequiredMixin, DeleteView):
 
 
 # TODO: odometer display / entry / adjustment rides
-# TODO: use Rides.objects.dates(date, "year"/ "month"), to get available yy/mm
 @login_required(login_url=LOGIN_URL)
 def mileage(request, year=None, bike_id=None):
     # odometer and recent mileage stuff for bikes / a bike ...
     """ show a monthly summary of mileage, with detail if requested """
+    years_dt = Ride.objects.dates('date', "year")
+    years = [y_dt.year for y_dt in years_dt]
     if year is None:
-        # TODO: use Queryset.latest() to retrieve latest ride on blog
-        year = dt.date.today().year
+        # or use Queryset.latest() to retrieve latest ride on blog
+        year = years[-1]
+    prev_yr, next_yr = get_prev_next_yr(year, years)
     if bike_id is not None:
         bike = get_object_or_404(Bike, pk=bike_id, owner=request.user)
     else:
@@ -619,8 +622,26 @@ def mileage(request, year=None, bike_id=None):
     monthly_mileage = Ride.mileage_by_month(request.user, year, bike_id)
     return render(request, 'bike/ride_archive_year.html',
                   context={'monthly_mileage': monthly_mileage,
-                           'bike': bike,
-                           'year': year})
+                           'bike': bike, 'bike_id': bike_id,
+                           'year': year,
+                           'prev_yr': prev_yr, 'next_yr': next_yr})
+
+
+def get_prev_next_yr(year: int, years: List[int]
+                     ) -> Tuple[Optional[int], Optional[int]]:
+    """ return the previous and next year in years, or None
+    years must be sorted in ascending order"""
+    # return index of first element > year or None
+    # log.info("get_prev_next_yr: year=%s, years=%s", year, years)
+    next_index = next((x[0] for x in enumerate(years) if x[1] > year), None)
+    next_yr = next_index and years[next_index]
+    if next_index is None:
+        next_index = len(years)
+    prev_yr = years[next_index-1] if next_index > 0 else None
+    if prev_yr == year:
+        prev_yr = years[next_index-2] if next_index > 1 else None
+    # log.info("get_prev_next_yr -> prev_yr=%s, next_yr=%s", prev_yr, next_yr)
+    return prev_yr, next_yr
 
 
 class RideMonthArchiveView(BikeLoginRequiredMixin, MonthArchiveView):

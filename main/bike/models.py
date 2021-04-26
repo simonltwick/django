@@ -9,7 +9,7 @@ from collections import defaultdict
 import datetime as dt
 from enum import IntEnum
 import logging
-from typing import Optional
+from typing import Optional, Union, List
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -188,10 +188,11 @@ class Ride(DistanceMixin):
                 )
 
     @classmethod
-    def mileage_by_month(cls, user, year, bike=None):
-        """ return total mileage by month, for a given year [and bike]
+    def mileage_by_month(cls, user, year: int, bike=None):
+        """ return total mileage by month, for a given year[s] [and bike]
         Also return the detailed data, grouped by month, if detail=True """
-        rides = cls.objects.filter(date__year=year, rider=user)
+        rides = cls.objects.filter(rider=user)
+        rides = rides.filter(date__year=year)
         if bike is not None:
             rides = rides.filter(bike=bike)
 
