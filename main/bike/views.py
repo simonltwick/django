@@ -620,10 +620,16 @@ def mileage(request, year=None, bike_id=None):
     else:
         bike = None
     monthly_mileage = Ride.mileage_by_month(request.user, year, bike_id)
+    distance_units = {distance_unit
+                      for dstunit_dst in monthly_mileage.values()
+                      for distance_unit in dstunit_dst}
+    total = {distance_unit: sum((monthly_mileage[month][distance_unit]
+                                 for month in monthly_mileage),)
+             for distance_unit in distance_units}
     return render(request, 'bike/ride_archive_year.html',
                   context={'monthly_mileage': monthly_mileage,
                            'bike': bike, 'bike_id': bike_id,
-                           'year': year,
+                           'year': year, 'total': total,
                            'prev_yr': prev_yr, 'next_yr': next_yr})
 
 

@@ -17,6 +17,12 @@
         </tr>
     {% empty %}(no rides on record)
     {% endfor %}
+    {% if total %}
+       <tr><th>Total:
+		 {% for mileage_units, miles in total.items %}
+	     <td>{{ miles|floatformat}} {{ mileage_units }}</td>
+	     {% endfor %}
+    {% endif %}
 </table>
 <p>{% if prev_yr %}
 	{% if bike_id %}<a href="{%url 'bike:mileage' year=prev_yr bike_id=bike_id %}">
