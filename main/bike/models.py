@@ -347,10 +347,6 @@ class ComponentType(models.Model):
     def get_absolute_url(self):
         return reverse('bike:component_type', kwargs={'pk': self.id})
 
-    def clean(self):
-        if self.maintenance_interval and not self.maint_interval_units:
-            raise ValidationError("Maintenance interval units not specified.")
-
 
 class Component(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE,
