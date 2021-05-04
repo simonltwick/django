@@ -17,7 +17,7 @@ from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
     DistanceUnits, MaintenanceType, Odometer,
     )
-from .forms import RideSelectionForm, RideForm, OdometerFormSet
+from .forms import RideSelectionForm, RideForm, OdometerFormSet, DateTimeForm
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -93,26 +93,35 @@ def odometer_readings_new(request, bike_id=None):
         return HttpResponse(
             "No bikes found." if bike_id is None else "Bike not found.",
             status=404)
+
+    initial_values = get_odometer_readings_initial_values(request, bikes)
+
     if request.method == 'POST':
-        formset = OdometerFormSet(request.POST)
+        dt_form = DateTimeForm(request.POST)
+        if dt_form.is_valid():
+            reading_dtime = dt_form.cleaned_data['reading_date_time']
+        formset = OdometerFormSet(
+            request.POST, initial=initial_values,
+            form_kwargs={'user': request.user, 'reading_dtime': reading_dtime})
+        orig_user = request.POST.get("user")
+        if orig_user != str(request.user):
+            log.error("Userid mismatch in odometer_readings_new: orig_user=%r,"
+                      " request.user=%r", orig_user, request.user)
+            return HttpResponse("User id mismatch", status=403)
+
         if formset.is_valid():
             # want to only validate & save forms with odo reading entered
             # ?custom validation & save: ignore unchanged forms even if invalid
             formset.save()
             next_url = request.GET.get('next') or reverse('bike:home')
             return HttpResponseRedirect(next_url)
+
     else:
         # Initial GET.  Populate the formset, one form for each bike
-        initial_values = [{'bike': bike, 'rider': request.user}
-                          for bike in bikes]
-        try:
-            preferences = Preferences.objects.get(user=request.user)
-            for i in initial_values:
-                i['distance_units'] = preferences.distance_units
-        except Preferences.DoesNotExist:
-            pass
+        dt_form = DateTimeForm()
         formset = OdometerFormSet(queryset=Odometer.objects.none(),
-                                  initial=initial_values)
+                                  initial=initial_values,
+                                  form_kwargs={'user': request.user})
         formset.extra = len(initial_values)
         user_bikes = request.user.bikes  # initialise the choice field
         for form in formset:
@@ -120,7 +129,20 @@ def odometer_readings_new(request, bike_id=None):
             # OR:
             form.fields['bike'].widget.attrs['readonly'] = True
     return render(request, 'bike/odometer_readings.html',
-                  context={'formset': formset, 'bike_id': bike_id})
+                  context={'formset': formset, 'dt_form': dt_form,
+                           'bike_id': bike_id, 'user': request.user})
+
+
+def get_odometer_readings_initial_values(request, bikes):
+    initial_values = [{'bike': bike, 'rider': request.user}
+                      for bike in bikes]
+    try:
+        preferences = Preferences.objects.get(user=request.user)
+        for i in initial_values:
+            i['distance_units'] = preferences.distance_units
+    except Preferences.DoesNotExist:
+        pass
+    return initial_values
 
 
 class PreferencesCreate(BikeLoginRequiredMixin, CreateView):

@@ -213,9 +213,10 @@ class Ride(DistanceMixin):
 
 class Odometer(DistanceRequiredMixin):
     rider = models.ForeignKey(User, on_delete=models.CASCADE)
-    initial = models.BooleanField(
-        default=False, help_text="Only tick this for the initial value of new "
-        "odometer or after resetting the odometer reading.")
+    initial_value = models.BooleanField(
+        default=False)  
+    # , help_text="Only tick this for the initial value of new "
+    #    "odometer or after resetting the odometer reading.")
     comment = models.CharField(max_length=100, null=True, blank=True)
     bike = models.ForeignKey(Bike, on_delete=models.CASCADE,
                              related_name='odometer_readings')
@@ -227,7 +228,7 @@ class Odometer(DistanceRequiredMixin):
         verbose_name = 'Odometer reading'
 
     def __str__(self):
-        reset = "reset to " if self.initial else ""
+        reset = "reset to " if self.initial_value else ""
         return (f"{self.bike} odometer {reset}"
                 f"{self.distance} {self.distance_units_display}"
                 f" on {self.date.date()}")
@@ -253,7 +254,7 @@ class Odometer(DistanceRequiredMixin):
         previous/next odo readings, so that the rides mileage totals to the
         same as the difference between the odo readings.
         Mileage before a "reset" odo reading is not adjusted """
-        if self.initial:  # after resetting odo: no adjustment ride
+        if self.initial_value:  # after resetting odo: no adjustment ride
             if self.adjustment_ride:
                 self.adjustment_ride.delete()
                 self.refresh_from_db()
@@ -264,7 +265,7 @@ class Odometer(DistanceRequiredMixin):
 
         # update following adjustment ride, if necessary
         next_odo = self.next_odo(self.bike_id, self.date)
-        if next_odo and not next_odo.initial:
+        if next_odo and not next_odo.initial_value:
             self.update_adjustment_ride(next_odo, self)
 
     @classmethod

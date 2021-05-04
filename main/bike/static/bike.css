@@ -4,6 +4,10 @@
 	font-weight: normal;
 }
 
+.odometer {
+	max-width: 10ch;
+}
+
 /* Style the breadcrumb list */
 ul.bike-breadcrumb {
   padding: 10px 16px;

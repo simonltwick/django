@@ -4,6 +4,8 @@
 <h1>Odometer readings:</h1>
 <form method='POST'>
 {% csrf_token %}
+{{ dt_form }}
+<input type="hidden" name="user" value="{{ user }}">
 {{ formset.management_form }}
 <table class="table">
 {% for form in formset %}
@@ -37,6 +39,8 @@
 {% empty %}<tr><td>(no forms to display)</td></tr>
 {% endfor %}
 </table>
+<p><b>Note:</b> Only tick the "initial value" box if you have reset or replaced
+the odometer</p>
 
 <input type="submit" class="btn btn-primary" value="OK">
 </form>

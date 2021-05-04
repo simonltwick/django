@@ -45,6 +45,12 @@ class OdometerForm(forms.ModelForm):
     model = Odometer
     # fields are defined in OdometerFormSet factory call
 
+    def __init__(self, *args, user=None, reading_dtime=None, **kwargs):
+        self.user = user
+        self.reading_dtime = reading_dtime
+        super().__init__(*args, **kwargs)
+        self.fields['distance'].widget.attrs['class']='odometer'
+
     # specialised handling of is_valid and save: forms with no distance data
     # are ignored (no validation, and no save)
     def distance_data(self):
@@ -57,8 +63,16 @@ class OdometerForm(forms.ModelForm):
         return True  # an empty form is valid, but won't be saved
 
     def save(self, *args, **kwargs):
-        if self.distance_data():
-            return super(OdometerForm, self).save(*args, **kwargs)
+        if not self.distance_data():
+            return None
+        # add rider field to the Odometer instance before saving
+        kwargs2 = dict(kwargs, commit=False)
+        obj = super(OdometerForm, self).save(*args, **kwargs2)
+        obj.rider = self.user
+        obj.date = self.reading_dtime
+        if kwargs.get('commit'):
+            obj.save()
+        return obj
 
 
 class BaseOdometerFormSet(forms.BaseModelFormSet):
@@ -76,7 +90,14 @@ OdometerFormSet = modelformset_factory(
     Odometer,
     formset=BaseOdometerFormSet,
     form=OdometerForm,
-    fields=['rider', 'bike', 'distance', 'distance_units', 'initial',
-            'comment', 'date'],
+    fields=[# 'rider', 
+            'bike', 'distance', 'distance_units', 'initial_value',
+            'comment',], 
+            # 'date'],
     extra=1  # overridden in view
     )
+
+
+class DateTimeForm(forms.Form):
+    reading_date_time = forms.DateTimeField(
+        label='Reading date & time', initial=dt.datetime.now)
