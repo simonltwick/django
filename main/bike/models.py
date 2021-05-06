@@ -230,7 +230,7 @@ class Odometer(DistanceRequiredMixin):
     def __str__(self):
         reset = "reset to " if self.initial_value else ""
         return (f"{self.bike} odometer {reset}"
-                f"{self.distance} {self.distance_units_display}"
+                f"{self.distance:0.1f} {self.distance_units_display}"
                 f" on {self.date.date()}")
 
     def save(self, *args, **kwargs):

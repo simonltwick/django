@@ -24,7 +24,12 @@
 
 <tr>
   <td>{{ ride.date }}</td><td>{{ ride.bike }}</td>
-  <td><a href="{% url 'bike:ride' ride.id %}">
+  <td>
+    {% if ride.is_adjustment %}
+	  <a href="{% url 'bike:odometer_adjustment_ride' ride_id=ride.id %}">
+    {% else %}
+	  <a href="{% url 'bike:ride' ride.id %}">
+    {% endif %}
     {{ ride.description|truncatechars:40 }}</a></td>
   <td>{{ ride.distance|floatformat }} {{ ride.get_distance_units_display }}</td>
 </tr>

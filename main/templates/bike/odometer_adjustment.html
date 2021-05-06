@@ -1,0 +1,15 @@
+{% extends 'bike/base.html' %}
+
+{% block content %}
+
+<h1>Edit odometer reading</h1>
+<form method='POST' action="{% url 'bike:odometer_adjustment' odo_reading_id=odo_reading.id %}?success={{ success_url }}">
+  {% csrf_token %}
+<h3>{{ odo_reading }}</h3>
+  <table>
+  {{ form.as_table }}
+  </table>
+  <input type="submit" class="btn btn-primary" value="Save">
+</form>
+
+{% endblock %}

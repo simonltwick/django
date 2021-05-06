@@ -41,6 +41,16 @@ class RideForm(forms.ModelForm):
         widgets = {'description': forms.Textarea()}
 
 
+class OdometerAdjustmentForm(forms.ModelForm):
+    class Meta:
+        model = Odometer
+        fields = ['distance', 'initial_value', 'comment']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['distance'].widget.attrs['class']='odometer'
+
+
 class OdometerForm(forms.ModelForm):
     model = Odometer
     # fields are defined in OdometerFormSet factory call

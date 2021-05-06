@@ -46,6 +46,10 @@ urlpatterns = [
          name='odometer_readings'),
     path('odometer/readings', views.odometer_readings_new,
          name='odometer_readings'),
+    path('odometer/adjustment/ride/<int:ride_id>', views.odometer_adjustment,
+         name='odometer_adjustment_ride'),
+    path('odometer/adjustment/<int:odo_reading_id>', views.odometer_adjustment,
+         name='odometer_adjustment'),
 
     path('components', views.components, name='components'),
     path('component/new', views.ComponentCreate.as_view(),

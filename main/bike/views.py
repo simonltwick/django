@@ -17,7 +17,9 @@ from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
     DistanceUnits, MaintenanceType, Odometer,
     )
-from .forms import RideSelectionForm, RideForm, OdometerFormSet, DateTimeForm
+from .forms import (
+    RideSelectionForm, RideForm,
+    OdometerFormSet, OdometerAdjustmentForm, DateTimeForm)
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -143,6 +145,29 @@ def get_odometer_readings_initial_values(request, bikes):
     except Preferences.DoesNotExist:
         pass
     return initial_values
+
+
+@login_required(login_url=LOGIN_URL)
+def odometer_adjustment(request, ride_id=None, odo_reading_id=None, 
+                        success=reverse_lazy('bike:rides')):
+    if request.method == 'GET':
+        if ride_id is None:
+            return HttpResponse("Missing ride_id", status=400)
+        odo_reading = Odometer.objects.select_related('bike').get(
+            adjustment_ride=ride_id, rider=request.user)
+        odo_form = OdometerAdjustmentForm(instance=odo_reading)
+    else:
+        if odo_reading_id is None:
+            return HttpResponse("Missing odo_reading_id", status=400)
+        odo_reading = Odometer.objects.select_related('bike').get(
+            pk=odo_reading_id, rider=request.user)
+        odo_form = OdometerAdjustmentForm(request.POST, instance=odo_reading)
+        if odo_form.is_valid():
+            odo_form.save()
+            return HttpResponseRedirect(success)
+    return render(request, 'bike/odometer_adjustment.html',
+                  context={"odo_reading": odo_reading, "form": odo_form,
+                           "success_url": success})
 
 
 class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
