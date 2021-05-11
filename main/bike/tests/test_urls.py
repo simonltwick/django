@@ -18,6 +18,8 @@ class BikeUrlTest(TestCase):
         self.user = User.objects.create(
             username='tester', password=make_password('testpw'))
         self.user.save()
+        preferences = Preferences.objects.create(user=self.user)
+        preferences.save()
         self.bike = Bike.objects.create(
             name='Test bike', description="test", owner=self.user)
         self.bike.save()
