@@ -19,7 +19,8 @@
 
 {% if forloop.first %}
   <table class="table">
-  <tr><th>date</th><th>bike</th><th>ride</th><th>distance</th></tr>
+  <tr><th>date</th><th>bike</th><th>ride</th><th>distance</th><th>ascent</th>
+  </tr>
 {% endif %}
 
 <tr>
@@ -32,6 +33,9 @@
     {% endif %}
     {{ ride.description|truncatechars:40 }}</a></td>
   <td>{{ ride.distance|floatformat }} {{ ride.get_distance_units_display }}</td>
+  {% if ride.ascent %}
+  <td>{{ ride.ascent }}{{ ride.ascent_units_display }}</td>
+  {% endif %}
 </tr>
 
 {% if forloop.last %}
