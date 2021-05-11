@@ -9,7 +9,7 @@ from collections import defaultdict
 import datetime as dt
 from enum import IntEnum
 import logging
-from typing import Optional, Union, List
+from typing import Optional
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -38,6 +38,7 @@ class Bike(models.Model):
         if last_odo:
             distances.append({'distance': last_odo.distance,
                               'distance_units': last_odo.distance_units})
+        # log.info("update_current_odo: owner=%s", self.owner)
         target_units = self.owner.preferences.distance_units
         self.current_odo = DistanceUnits.sum(distances, target_units)
 
@@ -56,8 +57,8 @@ class DistanceUnits(IntEnum):
         distance_list is a list of dicts [{'distance': d, 'distance_units': x}]
         where x is a DistanceUnits instance
         """
-        log.info("DistanceUnits.sum(%s, target_units=%s", distances_list,
-                 target_units)
+        # log.info("DistanceUnits.sum(%s, target_units=%s", distances_list,
+        #          target_units)
         distances = defaultdict(lambda: 0)
         for item in distances_list:
             distances[item['distance_units']] += item['distance']
@@ -149,9 +150,9 @@ class Ride(DistanceMixin):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # allow updating of odometer adjustment ride, if any
-        Odometer.ride_updated(self)
         if not self.is_adjustment:
+            # allow updating of following odometer adjustment ride, if any
+            Odometer.ride_updated(self)
             self.bike.update_current_odo()
 
     @property
@@ -172,15 +173,15 @@ class Ride(DistanceMixin):
         """ return ride distance after a datetime, in mixed distance_units, on
         bike=bike if given, else for all bikes
         Result is a list of dicts with bike_id, distance_units, distance """
-        log.info("Ride.distance_after(when=%s, bike=%s", when, bike)
+        # log.info("Ride.distance_after(when=%s, bike=%s", when, bike)
         query = Ride.objects
-        log.info("distance_after(1). query=%s", query)
+        # log.info("distance_after(1). query=%s", query)
         if bike is not None:
             query = query.filter(bike=bike)
-            log.info("distance_after(2). query=%s", query)
+            # log.info("distance_after(2). query=%s", query)
         if when is not None:
             query = query.filter(date__gt=when)
-            log.info("distance_after(3). query=%s", query)
+            # log.info("distance_after(3). query=%s", query)
         return (query
                 .order_by('bike_id', 'distance_units')
                 .values('bike_id', 'distance_units')
@@ -254,13 +255,20 @@ class Odometer(DistanceRequiredMixin):
         previous/next odo readings, so that the rides mileage totals to the
         same as the difference between the odo readings.
         Mileage before a "reset" odo reading is not adjusted """
+        # log.debug("Odometer.update_adjustment_rides(%s): initial_value=%s, "
+        #           "adjustment_ride=%s", self, self.initial_value, 
+        #           self.adjustment_ride)
         if self.initial_value:  # after resetting odo: no adjustment ride
             if self.adjustment_ride:
                 self.adjustment_ride.delete()
+                # log.debug(" >Odometer.update_adjustment_rides: adjustment "
+                #           "ride deleted")
                 self.refresh_from_db()
         else:
             prev_odo = self.previous_odo(self.bike_id, self.date)
             if prev_odo:
+                # log.debug(" >Odometer.update_adjustment_rides: adjustment "
+                #           "ride updated")
                 self.update_adjustment_ride(self, prev_odo)
 
         # update following adjustment ride, if necessary
@@ -288,10 +296,14 @@ class Odometer(DistanceRequiredMixin):
             distances, target_units=current_odo.distance_units)
         # log.info("update_adjustment_ride: total_distance=%s", total_distance)
         adj_ride = current_odo.adjustment_ride
+        # log.info("update_adjustment_ride(current_odo=%s (adj_ride=%s), "
+        #          "prev_odo=%s, ", current_odo, adj_ride, prev_odo)
         if adj_ride is None:
             adj_ride = Ride(
                 bike=current_odo.bike, rider=current_odo.rider,
                 is_adjustment=True)
+        # else:
+            # log.info(">update_adjustment_ride: adj_ride_id=%s", adj_ride.id)
         adj_ride.date = current_odo.date
         adj_ride.distance = total_distance
         adj_ride.distance_units = current_odo.distance_units
