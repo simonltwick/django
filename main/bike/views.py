@@ -4,6 +4,7 @@ from django.db.models import Sum, Q, Max
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic.list import ListView
 from django.views.generic.dates import MonthArchiveView
@@ -26,6 +27,7 @@ log.setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 
 LOGIN_URL = '/bike/login?next=/bike'
+CURRENT_TIMEZONE = timezone.get_current_timezone()
 
 
 class BikeLoginRequiredMixin(LoginRequiredMixin):
@@ -41,14 +43,14 @@ def home(request):
 
 @login_required(login_url=LOGIN_URL)
 def bikes(request):
-    today = dt.date.today()
+    today = timezone.now()
     sum_year = Sum('rides__distance', filter=Q(rides__date__year=today.year))
     sum_month = Sum('rides__distance', filter=(
         Q(rides__date__month=today.month) & Q(rides__date__year=today.year)))
     bikes = (Bike.objects  # .values('id', 'name', 'rides__distance_units')
              .filter(owner=request.user)
              .annotate(last_ridden=Max('rides__date'))
-             .order_by('id'))
+             .order_by('-last_ridden'))
     maint = (MaintenanceAction.objects
              .filter(user=request.user, bike__isnull=False, completed=False)
              .order_by('bike_id')
@@ -71,16 +73,19 @@ def bikes(request):
             bike.mileage.append(entry)
         else:
             bike.mileage = [entry]
-    log.info("maint=%s", maint)
+    # log.info("maint=%s", maint)
     # add maint details to bike entries
     for entry in maint:
         bike = bikes_by_id[entry.bike_id]
-        log.info("maint %s for bike %s", maint, bike)
+        # log.info("maint %s for bike %s", maint, bike)
         try:
             bike.maint_upcoming.append(entry)
         except AttributeError:
             bike.maint_upcoming = [entry]
-    return render(request, 'bike/bikes.html', context={'bikes': bikes})
+    monthname = today.strftime('%b')  # eg. Jan
+    return render(request, 'bike/bikes.html',
+                  context={'bikes': bikes, 'today': today,
+                           'monthname': monthname})
 
 
 @login_required(login_url=LOGIN_URL)
@@ -473,16 +478,20 @@ def rides(request):
                 rides = rides.filter(bike=bike)
             start_date = form.cleaned_data['start_date']
             if start_date:
+                start_date = dt.datetime.combine(start_date, dt.time(0),
+                                                 tzinfo=CURRENT_TIMEZONE)
                 rides = rides.filter(date__gte=start_date)
             end_date = form.cleaned_data['end_date']
             if end_date:
+                end_date = dt.datetime.combine(end_date, dt.time(23, 59, 59),
+                                               tzinfo=CURRENT_TIMEZONE)
                 rides = rides.filter(date__lte=end_date)
             rides = rides.order_by('-date').all()
             num_rides = form.cleaned_data['num_rides']
             if num_rides:
-                log.info("Applying filter num_rides=%d", num_rides)
+                # log.info("Applying filter num_rides=%d", num_rides)
                 rides = rides[:num_rides]
-            log.info("request.GET=%s", request.GET)
+            # log.info("request.GET=%s", request.GET)
             if not rides.exists():
                 form.add_error(None, "No rides found matching those criteria.")
             elif request.GET.get('action') == 'download_as_csv':
@@ -498,6 +507,7 @@ def rides(request):
         rides = Ride.objects.order_by('-date').all()[:20]
     return render(request, 'bike/rides.html',
                   context={'form': form, 'rides': rides})
+
 
 
 def csv_data_response(_request, filename, queryset, fields):

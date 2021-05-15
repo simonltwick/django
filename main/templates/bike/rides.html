@@ -24,7 +24,7 @@
 {% endif %}
 
 <tr>
-  <td>{{ ride.date }}</td><td>{{ ride.bike }}</td>
+  <td>{{ ride.date.date }}</td><td>{{ ride.bike }}</td>
   <td>
     {% if ride.is_adjustment %}
 	  <a href="{% url 'bike:odometer_adjustment_ride' ride_id=ride.id %}">
