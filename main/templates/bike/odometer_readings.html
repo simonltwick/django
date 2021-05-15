@@ -4,7 +4,7 @@
 <h1>Odometer readings:</h1>
 <form method='POST'>
 {% csrf_token %}
-{{ dt_form }}
+<p>{{ dt_form }}</p>
 <input type="hidden" name="user" value="{{ user }}">
 {{ formset.management_form }}
 <table class="table">

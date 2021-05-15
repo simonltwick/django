@@ -262,7 +262,11 @@ class BikeDelete(BikeLoginRequiredMixin, DeleteView):
 
 
 def components(request):
-    components = Component.objects.filter(owner=request.user).all()
+    components = (Component.objects
+                  .filter(owner=request.user)
+                  .order_by('type')
+                  .select_related('type', 'bike')
+                  .all())
     return render(request, 'bike/components.html',
                   context={'components': components})
 
