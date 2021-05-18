@@ -3,18 +3,36 @@
 {% block content %}
 <h1>Rides</h1>
 
-<h3>Choose a subset of rides:</h3>
 <form method='POST'>
-<table class="table">
-{{ form }}
 {% csrf_token %}
-</table>
-<input type="submit" class="btn btn-primary" value="Apply Filter">
-<input type="submit" class="btn btn-secondary" value="Download as CSV"
+<table class="table-sm">
+<tr><td colspan="8">Rides selection:
+<input type="submit" class="btn btn-link" value="Apply Filter">
+</td></tr>
+
+{% if form.non_field_errors %}
+  <tr><td colspan="8">{{ form.non_field_errors}}</td></tr>
+{% endif %}
+
+<tr class="table-info">
+{% for field in form %}
+  <td>
+  <div class="fieldWrapper">
+    {{ field.errors }}
+    {{ field.label_tag }}
+    {{ field }}
+	<br>{{ field.help_text }}
+  </div><td>
+{% endfor %}
+</tr></table>
+<br>
+<h3>Rides
+<input type="submit" class="btn btn-primary" value="Download as CSV"
     formaction="{% url 'bike:rides' %}?action=download_as_csv">
+</h3>
 </form>
 
-<h3>Rides</h3>
+
 {% for ride in rides %}
 
 {% if forloop.first %}
