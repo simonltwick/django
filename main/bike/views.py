@@ -600,7 +600,8 @@ class MaintTypeList(BikeLoginRequiredMixin, ListView):
     ordering = ('component_type', 'recurring', 'activity',)
 
     def get_queryset(self):
-        return MaintenanceType.objects.filter(user=self.request.user)
+        return (MaintenanceType.objects.filter(user=self.request.user)
+                .order_by(*self.ordering))
 
 
 class MaintTypeCreate(BikeLoginRequiredMixin, CreateView):

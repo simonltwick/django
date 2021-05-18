@@ -412,7 +412,7 @@ class MaintenanceType(MaintIntervalMixin):
         unique_together = ['component_type', 'activity']
 
     def __str__(self):
-        return f'{self.activity} - {self.component_type}'
+        return f'{self.component_type} - {self.activity}'
 
     def get_absolute_url(self):
         return reverse('bike:maint_type', kwargs={'pk': self.id})
@@ -443,7 +443,7 @@ class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
                            'description', 'due_date', 'distance')
 
     def __str__(self):
-        return f"{self.description or self.maint_type}"
+        return f"{self.bike}: {self.description or self.maint_type}"
 
     def get_absolute_url(self):
         return reverse('bike:maint', kwargs={'pk': self.id})
