@@ -8,6 +8,8 @@
 <table class="table-sm">
 <tr><td colspan="8">Rides selection:
 <input type="submit" class="btn btn-link" value="Apply Filter">
+<input type="submit" class="btn btn-link" value="Download as CSV"
+    formaction="{% url 'bike:rides' %}?action=download_as_csv">
 </td></tr>
 
 {% if form.non_field_errors %}
@@ -25,11 +27,7 @@
   </div><td>
 {% endfor %}
 </tr></table>
-<br>
-<h3>Rides
-<input type="submit" class="btn btn-primary" value="Download as CSV"
-    formaction="{% url 'bike:rides' %}?action=download_as_csv">
-</h3>
+<br><p>Selected rides:</p>
 </form>
 
 
