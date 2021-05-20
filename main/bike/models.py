@@ -352,7 +352,10 @@ class ComponentType(models.Model):
     subtype_of = models.ForeignKey('ComponentType', related_name='subtypes',
                                    on_delete=models.PROTECT,
                                    blank=True, null=True)
-    maintenance_type = models.ManyToManyField('MaintenanceType')
+
+    class Meta:
+        # INVALID: causes infinite loop ordering = ['subtype_of']
+        pass
 
     def __str__(self):
         return str(self.type)
@@ -403,7 +406,8 @@ class MaintIntervalMixin(models.Model):
 class MaintenanceType(MaintIntervalMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_types')
-    component_type = models.ForeignKey(ComponentType, on_delete=models.CASCADE)
+    component_type = models.ForeignKey(ComponentType, on_delete=models.PROTECT,
+                                       related_name='maintenance_type')
     activity = models.CharField(max_length=200)
     reference_info = models.CharField(max_length=300, blank=True, null=True)
     recurring = models.BooleanField(default=False)

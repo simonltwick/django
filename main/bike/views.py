@@ -613,6 +613,9 @@ class MaintTypeCreate(BikeLoginRequiredMixin, CreateView):
         form = super(MaintTypeCreate, self).get_form(*args, **kwargs)
         form.fields['component_type'].queryset = \
             self.request.user.component_types
+        if 'component_type' in self.request.GET:
+            form.fields['component_type'].initial = \
+                self.request.GET['component_type']
         return form
 
     def get_initial(self):

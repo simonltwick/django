@@ -15,8 +15,13 @@
    {% else %}
    formaction="{% url 'bike:component_type_new' %}?success={% url 'bike:component_types' %}">
    {% endif %}
+<a class="btn btn-secondary" href="{% url 'bike:component_type_new' %}">
+   Add another component type
+</a>
 </form>
- 
+
+{% if componenttype %}
+
 {% for subcomponent in subcomponent_types %}
   {% if forloop.first %}
   <h3>Sub-component-types</h3>
@@ -34,16 +39,24 @@
 {% empty %}
   <p>(no sub-component-types)</p>
 {% endfor %}
-
-{% if componenttype %}
-<p><a class="btn btn-secondary"
-	  href="{% url 'bike:component_type_new' %}?subtype_of={{ componenttype.id }}&success={% url 'bike:component_type' componenttype.id %}">
+<a href="{% url 'bike:component_type_new' %}?subtype_of={{ componenttype.id }}&success={% url 'bike:component_type' componenttype.id %}">
 	Add sub-component-type
    </a>
-</p>
-{% endif %}
-<a class="btn btn-secondary" href="{% url 'bike:component_type_new' %}">
-   Add another component type
+
+{% for maint_type in componenttype.maintenance_type.all %}
+  {% if forloop.first %}
+  <h3>Maintenance types</h3>
+  <ul>
+  {% endif %}
+  <li><a href="{% url 'bike:maint_type' maint_type.id %}">{{ maint_type }}</a>
+  </li>
+  {% if forloop.last %}</ul>{% endif %}
+{% empty %}
+  <p>(no maintenance types)</p>
+{% endfor %}
+<a href="{% url 'bike:maint_type_new' %}?next={% url 'bike:component_type' componenttype.id %}&component_type={{ componenttype.id }}">
+   Add maintenance type
 </a>
+{% endif %}
 
 {% endblock %}
