@@ -12,4 +12,10 @@ admin.site.register(Bike)
 admin.site.register(Odometer)
 admin.site.register(Preferences)
 admin.site.register(MaintenanceAction)
-admin.site.register(MaintenanceActionHistory)
+# admin.site.register(MaintenanceActionHistory)
+
+
+@admin.register(MaintenanceActionHistory)
+class MaintActionHistoryAdmin(admin.ModelAdmin):
+    readonly_fields=('action',)
+    fields=('action', 'date', 'distance', 'distance_units')
