@@ -395,9 +395,12 @@ class Component(models.Model):
 
 
 class MaintIntervalMixin(models.Model):
-    maintenance_interval = models.PositiveIntegerField(null=True, blank=True)
-    maint_interval_units = models.PositiveSmallIntegerField(
+    maintenance_interval_distance = models.PositiveIntegerField(
+        null=True, blank=True)
+    maint_interval_distance_units = models.PositiveSmallIntegerField(
         choices=IntervalUnits.CHOICES, null=True, blank=True)
+    maint_interval_days = models.PositiveSmallIntegerField(
+        null=True, blank=True)
 
     class Meta:
         abstract = True
@@ -406,17 +409,17 @@ class MaintIntervalMixin(models.Model):
 class MaintenanceType(MaintIntervalMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_types')
-    component_type = models.ForeignKey(ComponentType, on_delete=models.PROTECT,
+    component_type = models.ForeignKey(ComponentType, on_delete=models.CASCADE,
                                        related_name='maintenance_type')
-    activity = models.CharField(max_length=200)
+    description = models.CharField(max_length=200)
     reference_info = models.CharField(max_length=300, blank=True, null=True)
     recurring = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ['component_type', 'activity']
+        unique_together = ['component_type', 'description']
 
     def __str__(self):
-        return f'{self.component_type} - {self.activity}'
+        return f'{self.component_type} - {self.description}'
 
     def get_absolute_url(self):
         return reverse('bike:maint_type', kwargs={'pk': self.id})
@@ -428,17 +431,16 @@ class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_actions')
     bike = models.ForeignKey(Bike, related_name="maint_actions",
-                             on_delete=models.SET_NULL,
-                             null=True, blank=True)
+                             on_delete=models.SET_NULL, null=True, blank=True)
     component = models.ForeignKey(
         Component, on_delete=models.CASCADE, null=True, blank=True,
         help_text='you only need to specify one of bike or component.')
     maint_type = models.ForeignKey(MaintenanceType, on_delete=models.SET_NULL,
                                    blank=True, null=True)
-    description = models.CharField(max_length=100, blank=True, null=True)
-    due_date = models.DateField(null=True, blank=True,
-                                default=dt.date.today)
+    description = models.CharField(max_length=200, blank=True, null=True)
+    recurring = models.BooleanField(default=False)
     completed = models.BooleanField(default=False)
+    due_date = models.DateField(null=True, blank=True, default=dt.date.today)
     completed_date = models.DateField(null=True, blank=True)
     completed_distance = models.FloatField(null=True, blank=True)
 
@@ -474,9 +476,13 @@ class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
 
 class MaintenanceActionHistory(DistanceMixin):
     # distance, distance_units - DistanceMixin
+    component = models.ForeignKey(
+        Component, on_delete=models.CASCADE, null=True, blank=True,
+        help_text='you only need to specify one of bike or component.')
     action = models.ForeignKey(MaintenanceAction, on_delete=models.PROTECT,
                                related_name="maintenance_action")
-    date = models.DateField(null=True, blank=True)
+    description = models.CharField(max_length=200, blank=True, null=True)
+    completed_date = models.DateField(null=True, blank=True)
 
     def clean(self):
         if self.completed_date is None and self.completed_distance is None:
