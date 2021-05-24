@@ -19,7 +19,8 @@ from .models import (
     DistanceUnits, MaintenanceType, Odometer,
     )
 from .forms import (
-    RideSelectionForm, RideForm, MaintenanceActionUpdateForm,
+    RideSelectionForm, RideForm,
+    MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm)
 
 log = logging.getLogger(__name__)
@@ -580,12 +581,17 @@ def maint_action_update(request, pk: int):
         form = MaintenanceActionUpdateForm(
             request.POST, instance=maintenanceaction)
         if form.is_valid():
-            form.save()
+            maintenanceaction = form.save()
             if 'next' in request.GET:
                 return HttpResponseRedirect(request.GET['next'])
+
+    completion_form = MaintCompletionDetailsForm(initial={
+        'completed_date': timezone.now().date(),
+        'distance': maintenanceaction.current_bike_odo()})
     return render(
         request, 'bike/maintenanceaction_form.html',
-        context={'form': form, 'maintenanceaction': maintenanceaction})
+        context={'form': form, 'maintenanceaction': maintenanceaction,
+                 'completion_form': completion_form})
 
 
 @login_required
@@ -593,11 +599,28 @@ def maint_action_complete(request, pk: int):
     """ mark a maintenance action as complete """
     if request.method == "GET":
         return HttpResponse("Invalid method", status=405)
+
     maint_action = get_object_or_404(
         MaintenanceAction, pk=pk, user=request.user)
-    maint_action_form = MaintenanceActionUpdateForm(request.POST,
-                                                    instance=maint_action)
-    return HttpResponse("Not Implemented", status=501)
+    maint_action_form = MaintenanceActionUpdateForm(
+        request.POST, instance=maint_action)
+    completion_form = MaintCompletionDetailsForm(request.POST)
+    if maint_action_form.is_valid() and completion_form.is_valid():
+        comp_date = completion_form.cleaned_data['completed_date']
+        comp_distance = completion_form.cleaned_data['distance']
+        maint_history = maint_action.maint_completed(comp_date, comp_distance)
+        completion_form = MaintCompletionDetailsForm(initial={
+        'completed_date': timezone.now().date(),
+        'distance': maint_action.current_bike_odo()})
+        maint_action_form = MaintenanceActionUpdateForm(instance=maint_action)
+    else:
+        maint_history = ''
+    
+    return render(
+        request, 'bike/maintenanceaction_form.html',
+        context={'form': maint_action_form, 'maintenanceaction': maint_action,
+                 'completion_form': completion_form,
+                 'completion_msg': maint_history})
 
 
 class MaintActionUpdate(BikeLoginRequiredMixin, UpdateView):

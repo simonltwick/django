@@ -335,15 +335,6 @@ class Odometer(DistanceRequiredMixin):
                 .first())
 
 
-class IntervalUnits:
-    MILES = 101
-    KILOMETRES = 102
-    DAYS = 103
-    YEARS = 104
-    CHOICES = ((MILES, 'Miles'), (KILOMETRES, 'Kilometres'),
-               (DAYS, 'Days'), (YEARS, 'Years'))
-
-
 class ComponentType(models.Model):
     type = models.CharField(max_length=100, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE,
@@ -398,7 +389,7 @@ class MaintIntervalMixin(models.Model):
     maintenance_interval_distance = models.PositiveIntegerField(
         null=True, blank=True)
     maint_interval_distance_units = models.PositiveSmallIntegerField(
-        choices=IntervalUnits.CHOICES, null=True, blank=True)
+        choices=DistanceUnits.choices(), null=True, blank=True)
     maint_interval_days = models.PositiveSmallIntegerField(
         null=True, blank=True)
 
@@ -425,7 +416,7 @@ class MaintenanceType(MaintIntervalMixin):
         return reverse('bike:maint_type', kwargs={'pk': self.id})
 
 
-class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
+class MaintenanceAction(MaintIntervalMixin):
     # distance, distance_units - DistanceMixin
     # maintenance_interval, maint_interval_units - MaintIntervalMixin
     user = models.ForeignKey(User, on_delete=models.CASCADE,
@@ -442,6 +433,8 @@ class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
     completed = models.BooleanField(default=False)
     due_date = models.DateField(null=True, blank=True, default=dt.date.today)
     due_distance = models.FloatField(null=True, blank=True)
+    distance_units = models.PositiveSmallIntegerField(
+        choices=DistanceUnits.choices(), default=DistanceUnits.MILES)
     # completed_date & distance will be removed after data migration
     # DistanceMixin will be moreved after data migration
     completed_date = models.DateField(null=True, blank=True)
@@ -449,7 +442,7 @@ class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
 
     class Meta:
         unique_together = ('user', 'bike', 'component', 'maint_type',
-                           'description', 'due_date', 'distance')
+                           'description', 'due_date', 'due_distance')
 
     def __str__(self):
         return f"{self.bike}: {self.description or self.maint_type}"
@@ -476,26 +469,20 @@ class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
                    .all())
         return history
 
-    def maint_completed(self, comp_date: Optional[dt.date]=None,
-                        comp_distance: float=None):
+    def maint_completed(
+            self, comp_date: Optional[dt.date]=None, comp_distance: float=None
+            ) -> "MaintenanceActionHistory":
         """ record completion of a maintenance activity.
         This creates a MaintenanceActionHistory record.
         For non-recurring maintenance actions, the maint. action itself is
         also marked as complete.
         For recurring maint actions, the due date & distance are updated."""
         comp_date = comp_date or timezone.now().date()
-        if self.bike:
-            # completed distance defaults to bike's current_odo, in the
-            # distance units for the maint action
-            bike_odo = self.bike.current_odo
-            if self.user.preferences.distance_units != self.distance_units:
-                bike_odo = DistanceUnits.convert(
-                    bike_odo, self.user.preference.distance_units,
-                    self.distance_units)
-                comp_distance = comp_distance or bike_odo
+        comp_distance = comp_distance or self.current_bike_odo()
         history = MaintenanceActionHistory(
-            bike=self.bike, component=self.component, action=self,
-            description=self.description, completed_date=comp_date,
+            bike_id=self.bike_id, component_id=self.component_id, action=self,
+            description=self.description or self.maint_type,
+            completed_date=comp_date,
             distance=comp_distance, distance_units=self.distance_units)
         if not self.recurring:
             self.completed=True
@@ -514,8 +501,21 @@ class MaintenanceAction(DistanceMixin, MaintIntervalMixin):
                 self.due_distance = comp_distance + maint_interval_distance
             else:
                 self.due_distance = None
-            self.save(commit=False)
         history.save()
+        self.save()
+        return history
+
+    def current_bike_odo(self):
+        if (bike := self.bike) is None:
+            return None
+        # completed distance defaults to bike's current_odo, in the
+        # distance units for the maint action
+        bike_odo = bike.current_odo
+        if self.user.preferences.distance_units != self.distance_units:
+            bike_odo = DistanceUnits.convert(
+                bike_odo, self.user.preference.distance_units,
+                self.distance_units)
+        return bike_odo
 
 
 class MaintenanceActionHistory(DistanceMixin):
@@ -540,9 +540,9 @@ class MaintenanceActionHistory(DistanceMixin):
         verbose_name_plural = "Maintenance action history"
 
     def __str__(self):
-        when = self.date or f"{self.distance} {self.distance_units.display}"
+        when = (self.completed_date or
+                f"{self.distance} {self.distance_units.display}")
         return f"{self.action} on {when}"
-
 
 
 class ComponentChange(DistanceMixin):

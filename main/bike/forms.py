@@ -3,7 +3,8 @@ from django.forms import modelformset_factory
 import datetime as dt
 import logging
 
-from .models import Component, Ride, Odometer, MaintenanceAction
+from .models import (
+    Component, Ride, Odometer, MaintenanceAction, MaintenanceActionHistory)
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -114,5 +115,12 @@ class DateTimeForm(forms.Form):
 class MaintenanceActionUpdateForm(forms.ModelForm):
     class Meta:
         model = MaintenanceAction
-        fields = ['description', 'due_date', 'distance', 'distance_units']
+        fields = ['description', 'due_date', 'due_distance', 'distance_units',
+                  'recurring', 'maintenance_interval_distance',
+                  'maint_interval_distance_units', 'maint_interval_days']
 
+
+class MaintCompletionDetailsForm(forms.ModelForm):
+    class Meta:
+        model = MaintenanceActionHistory
+        fields = ['completed_date', 'distance']

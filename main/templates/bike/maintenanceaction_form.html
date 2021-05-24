@@ -5,34 +5,39 @@
 <form method='POST'>
 <table class="table">
 {% if maintenanceaction %}
-<p>Bike:{{ maintenanceaction.bike|default_if_none:"-" }};
+  <p>Bike:{{ maintenanceaction.bike|default_if_none:"-" }};
   Component:{{ maintenanceaction.component|default_if_none:"-" }};
   Maintenance type:{{ maintenanceaction.maint_type }}</p>
 {% endif %}
 {{ form }}
-{% if maintenanceaction.completed %}<p>This action was completed
+{% if maintenanceaction.completed %}<p>This maintenance action is complete.
   {% if maintenanceaction.completed_date %}on {{ maintenanceaction.completed_date }}{% endif %}
   {% if maintenanceaction.completed_distance %}
     at {{ maintenanceaction.completed_distance }}
     {{ maintenanceaction.maint_interval_distance_units }}
-{% endif %}
+  {% endif %}
 </p>{% endif %}
-{% csrf_token %}
-</table>
+  {% csrf_token %}
+  </table>
 
   <p>
   <input type="submit" class="btn btn-primary" value="Save">
 
   {% if maintenanceaction %}
-  <input type="submit" class="btn btn-primary" value="Mark as Done"
-    formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
-  <a class="btn btn-danger" href="{% url 'bike:maint_delete' maintenanceaction.id %}">
-  Delete</a>
-  <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?component_type={{ maintenanceaction.component.type_id }}&next={% url 'bike:maint' maintenanceaction.id %}">
-  New maint. type</a>
-{% else %}
-  <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?next={% url 'bike:maint_new' %}">
-  New maint. type</a>
+     <a class="btn btn-danger" href="{% url 'bike:maint_delete' maintenanceaction.id %}">
+    Delete</a>
+    <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?component_type={{ maintenanceaction.component.type_id }}&next={% url 'bike:maint' maintenanceaction.id %}">
+    New maint. type</a>
+    </p><p>
+    {% if completion_msg %}Completed: {{ completion_msg }}</p><p>{% endif %}
+    {% if not maintenanceaction.completed %}
+      <input type="submit" class="btn btn-primary" value="Mark as Done"
+      formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
+      {{ completion_form }} {{ maintenanceaction.get_distance_units_display }}
+    {% endif %}
+  {% else %}
+    <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?next={% url 'bike:maint_new' %}">
+    New maint. type</a>
   {% endif %}
 
   </p>

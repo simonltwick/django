@@ -17,9 +17,9 @@
 
 {% for action in maint_history %}
   {% if forloop.first %}<h3>Maintenance history</h3><ul>{% endif %}
-  <li>{{ action.date }}
-    {% if action.distance %}
-	  {{ action.distance}} {{ action.distance_units_display }}
+  <li>{{ action.due_date }}
+    {% if action.due_distance %}
+	  {{ action.due_distance}} {{ action.distance_units_display }}
     {% endif %}
     <a href="{% url 'bike:maint' action.id %}">{{ action }}</a></li>
   {% if forloop.last %}</ul>{% endif %}
