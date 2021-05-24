@@ -3,7 +3,7 @@ from django.forms import modelformset_factory
 import datetime as dt
 import logging
 
-from .models import Component, Ride, Odometer
+from .models import Component, Ride, Odometer, MaintenanceAction
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -109,3 +109,10 @@ OdometerFormSet = modelformset_factory(
 class DateTimeForm(forms.Form):
     reading_date_time = forms.DateTimeField(
         label='Reading date & time', initial=dt.datetime.now)
+
+
+class MaintenanceActionUpdateForm(forms.ModelForm):
+    class Meta:
+        model = MaintenanceAction
+        fields = ['description', 'due_date', 'distance', 'distance_units']
+

@@ -19,7 +19,7 @@ from .models import (
     DistanceUnits, MaintenanceType, Odometer,
     )
 from .forms import (
-    RideSelectionForm, RideForm,
+    RideSelectionForm, RideForm, MaintenanceActionUpdateForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm)
 
 log = logging.getLogger(__name__)
@@ -532,9 +532,9 @@ class MaintActionList(BikeLoginRequiredMixin, ListView):
 
 class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceAction
-    fields = ['bike', 'component', 'maint_type', 'description', 'due_date',
-              'distance', 'distance_units', 'completed', 'completed_date',
-              'completed_distance']
+    fields = ['bike', 'component', 'maint_type', 'description', 'recurring',
+              'due_date', 'distance', 'distance_units',
+              'completed', 'completed_date', 'completed_distance']
 
     def get_form(self, *args, **kwargs):
         form = super(MaintActionCreate, self).get_form(*args, **kwargs)
@@ -558,6 +558,10 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     def form_valid(self, form):
         obj = form.save(commit=False)
         obj.user = self.request.user
+        if obj.completed:
+            obj.mark_completed(obj.completed_date, obj.completed_distance)
+            if obj.recurring:
+                obj.completed = False
         return super(MaintActionCreate, self).form_valid(form)
 
     def get_success_url(self):
@@ -566,9 +570,39 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
         return super(MaintActionCreate, self).get_success_url()
 
 
+@login_required
+def maint_action_update(request, pk: int):
+    maintenanceaction = get_object_or_404(MaintenanceAction, pk=pk,
+                             user=request.user)
+    if request.method == 'GET':
+        form = MaintenanceActionUpdateForm(instance=maintenanceaction)
+    elif request.method == 'POST':
+        form = MaintenanceActionUpdateForm(
+            request.POST, instance=maintenanceaction)
+        if form.is_valid():
+            form.save()
+            if 'next' in request.GET:
+                return HttpResponseRedirect(request.GET['next'])
+    return render(
+        request, 'bike/maintenanceaction_form.html',
+        context={'form': form, 'maintenanceaction': maintenanceaction})
+
+
+@login_required
+def maint_action_complete(request, pk: int):
+    """ mark a maintenance action as complete """
+    if request.method == "GET":
+        return HttpResponse("Invalid method", status=405)
+    maint_action = get_object_or_404(
+        MaintenanceAction, pk=pk, user=request.user)
+    maint_action_form = MaintenanceActionUpdateForm(request.POST,
+                                                    instance=maint_action)
+    return HttpResponse("Not Implemented", status=501)
+
+
 class MaintActionUpdate(BikeLoginRequiredMixin, UpdateView):
     model = MaintenanceAction
-    fields = MaintActionCreate.fields
+    fields = ['description', 'due_date', 'distance', 'distance_units']
 
     def get_success_url(self):
         if 'next' in self.request.GET:
