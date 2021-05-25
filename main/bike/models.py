@@ -478,7 +478,8 @@ class MaintenanceAction(MaintIntervalMixin):
             bike_id=self.bike_id, component_id=self.component_id, action=self,
             description=self.description or self.maint_type,
             completed_date=comp_date,
-            distance=comp_distance, distance_units=self.distance_units)
+            distance=comp_distance,
+            distance_units=self.maint_interval_distance_units)
         if not self.recurring:
             self.completed=True
         else:
@@ -488,11 +489,6 @@ class MaintenanceAction(MaintIntervalMixin):
                 self.due_date = None
             if self.maintenance_interval_distance:
                 maint_interval_distance = self.maintenance_interval_distance
-                if self.distance_units != self.maint_interval_distance_units:
-                    maint_interval_distance = DistanceUnits.convert(
-                        maint_interval_distance,
-                        self.maint_interval_distance_units,
-                        self.distance_units)
                 self.due_distance = comp_distance + maint_interval_distance
             else:
                 self.due_distance = None
@@ -506,10 +502,11 @@ class MaintenanceAction(MaintIntervalMixin):
         # completed distance defaults to bike's current_odo, in the
         # distance units for the maint action
         bike_odo = bike.current_odo
-        if self.user.preferences.distance_units != self.distance_units:
+        if (self.user.preferences.distance_units != 
+                self.maint_interval_distance_units):
             bike_odo = DistanceUnits.convert(
                 bike_odo, self.user.preference.distance_units,
-                self.distance_units)
+                self.maint_interval_distance_units)
         return bike_odo
 
 
