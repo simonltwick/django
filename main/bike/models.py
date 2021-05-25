@@ -433,13 +433,6 @@ class MaintenanceAction(MaintIntervalMixin):
     completed = models.BooleanField(default=False)
     due_date = models.DateField(null=True, blank=True, default=dt.date.today)
     due_distance = models.FloatField(null=True, blank=True)
-    distance = models.FloatField(null=True, blank=True, help_text='legacy')
-    distance_units = models.PositiveSmallIntegerField(
-        choices=DistanceUnits.choices(), default=DistanceUnits.MILES)
-    # completed_date & distance will be removed after data migration
-    # DistanceMixin will be moreved after data migration
-    completed_date = models.DateField(null=True, blank=True, help_text='legacy')
-    completed_distance = models.FloatField(null=True, blank=True, help_text='legacy')
 
     class Meta:
         unique_together = ('user', 'bike', 'component', 'maint_type',

@@ -20,8 +20,9 @@ class MaintActionAdmin(admin.ModelAdmin):
     readonly_fields=('bike', 'component', 'maint_type')
     fields=('bike', 'component', 'maint_type',
             'description', 'completed', 
-            'due_date', 'due_distance', 'distance', 
-            'completed_distance', 'distance_units', 'completed_date',
+            'due_date', 'due_distance',
+            # 'distance', 
+            # 'completed_distance', 'distance_units', 'completed_date',
             'recurring', 'maintenance_interval_distance',
             'maint_interval_distance_units', 'maint_interval_days', )
 

@@ -115,10 +115,12 @@ class DateTimeForm(forms.Form):
 class MaintenanceActionUpdateForm(forms.ModelForm):
     class Meta:
         model = MaintenanceAction
-        fields = ['description', 'due_date', 'due_distance', 'distance_units',
+        fields = ['description', 'due_date', 'due_distance',
+                  # 'distance_units',
                   'recurring', 'maintenance_interval_distance',
                   'maint_interval_distance_units', 'maint_interval_days',
-                  'distance', 'completed_distance', 'completed_date']
+                  # 'distance', 'completed_distance', 'completed_date'
+                  ]
 
 
 class MaintCompletionDetailsForm(forms.ModelForm):
