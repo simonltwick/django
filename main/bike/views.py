@@ -241,7 +241,8 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
         context['maint'] = MaintenanceAction.objects.filter(
             bike_id=pk, completed=False)
         if pk is not None:
-            context['maint_history'] = MaintenanceAction.history(bike_id=pk)
+            context['maint_history'] = MaintenanceAction.history(
+                user=self.request.user, bike_id=pk)
         return context
 
     def form_valid(self, form):
@@ -612,6 +613,8 @@ def maint_action_complete(request, pk: int):
         completion_form = MaintCompletionDetailsForm(initial={
         'completed_date': timezone.now().date(),
         'distance': maint_action.current_bike_odo()})
+        # or maint_action_form.data[field_name]=new_value
+        # for due_distance and for completed
         maint_action_form = MaintenanceActionUpdateForm(instance=maint_action)
     else:
         maint_history = ''
