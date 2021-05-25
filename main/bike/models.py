@@ -451,13 +451,14 @@ class MaintenanceAction(MaintIntervalMixin):
         return reverse('bike:maint', kwargs={'pk': self.id})
 
     @classmethod
-    def history(cls, bike_id=None, component_id=None, order_by='-date'):
-        """ return a list of maintenance actions and a list of completion dates
+    def history(
+            cls, user, bike_id=None, component_id=None, order_by='-completed_date'):
+        """ return a list of maintenance action histories
         ordered by either date or maint action.
         """
-        if order_by not in {'-date', 'action_id'}:
+        if order_by not in {'-completed_date', 'action_id'}:
             raise ValueError(f"order_by: invalid value '{order_by}'")
-        actions = MaintenanceAction.objects
+        actions = MaintenanceAction.objects.filter(user=user)
         if bike_id is not None:
             actions = actions.filter(bike_id=bike_id)
         if component_id is not None:
