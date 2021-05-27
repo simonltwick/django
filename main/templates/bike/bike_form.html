@@ -11,18 +11,29 @@
 
 {% for action in maint %}
   {% if forloop.first %}<h3>Maintenance actions</h3><ul>{% endif %}
-  <li><a href="{% url 'bike:maint' action.id %}">{{ action }}</a></li>
+  <li><a href="{% url 'bike:maint' action.id %}">{{ action }}</a>
+  {% if action.due_date or action.due_distance %}
+  due
+    {{ action.due_date|default_if_none:"" }}
+    {% if action.due_date and action_due_distance %} or {% endif %}
+    {% if action.due_distance %}
+      at {{ action.due_distance }} {{ action.get_maint_interval_distance_units_display }}
+    {% endif %}
+  {% endif %}</li>
   {% if forloop.last %}</ul>{% endif %}
 {% endfor %}
 
 {% for action in maint_history %}
-  {% if forloop.first %}<h3>Maintenance history</h3><ul>{% endif %}
-  <li>{{ action.due_date }}
-    {% if action.due_distance %}
-	  {{ action.due_distance}} {{ action.distance_units_display }}
-    {% endif %}
-    <a href="{% url 'bike:maint' action.id %}">{{ action }}</a></li>
-  {% if forloop.last %}</ul>{% endif %}
+  {% if forloop.first %}<h3>Maintenance history</h3><table>{% endif %}
+  <tr><td>{{ action.completed_date }}</td>
+    
+    <td><a href="{% url 'bike:maint' action.id %}">{{ action }}</a></td>
+	<td>{% if action.distance %}
+	  {{ action.distance}} {{ action.distance_units_display }}
+      {% endif %}
+	</td>
+  </tr>
+  {% if forloop.last %}</table>{% endif %}
 {% endfor %}
  
 {% for subcomponent in components %}
