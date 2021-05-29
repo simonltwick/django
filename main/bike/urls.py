@@ -28,6 +28,11 @@ urlpatterns = [
          name='maint_complete'),
     path('maint/<int:pk>/delete', views.MaintActionDelete.as_view(),
          name='maint_delete'),
+    
+    path('maint/history/<int:pk>', views.MaintHistoryUpdate.as_view(),
+         name='maint_history'),
+    path('maint/history/<int:pk>/delete', views.MaintHistoryDelete.as_view(),
+         name='maint_history_delete'),
 
     path('maint_types', views.MaintTypeList.as_view(), name='maint_types'),
     path('maint_type/new', views.MaintTypeCreate.as_view(),

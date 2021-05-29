@@ -1,0 +1,32 @@
+{% extends 'bike/base.html' %}
+
+{% block content %}
+<h1>Maintenance Action History: {{ maintenanceactionhistory.action }}</h1>
+<form method='POST'>
+  {% csrf_token %}
+{% if maintenanceactionhistory %}
+  <p>Bike:{{ maintenanceactionhistory.bike|default_if_none:"-" }};
+  Component:{{ maintenanceactionhistory.component|default_if_none:"-" }};
+  Maintenance type:{{ maintenanceactionhistory.action }}</p>
+{% endif %}
+
+Completion details:
+
+<!-- table class="table" -->
+  {{ form }}
+  {{ maintenanceactionhistory.get_distance_units_display }}
+<!-- /table -->
+
+  <p>
+  <input type="submit" class="btn btn-primary" value="OK">
+
+  {% if maintenanceactionhistory %}
+     <a class="btn btn-danger"
+	   href="{% url 'bike:maint_history_delete' maintenanceactionhistory.id %}?success={% url 'bike:bike' maintenanceactionhistory.bike_id %}">
+    Delete</a>
+  {% endif %}
+
+  </p>
+</form>
+
+{% endblock %}

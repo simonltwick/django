@@ -16,7 +16,7 @@ from typing import List, Tuple, Optional
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
-    DistanceUnits, MaintenanceType, Odometer,
+    DistanceUnits, MaintenanceActionHistory, MaintenanceType, Odometer,
     )
 from .forms import (
     RideSelectionForm, RideForm,
@@ -653,6 +653,41 @@ class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
             return HttpResponse("Unauthorised maint. action", status=401)
         return super(
             MaintActionDelete, self).dispatch(request, *args, **kwargs)
+
+
+class MaintHistoryUpdate(BikeLoginRequiredMixin, UpdateView):
+    model = MaintenanceActionHistory
+    fields = ['description', 'completed_date', 'distance']
+
+    def get_success_url(self):
+        try:
+            return self.request.GET['success']
+        except KeyError:
+            return super(MaintHistoryUpdate, self).get_success_url()
+
+    def dispatch(self, request, *args, **kwargs):
+        if not MaintenanceActionHistory.objects.filter(
+                pk=kwargs['pk'], action__user=request.user).exists():
+            return HttpResponse("Unauthorised maint. history", status=401)
+        return super(
+            MaintHistoryUpdate, self).dispatch(request, *args, **kwargs)
+
+
+class MaintHistoryDelete(BikeLoginRequiredMixin, DeleteView):
+    model = MaintenanceActionHistory
+
+    def dispatch(self, request, *args, **kwargs):
+        if not MaintenanceActionHistory.objects.filter(
+                pk=kwargs['pk'], action__user=request.user).exists():
+            return HttpResponse("Unauthorised maint. history", status=401)
+        return super(
+            MaintHistoryDelete, self).dispatch(request, *args, **kwargs)
+
+    def get_success_url(self):
+        try:
+            return self.request.GET['success']
+        except KeyError:
+            return super(MaintHistoryDelete, self).get_success_url()
 
 
 class MaintTypeList(BikeLoginRequiredMixin, ListView):

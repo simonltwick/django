@@ -8,7 +8,6 @@
 {% csrf_token %}
 </table>
 
-
 {% for action in maint %}
   {% if forloop.first %}<h3>Maintenance actions</h3><ul>{% endif %}
   <li><a href="{% url 'bike:maint' action.id %}">{{ action }}</a>
@@ -27,7 +26,8 @@
   {% if forloop.first %}<h3>Maintenance history</h3><table>{% endif %}
   <tr><td>{{ action.completed_date }}</td>
     
-    <td><a href="{% url 'bike:maint' action.id %}">{{ action }}</a></td>
+    <td><a href="{% url 'bike:maint_history' action.id %}?success={% url 'bike:bike' bike.id %}">
+	  {{ action.action }}</a></td>
 	<td>{% if action.distance %}
 	  {{ action.distance}} {{ action.distance_units_display }}
       {% endif %}

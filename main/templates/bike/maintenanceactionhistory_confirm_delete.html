@@ -1,0 +1,31 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ maintenanceactionhistory }} 
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ maintenanceactionhistory }}</h1>
+    <p>{{ maintenanceactionhistory.description }}
+    Completed {% if maintenanceactionhistory.completed_date %}
+	  on {{ maintenanceactionhistory.completed_date }}{% endif %}
+    {% if maintenanceactionhistory.distance %}
+	  at {{ maintenanceactionhistory.distance }}
+	  {{ maintenanceactionhistory.get_distance_units_display }}
+    {% endif %}
+	<p class="errormsg">This maintenance history item will be deleted.</p>
+<h2>Are you sure?</h2>
+
+<form method="post"> 
+
+	{% csrf_token %}
+	<table class="table">
+	{{ form }}
+	</table>
+	<p>
+	<input type="submit" class="btn btn-danger" value="Delete">
+	</p>
+</form>
+
+{% endblock %}
