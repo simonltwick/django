@@ -3,9 +3,29 @@
 {% block content %}
 <h1>Maintenance Type details:</h1>
 <form method='POST'>
-<table class="table">
-{{ form }}
 {% csrf_token %}
+
+<table class="table">
+{{ form.non_field_errors }}
+{% for hidden_field in form.hidden_fields %}
+    {{ hidden_field.errors }}
+    {{ hidden_field }}
+{% endfor %}
+
+{% for field in form.visible_fields %}
+<tr> 
+  <th>{{ field.label_tag }}</th>
+  <td>
+  {{ field.errors }}
+  {{ field }}
+  {% if field.name == 'maintenance_interval_distance' %}
+  {{ distance_units }}
+  {% endif %}
+  {{ field.help_text }}
+  </td>
+</tr>
+{% endfor %}
+
 </table>
 
   <p>

@@ -534,9 +534,10 @@ class MaintActionList(BikeLoginRequiredMixin, ListView):
 
 class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceAction
-    fields = ['bike', 'component', 'maint_type', 'description', 'recurring',
-              'due_date', 'distance', 'distance_units',
-              'completed', 'completed_date', 'completed_distance']
+    fields = ['bike', 'component', 'maint_type', 'description', 'due_date',
+              'due_distance', 'completed', 'recurring', 
+              'maintenance_interval_distance', 'maint_interval_distance_units',
+              'maint_interval_days']
 
     def get_form(self, *args, **kwargs):
         form = super(MaintActionCreate, self).get_form(*args, **kwargs)
@@ -571,6 +572,14 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
             return self.request.GET['next']
         return super(MaintActionCreate, self).get_success_url()
 
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super().get_context_data(**kwargs)
+        # Add in a QuerySet of all the books
+        context['distance_units'] = (self.request.user.preferences
+                                     .get_distance_units_display())
+        return context
+
 
 @login_required
 def maint_action_update(request, pk: int):
@@ -589,10 +598,12 @@ def maint_action_update(request, pk: int):
     completion_form = MaintCompletionDetailsForm(initial={
         'completed_date': timezone.now().date(),
         'distance': maintenanceaction.current_bike_odo()})
+    distance_units = request.user.preferences.get_distance_units_display()
     return render(
         request, 'bike/maintenanceaction_form.html',
         context={'form': form, 'maintenanceaction': maintenanceaction,
-                 'completion_form': completion_form})
+                 'completion_form': completion_form,
+                 'distance_units': distance_units})
 
 
 @login_required
@@ -625,7 +636,7 @@ def maint_action_complete(request, pk: int):
                  'completion_form': completion_form,
                  'completion_msg': maint_history})
 
-
+"""
 class MaintActionUpdate(BikeLoginRequiredMixin, UpdateView):
     model = MaintenanceAction
     fields = ['description', 'due_date', 'distance', 'distance_units']
@@ -640,7 +651,7 @@ class MaintActionUpdate(BikeLoginRequiredMixin, UpdateView):
                 pk=kwargs['pk'], user=request.user).exists():
             return HttpResponse("Unauthorised maint. action", status=401)
         return super(
-            MaintActionUpdate, self).dispatch(request, *args, **kwargs)
+            MaintActionUpdate, self).dispatch(request, *args, **kwargs)"""
 
 
 class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
@@ -692,7 +703,7 @@ class MaintHistoryDelete(BikeLoginRequiredMixin, DeleteView):
 
 class MaintTypeList(BikeLoginRequiredMixin, ListView):
     model = MaintenanceType
-    ordering = ('component_type', 'recurring', 'activity',)
+    ordering = ('component_type', 'recurring', 'description',)
 
     def get_queryset(self):
         return (MaintenanceType.objects.filter(user=self.request.user)
@@ -701,8 +712,9 @@ class MaintTypeList(BikeLoginRequiredMixin, ListView):
 
 class MaintTypeCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceType
-    fields = ('component_type', 'activity', 'reference_info', 'recurring',
-              'maintenance_interval', 'maint_interval_units')
+    fields = ('component_type', 'description', 'reference_info', 'recurring',
+              'maintenance_interval_distance', 'maint_interval_distance_units',
+              'maint_interval_days')
 
     def get_form(self, *args, **kwargs):
         form = super(MaintTypeCreate, self).get_form(*args, **kwargs)
@@ -723,6 +735,14 @@ class MaintTypeCreate(BikeLoginRequiredMixin, CreateView):
             initial = initial.copy()
             initial['component_type'] = ctype
         return initial
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super().get_context_data(**kwargs)
+        # Add in a QuerySet of all the books
+        context['distance_units'] = (self.request.user.preferences
+                                     .get_distance_units_display())
+        return context
 
     def form_valid(self, form):
         obj = form.save(commit=False)
@@ -751,6 +771,13 @@ class MaintTypeUpdate(BikeLoginRequiredMixin, UpdateView):
         return super(
             MaintTypeUpdate, self).dispatch(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super().get_context_data(**kwargs)
+        # Add in a QuerySet of all the books
+        context['distance_units'] = (self.request.user.preferences
+                                     .get_distance_units_display())
+        return context
 
 class MaintTypeDelete(BikeLoginRequiredMixin, DeleteView):
     model = MaintenanceType

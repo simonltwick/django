@@ -9,14 +9,37 @@
   Component:{{ maintenanceaction.component|default_if_none:"-" }};
   Maintenance type:{{ maintenanceaction.maint_type }}</p>
 {% endif %}
-{{ form }}
+
+{{ form.non_field_errors }}
+{% for hidden_field in form.hidden_fields %}
+    {{ hidden_field.errors }}
+    {{ hidden_field }}
+{% endfor %}
+
+{% for field in form.visible_fields %}
+<tr> 
+  <th>{{ field.label_tag }}</th>
+  <td>
+  {{ field.errors }}
+  {{ field }}
+  {% if field.name == 'maintenance_interval_distance' or field.name == 'due_distance' %}
+  {{ distance_units }}
+  {% endif %}
+  {{ field.help_text }}
+  </td>
+</tr>
+{% endfor %}
+
 {% if maintenanceaction.completed %}<p>This maintenance action is complete.
-  {% if maintenanceaction.completed_date %}on {{ maintenanceaction.completed_date }}{% endif %}
+  {% if maintenanceaction.completed_date %}
+	on {{ maintenanceaction.completed_date }}
+  {% endif %}
   {% if maintenanceaction.completed_distance %}
     at {{ maintenanceaction.completed_distance }}
     {{ maintenanceaction.maint_interval_distance_units }}
-  {% endif %}
-</p>{% endif %}
+    / {{ distance_units }}
+  {% endif %}</p>
+{% endif %}
   {% csrf_token %}
   </table>
 
@@ -34,6 +57,7 @@
       <input type="submit" class="btn btn-primary" value="Mark as Done"
       formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
       {{ completion_form }} {{ maintenanceaction.get_distance_units_display }}
+      / {{ distance_units }}
     {% endif %}
   {% else %}
     <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?next={% url 'bike:maint_new' %}">
