@@ -16,7 +16,7 @@
     {{ action.due_date|default_if_none:"" }}
     {% if action.due_date and action_due_distance %} or {% endif %}
     {% if action.due_distance %}
-      at {{ action.due_distance }} {{ action.get_maint_interval_distance_units_display }}
+      at {{ action.due_distance }} {{ distance_units }}
     {% endif %}
   {% endif %}</li>
   {% if forloop.last %}</ul>{% endif %}

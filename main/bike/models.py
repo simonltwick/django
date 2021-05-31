@@ -388,8 +388,7 @@ class Component(models.Model):
 class MaintIntervalMixin(models.Model):
     maintenance_interval_distance = models.PositiveIntegerField(
         null=True, blank=True)
-    maint_interval_distance_units = models.PositiveSmallIntegerField(
-        choices=DistanceUnits.choices(), null=True, blank=True)
+    # distance units are set in preferences
     maint_interval_days = models.PositiveSmallIntegerField(
         null=True, blank=True)
 
@@ -398,6 +397,7 @@ class MaintIntervalMixin(models.Model):
 
 
 class MaintenanceType(MaintIntervalMixin):
+    # maintenance_interval_distance, maint_interval_days - MaintIntervalMixin
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_types')
     component_type = models.ForeignKey(ComponentType, on_delete=models.CASCADE,
@@ -418,7 +418,7 @@ class MaintenanceType(MaintIntervalMixin):
 
 class MaintenanceAction(MaintIntervalMixin):
     # distance, distance_units - DistanceMixin
-    # maintenance_interval, maint_interval_units - MaintIntervalMixin
+    # maintenance_interval_distance, maint_interval_days - MaintIntervalMixin
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_actions')
     bike = models.ForeignKey(Bike, related_name="maint_actions",
@@ -479,7 +479,7 @@ class MaintenanceAction(MaintIntervalMixin):
             description=self.description or self.maint_type,
             completed_date=comp_date,
             distance=comp_distance,
-            distance_units=self.maint_interval_distance_units)
+            distance_units=self.user.preferences.distance_units)
         if not self.recurring:
             self.completed=True
         else:
@@ -497,17 +497,9 @@ class MaintenanceAction(MaintIntervalMixin):
         return history
 
     def current_bike_odo(self):
-        if (bike := self.bike) is None:
-            return None
-        # completed distance defaults to bike's current_odo, in the
-        # distance units for the maint action
-        bike_odo = bike.current_odo
-        if (self.user.preferences.distance_units != 
-                self.maint_interval_distance_units):
-            bike_odo = DistanceUnits.convert(
-                bike_odo, self.user.preference.distance_units,
-                self.maint_interval_distance_units)
-        return bike_odo
+        if (bike := self.bike or self.component.bike):
+            return bike.current_odo
+        return None
 
 
 class MaintenanceActionHistory(DistanceMixin):
@@ -532,8 +524,11 @@ class MaintenanceActionHistory(DistanceMixin):
         verbose_name_plural = "Maintenance action history"
 
     def __str__(self):
-        when = (self.completed_date or
-                f"{self.distance} {self.distance_units.display}")
+        when = (f" on {self.completed_date}" if self.completed_date else None,
+                f"at {self.distance} {self.distance_units_display}"
+                if self.distance else None)
+        when = ' '.join(item for item in when
+                        if item is not None)
         return f"{self.action} on {when}"
 
 

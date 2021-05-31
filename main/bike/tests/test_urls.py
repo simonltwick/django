@@ -34,7 +34,7 @@ class BikeUrlTest(TestCase):
         self.client.login(username='tester', password='testpw')
 
     def test_home(self):
-        self.try_url(reverse('bike:home'), context={'preferences_set': False})
+        self.try_url(reverse('bike:home'), context={'preferences_set': True})
 
     def test_bike(self):
         bid = self.bike.id

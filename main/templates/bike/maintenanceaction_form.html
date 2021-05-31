@@ -36,8 +36,7 @@
   {% endif %}
   {% if maintenanceaction.completed_distance %}
     at {{ maintenanceaction.completed_distance }}
-    {{ maintenanceaction.maint_interval_distance_units }}
-    / {{ distance_units }}
+    {{ distance_units }}
   {% endif %}</p>
 {% endif %}
   {% csrf_token %}
@@ -56,8 +55,7 @@
     {% if not maintenanceaction.completed %}
       <input type="submit" class="btn btn-primary" value="Mark as Done"
       formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
-      {{ completion_form }} {{ maintenanceaction.get_distance_units_display }}
-      / {{ distance_units }}
+      {{ completion_form }} {{ distance_units }}
     {% endif %}
   {% else %}
     <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?next={% url 'bike:maint_new' %}">

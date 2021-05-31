@@ -240,6 +240,8 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
         context['components'] = Component.objects.filter(bike_id=pk)
         context['maint'] = MaintenanceAction.objects.filter(
             bike_id=pk, completed=False)
+        context['distance_units'] = (self.request.user.preferences
+                                     .get_distance_units_display())
         if pk is not None:
             context['maint_history'] = MaintenanceAction.history(
                 user=self.request.user, bike_id=pk)
@@ -536,8 +538,7 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceAction
     fields = ['bike', 'component', 'maint_type', 'description', 'due_date',
               'due_distance', 'completed', 'recurring', 
-              'maintenance_interval_distance', 'maint_interval_distance_units',
-              'maint_interval_days']
+              'maintenance_interval_distance', 'maint_interval_days']
 
     def get_form(self, *args, **kwargs):
         form = super(MaintActionCreate, self).get_form(*args, **kwargs)
@@ -617,13 +618,15 @@ def maint_action_complete(request, pk: int):
     maint_action_form = MaintenanceActionUpdateForm(
         request.POST, instance=maint_action)
     completion_form = MaintCompletionDetailsForm(request.POST)
+    distance_units = request.user.preferences.distance_units
     if maint_action_form.is_valid() and completion_form.is_valid():
         comp_date = completion_form.cleaned_data['completed_date']
         comp_distance = completion_form.cleaned_data['distance']
         maint_history = maint_action.maint_completed(comp_date, comp_distance)
         completion_form = MaintCompletionDetailsForm(initial={
         'completed_date': timezone.now().date(),
-        'distance': maint_action.current_bike_odo()})
+        'distance': maint_action.current_bike_odo(),
+        'distance_units': distance_units})
         # or maint_action_form.data[field_name]=new_value
         # for due_distance and for completed
         maint_action_form = MaintenanceActionUpdateForm(instance=maint_action)
@@ -634,24 +637,8 @@ def maint_action_complete(request, pk: int):
         request, 'bike/maintenanceaction_form.html',
         context={'form': maint_action_form, 'maintenanceaction': maint_action,
                  'completion_form': completion_form,
-                 'completion_msg': maint_history})
-
-"""
-class MaintActionUpdate(BikeLoginRequiredMixin, UpdateView):
-    model = MaintenanceAction
-    fields = ['description', 'due_date', 'distance', 'distance_units']
-
-    def get_success_url(self):
-        if 'next' in self.request.GET:
-            return self.request.GET['next']
-        return super(MaintActionUpdate, self).get_success_url()
-
-    def dispatch(self, request, *args, **kwargs):
-        if not MaintenanceAction.objects.filter(
-                pk=kwargs['pk'], user=request.user).exists():
-            return HttpResponse("Unauthorised maint. action", status=401)
-        return super(
-            MaintActionUpdate, self).dispatch(request, *args, **kwargs)"""
+                 'completion_msg': maint_history,
+                 'distance_units': distance_units})
 
 
 class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
@@ -713,8 +700,7 @@ class MaintTypeList(BikeLoginRequiredMixin, ListView):
 class MaintTypeCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceType
     fields = ('component_type', 'description', 'reference_info', 'recurring',
-              'maintenance_interval_distance', 'maint_interval_distance_units',
-              'maint_interval_days')
+              'maintenance_interval_distance', 'maint_interval_days')
 
     def get_form(self, *args, **kwargs):
         form = super(MaintTypeCreate, self).get_form(*args, **kwargs)
@@ -791,7 +777,6 @@ class MaintTypeDelete(BikeLoginRequiredMixin, DeleteView):
             MaintTypeDelete, self).dispatch(request, *args, **kwargs)
 
 
-# TODO: odometer display / entry / adjustment rides
 @login_required(login_url=LOGIN_URL)
 def mileage(request, year=None, bike_id=None):
     # odometer and recent mileage stuff for bikes / a bike ...
