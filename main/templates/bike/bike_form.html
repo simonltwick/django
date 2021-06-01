@@ -3,9 +3,10 @@
 {% block content %}
 <h1>Bike details:</h1>
 <form method='POST'>
+{% csrf_token %}
 <table class="table">
 {{ form }}
-{% csrf_token %}
+<th>Odometer</th><td>{{ bike.current_odo }} {{ distance_units }}</td>
 </table>
 
 {% for action in maint %}

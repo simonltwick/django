@@ -30,6 +30,11 @@ class Bike(models.Model):
     def __str__(self):
         return self.name
 
+    """ handling of current_odo and adjustment rides:
+        current_odo is intended to keep track of the calculated bike odometer,
+        based on last odo reading plus any subsequent rides.  It's updated by
+        Odometer.save, and by Ride.save, through update_current_odo which
+        recalculates based on last odometer reading plus subsequent rides. """
     def update_current_odo(self):
         last_odo = Odometer.previous_odo(self.id, timezone.now())
         date_after = last_odo.date if last_odo else None
@@ -237,6 +242,8 @@ class Odometer(DistanceRequiredMixin):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.update_adjustment_rides()
+        self.bike.update_current_odo()
+        self.bike.save()
 
     @classmethod
     def ride_updated(cls, ride):
@@ -439,7 +446,8 @@ class MaintenanceAction(MaintIntervalMixin):
                            'description', 'due_date', 'due_distance')
 
     def __str__(self):
-        return f"{self.bike}: {self.description or self.maint_type}"
+        return (f"{self.component or self.bike}: "
+                f"{self.description or self.maint_type}")
 
     def get_absolute_url(self):
         return reverse('bike:maint', kwargs={'pk': self.id})

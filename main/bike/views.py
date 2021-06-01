@@ -105,18 +105,22 @@ def odometer_readings_new(request, bike_id=None):
     initial_values = get_odometer_readings_initial_values(request, bikes)
 
     if request.method == 'POST':
+        # process date/time form
         dt_form = DateTimeForm(request.POST)
         if dt_form.is_valid():
             reading_dtime = dt_form.cleaned_data['reading_date_time']
         formset = OdometerFormSet(
             request.POST, initial=initial_values,
             form_kwargs={'user': request.user, 'reading_dtime': reading_dtime})
+
+        # retrieve user & check it hasn't changed
         orig_user = request.POST.get("user")
         if orig_user != str(request.user):
             log.error("Userid mismatch in odometer_readings_new: orig_user=%r,"
                       " request.user=%r", orig_user, request.user)
             return HttpResponse("User id mismatch", status=403)
 
+        # process odo readings
         if formset.is_valid():
             # want to only validate & save forms with odo reading entered
             # ?custom validation & save: ignore unchanged forms even if invalid
@@ -142,6 +146,7 @@ def odometer_readings_new(request, bike_id=None):
 
 
 def get_odometer_readings_initial_values(request, bikes):
+    """ return values for bikes, with user and distance units for each bike """
     initial_values = [{'bike': bike, 'rider': request.user}
                       for bike in bikes]
     try:

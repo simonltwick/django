@@ -92,7 +92,7 @@ class BaseOdometerFormSet(forms.BaseModelFormSet):
             if form.cleaned_data.get('distance') is not None)
         if not distance_entries:
             raise forms.ValidationError(
-                "You must enter at least one odometer reading.")
+                "No odometer readings have been entered.")
 
 
 OdometerFormSet = modelformset_factory(
