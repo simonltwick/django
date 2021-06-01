@@ -50,7 +50,8 @@ def bikes(request):
         Q(rides__date__month=today.month) & Q(rides__date__year=today.year)))
     bikes = (Bike.objects  # .values('id', 'name', 'rides__distance_units')
              .filter(owner=request.user)
-             .annotate(last_ridden=Max('rides__date'))
+             .annotate(last_ridden=Max(
+                 'rides__date', filter=Q(rides__is_adjustment=False)))
              .order_by('-last_ridden'))
     maint = (MaintenanceAction.objects
              .filter(user=request.user, bike__isnull=False, completed=False)
