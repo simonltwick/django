@@ -1,7 +1,7 @@
 {% extends 'bike/base.html' %}
 
 {% block content %}
-<h1>Bike details:</h1>
+<h1>Bike details: {{ bike.name }}</h1>
 <form method='POST'>
 {% csrf_token %}
 <table class="table">
@@ -13,13 +13,14 @@
   {% if forloop.first %}<h3>Maintenance actions</h3><ul>{% endif %}
   <li><a href="{% url 'bike:maint' action.id %}">{{ action }}</a>
   {% if action.due_date or action.due_distance %}
-  due
+  due in {{ action.due }}:
     {{ action.due_date|default_if_none:"" }}
     {% if action.due_date and action_due_distance %} or {% endif %}
     {% if action.due_distance %}
       at {{ action.due_distance }} {{ distance_units }}
     {% endif %}
-  {% endif %}</li>
+  {% endif %}
+  </li>
   {% if forloop.last %}</ul>{% endif %}
 {% endfor %}
 
@@ -36,7 +37,7 @@
   </tr>
   {% if forloop.last %}</table>{% endif %}
 {% endfor %}
- 
+<br>
 {% for subcomponent in components %}
   {% if forloop.first %}
     <h3>Components</h3>

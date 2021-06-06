@@ -1,7 +1,8 @@
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Sum, F, ExpressionWrapper
+from django.db.models.functions import Now
 from django.urls import reverse
 from django.utils import timezone
 
@@ -508,6 +509,33 @@ class MaintenanceAction(MaintIntervalMixin):
         if (bike := self.bike or self.component.bike):
             return bike.current_odo
         return None
+
+    @classmethod
+    def upcoming(cls, user, bike_id: int=None):
+        """ return a queryset of incomplete maintenance actions
+            due_in_time is a datetime.timedelta object,
+            due_in_distance is a float using preferences.distance_units """
+        upcoming = MaintenanceAction.objects.filter(completed=False, user=user)
+        if bike_id is not None:
+            upcoming = upcoming.filter(bike_id=bike_id)
+        upcoming = (upcoming
+                #    .annotate(
+                # due_in_time= ExpressionWrapper(
+                #     F('due_date') - timezone.now().date(),
+                #     output_field=models.DurationField())
+                # )
+            # .annotate(due_in_time = TimeDiff('due_distance', Now()))
+            .annotate(
+                due_in_distance=F('due_distance') - F('bike__current_odo')
+                )
+            )
+        return upcoming
+
+
+"""class TimeDiff(models.Func):
+    function = 'timediff'  # only works on mysql
+    output_field = models.TimeField() """
+    # you could also implement __init__ to enforce only two date fields
 
 
 class MaintenanceActionHistory(DistanceMixin):

@@ -244,10 +244,20 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
         context = super(BikeUpdate, self).get_context_data(**kwargs)
         pk = self.kwargs['pk']
         context['components'] = Component.objects.filter(bike_id=pk)
-        context['maint'] = MaintenanceAction.objects.filter(
-            bike_id=pk, completed=False)
-        context['distance_units'] = (self.request.user.preferences
-                                     .get_distance_units_display())
+        context['distance_units'] = distance_units = (
+            self.request.user.preferences.get_distance_units_display())
+        """context['maint'] = MaintenanceAction.objects.filter(
+            bike_id=pk, completed=False)"""
+        upcoming = MaintenanceAction.upcoming(
+            bike_id=pk, user=self.request.user).all()
+        for ma in upcoming:
+            ma.due_in_time = ((ma.due_date - timezone.now().date()).days
+                              if ma.due_date is not None else None)
+            due = [f"{ma.due_in_time} days" if ma.due_in_time else None,
+                   (f"{ma.due_in_distance:0.0f} {distance_units}"
+                   if ma.due_in_distance else None)]
+            ma.due = ', '.join(d for d in due if d is not None)
+        context['maint'] = upcoming
         if pk is not None:
             context['maint_history'] = MaintenanceAction.history(
                 user=self.request.user, bike_id=pk)
