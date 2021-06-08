@@ -18,23 +18,21 @@
   <td><a href="{% url 'bike:bike' bike.id %}">{{ bike.name }}</a>
   </td>
   <td>{{ bike.last_ridden.date|default:"" }}</td>
-    {% if bike.mileage %}
-    {# loop through all mileages units for each of 4  columns #}
-    {% with mileage=bike.mileage %}
+    {# loop through all mileage distance_units for each of 4 columns #}
   </td>
-  <td>{% for entry in mileage %}
+    {% if bike.mileage %}
+  <td>{% for entry in bike.mileage %}
 	  {{ entry.distance_month|floatformat|default:"" }}<br />
       {% endfor %}</td>
-  <td>{% for entry in mileage %}
+  <td>{% for entry in bike.mileage %}
 	  {{ entry.distance_year|floatformat|default:"" }}<br />
       {% endfor %}</td> 
-  <td>{% for entry in mileage %}
+  <td>{% for entry in bike.mileage %}
 	  {{ entry.distance|floatformat|default:"" }}<br />
       {% endfor %}</td>
-  <td>{% for entry in mileage %}
+  <td>{% for entry in bike.mileage %}
 	  {{ entry.distance_units|default:"" }}<br />
       {% endfor %}</td>
-    {% endwith %}
     {% else %}
     <td></td><td></td><td></td><td></td>
     {% endif %}

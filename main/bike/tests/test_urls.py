@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from ..models import (
     Bike, ComponentType, Ride, Component, MaintenanceAction, DistanceUnits,
-    MaintenanceType, Preferences,
+    MaintenanceType, Preferences, Odometer
     )
 
 
@@ -32,6 +32,21 @@ class BikeUrlTest(TestCase):
         self.ct.save()
         self.client = Client(raise_request_exception=True)
         self.client.login(username='tester', password='testpw')
+        self.maint = MaintenanceAction.objects.create(
+            bike=self.bike, user=self.user, recurring=True)
+        self.maint.save()
+        self.maint_history = self.maint.maint_completed(comp_distance=99.0)
+        self.odo = Odometer.objects.create(rider=self.user, bike=self.bike,
+                                           distance=0.0, initial_value=True)
+        self.odo.save()
+        self.assertIsNone(
+            self.odo.adjustment_ride,
+            "initial odo reading doesn't create an adjustment ride")
+        self.odo2 = Odometer.objects.create(rider=self.user, bike=self.bike,
+                                            distance=5.0)
+        self.odo2.save()
+        self.adjustment_ride = self.odo2.adjustment_ride
+        self.assertIsNotNone(self.adjustment_ride)
 
     def test_home(self):
         self.try_url(reverse('bike:home'), context={'preferences_set': True})
@@ -46,7 +61,8 @@ class BikeUrlTest(TestCase):
 
     def test_ride(self):
         rid = self.ride.id
-        self.try_url(reverse('bike:rides'), context={'rides': [self.ride]})
+        self.try_url(reverse('bike:rides'),
+                     context={'rides': [self.adjustment_ride, self.ride]})
         self.try_url(reverse('bike:ride', kwargs={'pk': rid}),
                      context={'ride': self.ride})
         self.try_url(reverse('bike:ride_delete', kwargs={'pk': rid}),
@@ -54,9 +70,7 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:ride_new'))
 
     def test_maint_action(self):
-        maint = MaintenanceAction.objects.create(
-            bike=self.bike, user=self.user)
-        maint.save()
+        maint = self.maint
         self.try_url(reverse('bike:maint_actions'),
                      context={'object_list': [maint]})
         self.try_url(reverse('bike:maint', kwargs={'pk': maint.id}),
@@ -65,6 +79,18 @@ class BikeUrlTest(TestCase):
                              kwargs={'pk': maint.id}),
                      context={'maintenanceaction': maint})
         self.try_url(reverse('bike:maint_new'),)
+        # maint_complete requires POST method
+        """self.try_url(reverse('bike:maint_complete',
+                             kwargs={'pk': maint.id}),
+                     context={'maintenanceaction': maint})"""
+
+    def test_maint_history(self):
+        history = self.maint_history
+        self.try_url(reverse('bike:maint_history', kwargs={'pk': history.id}),
+                     context={'maintenanceactionhistory': history})
+        self.try_url(reverse('bike:maint_history_delete',
+                             kwargs={'pk': history.id}),
+                     context={'maintenanceactionhistory': history})
 
     def test_maint_type(self):
         maint = MaintenanceType.objects.create(
@@ -113,12 +139,17 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:rides_month',
                              kwargs={'month': self.ride.date.month,
                                      'year': self.ride.date.year}),
-                     context={'object_list': [self.ride]})
+                     context={'object_list': [self.ride, self.adjustment_ride]}
+                     )
 
     def test_odometer(self):
         self.try_url(reverse('bike:odometer_readings'))
         self.try_url(reverse('bike:odometer_readings',
                              kwargs={'bike_id': self.bike.id}))
+        self.try_url(reverse('bike:odometer_adjustment_ride',
+                             kwargs={'ride_id': self.adjustment_ride.id}))
+        # add odometer_adjustment_ride <adj_ride_id>
+        # can't add odometer_adjustment as requires POST method
 
     def test_component(self):
         comp = Component.objects.create(type=self.ct, name='Test component',

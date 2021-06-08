@@ -48,35 +48,42 @@ def bikes(request):
     sum_year = Sum('rides__distance', filter=Q(rides__date__year=today.year))
     sum_month = Sum('rides__distance', filter=(
         Q(rides__date__month=today.month) & Q(rides__date__year=today.year)))
-    bikes = (Bike.objects  # .values('id', 'name', 'rides__distance_units')
-             .filter(owner=request.user)
-             .annotate(last_ridden=Max(
-                 'rides__date', filter=Q(rides__is_adjustment=False)))
-             .order_by('-last_ridden'))
+    # rides_year = (Ride.objects.filter(rider=request.user)
+    #               .filter(date__year=today.year).all())
+    # log.info("rides_year=\n\t%s", '\n\t'.join(
+    #     f"{ride.bike.name}: {ride.date.date()} {ride.distance:0.1f}"
+    #     for ride in rides_year))
     maint = (MaintenanceAction.objects
              .filter(user=request.user, bike__isnull=False, completed=False)
              .order_by('bike_id')
              .all())
+    bikes = Bike.objects.filter(owner=request.user)
     mileage = (bikes
-               .values('id', 'rides__distance_units')
                .filter(rides__distance_units__isnull=False)
-               .annotate(distance=Sum('rides__distance'),
-                         distance_month=sum_month,
-                         distance_year=sum_year)
+               .values('id', 'rides__distance_units')
+               .annotate(
+                   distance=Sum('rides__distance'),
+                   distance_year=sum_year,
+                   distance_month=sum_month,
+                         )
                )
-    # mileage is a queryset of dicts, one for each bike/distance_unit combo
-    # add mileage details to bike entries
+    bikes = bikes.annotate(
+        last_ridden=Max('rides__date', filter=Q(rides__is_adjustment=False))
+        ).order_by('-last_ridden').all()
+    # bikes is a queryset of dicts, one for each bike/distance_unit combo
+    for entry in mileage:
+        entry['distance_units'] = DistanceUnits(  # km or miles
+            entry['rides__distance_units']).name.lower()
+    # log.info("mileage=%s", mileage)
+    # log.info("maint=%s", maint)
+    # add maint details to bike entries
     bikes_by_id = {bike.id: bike for bike in bikes}
     for entry in mileage:
         bike = bikes_by_id[entry['id']]
-        entry['distance_units'] = DistanceUnits(  # km or miles
-            entry['rides__distance_units']).name.lower()
-        if hasattr(bike, 'mileage'):
+        try:
             bike.mileage.append(entry)
-        else:
+        except AttributeError:
             bike.mileage = [entry]
-    # log.info("maint=%s", maint)
-    # add maint details to bike entries
     for entry in maint:
         bike = bikes_by_id[entry.bike_id]
         # log.info("maint %s for bike %s", maint, bike)

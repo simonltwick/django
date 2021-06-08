@@ -474,7 +474,8 @@ class MaintenanceAction(MaintIntervalMixin):
         return history
 
     def maint_completed(
-            self, comp_date: Optional[dt.date]=None, comp_distance: float=None
+            self, comp_date: Optional[dt.date]=None,
+            comp_distance: Optional[float]=None
             ) -> "MaintenanceActionHistory":
         """ record completion of a maintenance activity.
         This creates a MaintenanceActionHistory record.
