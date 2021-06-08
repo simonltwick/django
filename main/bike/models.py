@@ -198,8 +198,7 @@ class Ride(DistanceMixin):
     def mileage_by_month(cls, user, year: int, bike=None):
         """ return total mileage by month and by mileage unit,
         for a given year [and bike] """
-        rides = cls.objects.filter(rider=user)
-        rides = rides.filter(date__year=year)
+        rides = cls.objects.filter(rider=user, date__year=year)
         if bike is not None:
             rides = rides.filter(bike=bike)
 

@@ -2,11 +2,16 @@ from django.test import TestCase, Client, override_settings
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from django.urls import reverse
+import logging
 
 from ..models import (
     Bike, ComponentType, Ride, Component, MaintenanceAction, DistanceUnits,
     MaintenanceType, Preferences, Odometer
     )
+
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 class BikeUrlTest(TestCase):
@@ -20,33 +25,37 @@ class BikeUrlTest(TestCase):
         self.user.save()
         preferences = Preferences.objects.create(user=self.user)
         preferences.save()
+
         self.bike = Bike.objects.create(
             name='Test bike', description="test", owner=self.user)
         self.bike.save()
-        self.ride = Ride.objects.create(rider=self.user, bike=self.bike,
-                                        distance=5,
-                                        distance_units=DistanceUnits.MILES)
-        self.ride.save()
-        self.ct = ComponentType.objects.create(user=self.user,
-                                               type="Test type")
-        self.ct.save()
-        self.client = Client(raise_request_exception=True)
-        self.client.login(username='tester', password='testpw')
-        self.maint = MaintenanceAction.objects.create(
-            bike=self.bike, user=self.user, recurring=True)
-        self.maint.save()
-        self.maint_history = self.maint.maint_completed(comp_distance=99.0)
+
         self.odo = Odometer.objects.create(rider=self.user, bike=self.bike,
                                            distance=0.0, initial_value=True)
         self.odo.save()
         self.assertIsNone(
             self.odo.adjustment_ride,
             "initial odo reading doesn't create an adjustment ride")
-        self.odo2 = Odometer.objects.create(rider=self.user, bike=self.bike,
-                                            distance=5.0)
+        self.ride = Ride.objects.create(
+            rider=self.user, bike=self.bike, distance=5,
+            description="Test ride", distance_units=DistanceUnits.MILES)
+        self.ride.save()
+        self.odo2 = Odometer.objects.create(
+            rider=self.user, bike=self.bike, distance=5.0)
         self.odo2.save()
         self.adjustment_ride = self.odo2.adjustment_ride
         self.assertIsNotNone(self.adjustment_ride)
+
+        self.ct = ComponentType.objects.create(
+            user=self.user, type="Test type")
+        self.ct.save()
+        self.maint = MaintenanceAction.objects.create(
+            bike=self.bike, user=self.user, recurring=True)
+        self.maint.save()
+        self.maint_history = self.maint.maint_completed(comp_distance=99.0)
+
+        self.client = Client(raise_request_exception=True)
+        self.client.login(username='tester', password='testpw')
 
     def test_home(self):
         self.try_url(reverse('bike:home'), context={'preferences_set': True})
