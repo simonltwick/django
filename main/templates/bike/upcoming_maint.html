@@ -1,0 +1,11 @@
+<!-- to be %included expects context = maint_per_bike {bike: [maintactions]}-->
+
+{% for bike_maint in maint_per_bike %}
+<p>Bike: {{ bike_maint.grouper }}</p>
+{% with bike_maint.list as maint %}
+{% include 'bike/bike_maint_upcoming.html' %}
+{% endwith %}
+{% endfor %}
+
+<p><a class="btn btn-success" href="{% url 'bike:maint_new' %}">
+New maintenance action</a></p>

@@ -38,8 +38,11 @@ class BikeLoginRequiredMixin(LoginRequiredMixin):
 @login_required(login_url=LOGIN_URL)
 def home(request):
     preferences_set = Preferences.objects.filter(user=request.user).exists()
+    maint = (upcoming_maint(request.user)
+                      if preferences_set else None)
     return render(request, 'bike/home.html',
-                  context={'preferences_set': preferences_set})
+                  context={'preferences_set': preferences_set,
+                           'upcoming_maint': maint})
 
 
 @login_required(login_url=LOGIN_URL)
@@ -258,12 +261,13 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
         upcoming = MaintenanceAction.upcoming(
             bike_id=pk, user=self.request.user).all()
         for ma in upcoming:
-            ma.due_in_time = ((ma.due_date - timezone.now().date()).days
+            """ma.due_in_time = ((ma.due_date - timezone.now().date()).days
                               if ma.due_date is not None else None)
             due = [f"{ma.due_in_time} days" if ma.due_in_time else None,
                    (f"{ma.due_in_distance:0.0f} {distance_units}"
                    if ma.due_in_distance else None)]
-            ma.due = ', '.join(d for d in due if d is not None)
+            ma.due = ', '.join(d for d in due if d is not None)"""
+            ma.due = ma.due_in(distance_units)
         context['maint'] = upcoming
         if pk is not None:
             context['maint_history'] = MaintenanceAction.history(
@@ -553,8 +557,17 @@ class MaintActionList(BikeLoginRequiredMixin, ListView):
     ordering = ('bike', 'component', 'distance', 'due_date')
 
     def get_queryset(self):
-        return MaintenanceAction.objects.filter(
-            user=self.request.user, completed=False)
+        # passed in context as object_list 
+        return upcoming_maint(self.request.user)
+
+
+def upcoming_maint(user):
+    distance_units = user.preferences.get_distance_units_display()
+    upcoming = MaintenanceAction.upcoming(
+        user=user).select_related('bike')
+    for ma in upcoming:
+        ma.due = ma.due_in(distance_units)
+    return upcoming
 
 
 class MaintActionCreate(BikeLoginRequiredMixin, CreateView):

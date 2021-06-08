@@ -531,6 +531,22 @@ class MaintenanceAction(MaintIntervalMixin):
             )
         return upcoming
 
+    def due_in(self, distance_units):
+        """ return a string with "Due in xxx days, xxx <distance units".
+        Used after calling Maintaction.upcoming """
+        try:
+            return self._due_in
+        except AttributeError:
+            pass
+        if not hasattr(self, 'due_in_distance'):
+            self.due_in_distance = None
+        self.due_in_time = ((self.due_date - timezone.now().date()).days
+                          if self.due_date is not None else None)
+        due = [f"{self.due_in_time} days" if self.due_in_time else None,
+               (f"{self.due_in_distance:0.0f} {distance_units}"
+               if self.due_in_distance else None)]
+        self._due_in = ', '.join(d for d in due if d is not None)
+        return self._due_in
 
 """class TimeDiff(models.Func):
     function = 'timediff'  # only works on mysql

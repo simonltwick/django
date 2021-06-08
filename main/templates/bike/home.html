@@ -11,23 +11,15 @@
 <p>Please <a href="{% url 'bike:preferences_new' %}">set your preferences.</a></p>
 {% endif %}
 
+<p><a class="btn btn-success" href="{% url 'bike:ride_new' %}">
+Record a ride</a></p>
 
-<a class="btn btn-success" href="{% url 'bike:ride_new' %}">Record a ride</a>
-
-
-{% for activity in request.user.maint_activities.all %}
-{% if forloop.first %}
-<h3>Maintenance Activities</h3>
-<ul>
+{% if upcoming_maint %}
+<h3>Upcoming Maintenance</h3>
+{% regroup upcoming_maint by bike as maint_per_bike %}
+{% include 'bike/upcoming_maint.html' %}
 {% endif %}
 
-	<li><a href="{% url 'bike:maint_activity' activity.id %}">{{ activity.name }}</a>
-	</li>
-
-{% if forloop.last %}
-</ul>
-{% endif %}
-{% endfor %}
 <h3>About Bike</h3>
 <p>The Bike website allows you to keep track of your cycling mileage,
 maintenance of your bikes and their components. See the help pages for more

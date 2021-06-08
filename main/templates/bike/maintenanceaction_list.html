@@ -3,22 +3,8 @@
 {% block content %}
 {% load static %}
 
-<h1>Maintenance Actions</h1>
-{% for maint in object_list %}
-{% if forloop.first %}
-<ul>
-{% endif %}
-
-<li><a href="{% url 'bike:maint' maint.id %}">{{ maint }}</a></li>
-
-{% if forloop.last %}
-</ul>
-{% endif %}
-{% empty %}
-<p>No maintenance actions found :-(</p>
-{% endfor %}
-
-<p><a class="btn btn-success" href="{% url 'bike:maint_new' %}">
-New maintenance action</a></p>
+<h1>Upcoming Maintenance</h1>
+{% regroup object_list by bike as maint_per_bike %}
+{% include 'bike/upcoming_maint.html' %}
 
 {% endblock%}
