@@ -44,9 +44,9 @@ class Bike(models.Model):
         if last_odo:
             distances.append({'distance': last_odo.distance,
                               'distance_units': last_odo.distance_units})
-        # log.info("update_current_odo: owner=%s", self.owner)
         target_units = self.owner.preferences.distance_units
         self.current_odo = DistanceUnits.sum(distances, target_units)
+        # log.info("update_current_odo: new value=%s", self.current_odo)
 
 
 class DistanceUnits(IntEnum):
@@ -160,6 +160,7 @@ class Ride(DistanceMixin):
             # allow updating of following odometer adjustment ride, if any
             Odometer.ride_updated(self)
             self.bike.update_current_odo()
+            self.bike.save()
 
     @property
     def ascent_units_display(self):
