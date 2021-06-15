@@ -8,6 +8,10 @@
 {{ form }}
 <th>Odometer</th><td>{{ bike.current_odo }} {{ distance_units }}</td>
 </table>
+{% if bike %}
+<p><a href="{% url 'bike:rides' bike_id=bike.id %}">Rides</a>
+<span style="color:gray">Odometer readings</span>
+</p>{% endif %}
 
 <h3>Upcoming Maintenance</h3>
 {% include 'bike/bike_maint_upcoming.html' %}
@@ -15,7 +19,7 @@
 {% if bike %}
   <p>
   <input type="submit" class="btn btn-secondary" value="Add maint. action"
-    	 formaction="{{ save_url }}?next={% url 'bike:maint_new' %}?bike={{  bike.id }}">
+    	 formaction="{{ save_url }}?next={% url 'bike:maint_new' %}?bike={{ bike.id }}">
   </p>
   
 {% endif %}

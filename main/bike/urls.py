@@ -8,6 +8,7 @@ urlpatterns = [
     path('', views.home, name='home'),
 
     path('rides', views.rides, name='rides'),
+    path('bike/<int:bike_id>/rides', views.rides, name='rides'),
     path('ride/new', views.RideCreate.as_view(), name='ride_new'),
     path('ride/<int:pk>', views.RideUpdate.as_view(), name='ride'),
     path('ride/<int:pk>/delete', views.RideDelete.as_view(),

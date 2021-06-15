@@ -495,7 +495,7 @@ class RideDelete(BikeLoginRequiredMixin, DeleteView):
 
 
 @login_required(login_url=LOGIN_URL)
-def rides(request):
+def rides(request, bike_id=None):
     # TODO: implement search rides with QuerySet.(description_icontains=xx)
     # TODO: search for year/month with Queryset.filter(date__year=xx)
     if request.method == 'POST':
@@ -533,16 +533,22 @@ def rides(request):
         else:
             rides = Ride.objects.order_by('-date').all()[:20]
     else:
-        rides = Ride.objects.order_by('-date').all()[:20]
+        rides = Ride.objects
+        if bike_id is not None:
+            rides = rides.filter(bike_id=bike_id)
+        rides = rides.order_by('-date')[:20]
         if rides:
             start_date = rides[len(rides) - 1].date
             end_date = max(rides[0].date, timezone.now())
         else:
             start_date = end_date = None
         
+        initial={'start_date': start_date, 'end_date': end_date}
+        if bike_id is not None:
+            initial['bike'] = bike_id
         form = RideSelectionForm(
             bikes=Bike.objects.filter(owner=request.user).all(),
-            initial={'start_date': start_date, 'end_date': end_date})
+            initial=initial)
         
     return render(request, 'bike/rides.html',
                   context={'form': form, 'rides': rides})
