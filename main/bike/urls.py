@@ -7,8 +7,8 @@ app_name = 'bike'  # for url namespacing
 urlpatterns = [
     path('', views.home, name='home'),
 
-    path('rides', views.rides, name='rides'),
-    path('bike/<int:bike_id>/rides', views.rides, name='rides'),
+    path('rides', views.RidesList.as_view(), name='rides'),
+    path('bike/<int:bike_id>/rides', views.RidesList.as_view(), name='rides'),
     path('ride/new', views.RideCreate.as_view(), name='ride_new'),
     path('ride/<int:pk>', views.RideUpdate.as_view(), name='ride'),
     path('ride/<int:pk>/delete', views.RideDelete.as_view(),
@@ -51,10 +51,14 @@ urlpatterns = [
     path('mileage/<int:year>/<int:month>',
          views.RideMonthArchiveView.as_view(), name='rides_month'),
 
-    path('odometer/readings/<int:bike_id>', views.odometer_readings_new,
+    path('odometer/readings', views.OdometerList.as_view(),
          name='odometer_readings'),
-    path('odometer/readings', views.odometer_readings_new,
+    path('odometer/readings/<int:bike_id>', views.OdometerList.as_view(),
          name='odometer_readings'),
+    path('odometer/readings/new/<int:bike_id>', views.odometer_readings_new,
+         name='odometer_readings_new'),
+    path('odometer/readings/new', views.odometer_readings_new,
+         name='odometer_readings_new'),
     path('odometer/adjustment/ride/<int:ride_id>', views.odometer_adjustment,
          name='odometer_adjustment_ride'),
     path('odometer/adjustment/<int:odo_reading_id>', views.odometer_adjustment,

@@ -1,0 +1,48 @@
+{% extends 'bike/base.html' %}
+
+{% block content %}
+<h1>New Odometer readings:</h1>
+<form method='POST'>
+{% csrf_token %}
+<p>{{ dt_form }}</p>
+<input type="hidden" name="user" value="{{ user }}">
+{{ formset.management_form }}
+<table class="table">
+{% for form in formset %}
+  {% if forloop.first %}{# write table headers #}
+    <tr><td></td>
+    {% for field in form.visible_fields %}
+      <th>{{ field.label_tag }}
+      {% if field.help_text %}
+      <p class="help">{{ field.help_text|safe }}</p>
+      {% endif %}
+	  </th>
+    {% endfor %}
+    </tr>
+  {% endif %}
+
+  <tr><td>{{ form.non_field_errors }}
+
+  {% for hidden in form.hidden_fields %}
+    {{ hidden.errors }}{{ hidden }}
+  {% endfor %}
+  </td>
+
+  {% for field in form.visible_fields %}
+    <div class="fieldWrapper">
+      <td>{{ field.errors }}
+      {{ field }}
+      </td>
+    </div>
+  {% endfor %}
+  </tr>
+{% empty %}<tr><td>(no forms to display)</td></tr>
+{% endfor %}
+</table>
+<p><b>Note:</b> Only tick the "initial value" box if you have reset or replaced
+the odometer</p>
+
+<input type="submit" class="btn btn-primary" value="OK">
+</form>
+
+{% endblock %}

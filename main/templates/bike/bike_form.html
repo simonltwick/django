@@ -9,8 +9,20 @@
 <th>Odometer</th><td>{{ bike.current_odo }} {{ distance_units }}</td>
 </table>
 {% if bike %}
-<p><a href="{% url 'bike:rides' bike_id=bike.id %}">Rides</a>
-<span style="color:gray">Odometer readings</span>
+<p>
+    <input type="submit" class="btn btn-primary" value="OK"
+      {% url 'bike:bike' bike.id as save_url %}
+      formaction="{{ save_url }}?next={% url 'bike:bikes' %}">
+	<a href="{% url 'bike:bike_delete' bike.id %}?next={% url 'bike:bikes' %}"
+	  class="btn btn-danger">Delete</a>
+	<a href="{% url 'bike:rides' bike_id=bike.id %}" class="btn btn-secondary">
+	  Rides</a>
+    <a href="{% url 'bike:odometer_readings' bike_id=bike.id %}"
+	  class="btn btn-secondary">Odometer history</a>
+    
+{% else %}
+    <input type="submit" class="btn btn-primary" value="OK"
+    formaction="{% url 'bike:bike_new' %}?next={% url 'bike:bikes' %}">
 </p>{% endif %}
 
 <h3>Upcoming Maintenance</h3>
@@ -19,9 +31,9 @@
 {% if bike %}
   <p>
   <input type="submit" class="btn btn-secondary" value="Add maint. action"
-    	 formaction="{{ save_url }}?next={% url 'bike:maint_new' %}?bike={{ bike.id }}">
+    	 formaction="{% url 'bike:maint_new' %}?bike={{ bike.id }}">
   </p>
-  
+
 {% endif %}
 
 {% for action in maint_history %}
@@ -60,16 +72,6 @@
 	<a class="btn btn-secondary"
 	  href="{% url 'bike:component_new' %}?bike={{ bike.id }}&next={% url 'bike:bike' bike.id %}">
 	Add component</a>
-</p><p>
-    <input type="submit" class="btn btn-primary" value="OK"
-    {% url 'bike:bike' bike.id as save_url %}
-    formaction="{{ save_url }}?next={% url 'bike:bikes' %}">
-	<a href="{% url 'bike:bike_delete' bike.id %}?next={% url 'bike:bikes' %}"
-	class="btn btn-danger">Delete</a>
-    
-{% else %}
-    <input type="submit" class="btn btn-primary" value="OK"
-    formaction="{% url 'bike:bike_new' %}?next={% url 'bike:bikes' %}">
 {% endif %}
 </p>
 </form>

@@ -11,10 +11,10 @@ log.setLevel(logging.DEBUG)
 
 
 class RideSelectionForm(forms.Form):
-    num_rides = forms.IntegerField(
+    max_entries = forms.IntegerField(
         required=False, initial=20, min_value=1,
-        label="Maximum number of rides",
-        help_text="Leave blank for all rides.")
+        label="Maximum number to display",
+        help_text="Leave blank for all.")
     bike = forms.ChoiceField(required=False, choices=[])  # set in constructor
     start_date = forms.DateField(required=False)
     end_date = forms.DateField(required=False)

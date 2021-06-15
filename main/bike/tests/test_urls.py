@@ -71,7 +71,7 @@ class BikeUrlTest(TestCase):
     def test_ride(self):
         rid = self.ride.id
         self.try_url(reverse('bike:rides'),
-                     context={'rides': [self.adjustment_ride, self.ride]})
+                     context={'entries': [self.adjustment_ride, self.ride]})
         self.try_url(reverse('bike:ride', kwargs={'pk': rid}),
                      context={'ride': self.ride})
         self.try_url(reverse('bike:ride_delete', kwargs={'pk': rid}),
@@ -155,8 +155,13 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:odometer_readings'))
         self.try_url(reverse('bike:odometer_readings',
                              kwargs={'bike_id': self.bike.id}))
+        self.try_url(reverse('bike:odometer_readings_new'))
+        self.try_url(reverse('bike:odometer_readings_new',
+                             kwargs={'bike_id': self.bike.id}))
         self.try_url(reverse('bike:odometer_adjustment_ride',
                              kwargs={'ride_id': self.adjustment_ride.id}))
+        self.try_url(reverse('bike:odometer_adjustment',
+                             kwargs={'odo_reading_id': self.odo.id}))
         # add odometer_adjustment_ride <adj_ride_id>
         # can't add odometer_adjustment as requires POST method
 

@@ -100,98 +100,6 @@ def bikes(request):
                            'monthname': monthname})
 
 
-@login_required(login_url=LOGIN_URL)
-def odometer_readings_new(request, bike_id=None):
-    """ enter new odometer readings for one or all bikes """
-    bikes = (Bike.objects.filter(owner=request.user)
-             .annotate(last_ride=Max('rides__date'))
-             .order_by('-last_ride'))
-    if bike_id is not None:
-        bikes = bikes.filter(pk=bike_id, owner=request.user)
-    if not bikes.exists():
-        return HttpResponse(
-            "No bikes found." if bike_id is None else "Bike not found.",
-            status=404)
-
-    initial_values = get_odometer_readings_initial_values(request, bikes)
-
-    if request.method == 'POST':
-        # process date/time form
-        dt_form = DateTimeForm(request.POST)
-        if dt_form.is_valid():
-            reading_dtime = dt_form.cleaned_data['reading_date_time']
-        formset = OdometerFormSet(
-            request.POST, initial=initial_values,
-            form_kwargs={'user': request.user, 'reading_dtime': reading_dtime})
-
-        # retrieve user & check it hasn't changed
-        orig_user = request.POST.get("user")
-        if orig_user != str(request.user):
-            log.error("Userid mismatch in odometer_readings_new: orig_user=%r,"
-                      " request.user=%r", orig_user, request.user)
-            return HttpResponse("User id mismatch", status=403)
-
-        # process odo readings
-        if formset.is_valid():
-            # want to only validate & save forms with odo reading entered
-            # ?custom validation & save: ignore unchanged forms even if invalid
-            formset.save()
-            next_url = request.GET.get('next') or reverse('bike:home')
-            return HttpResponseRedirect(next_url)
-
-    else:
-        # Initial GET.  Populate the formset, one form for each bike
-        dt_form = DateTimeForm()
-        formset = OdometerFormSet(queryset=Odometer.objects.none(),
-                                  initial=initial_values,
-                                  form_kwargs={'user': request.user})
-        formset.extra = len(initial_values)
-        user_bikes = request.user.bikes  # initialise the choice field
-        for form in formset:
-            form.fields['bike'].queryset = user_bikes
-            # OR:
-            form.fields['bike'].widget.attrs['readonly'] = True
-    return render(request, 'bike/odometer_readings.html',
-                  context={'formset': formset, 'dt_form': dt_form,
-                           'bike_id': bike_id, 'user': request.user})
-
-
-def get_odometer_readings_initial_values(request, bikes):
-    """ return values for bikes, with user and distance units for each bike """
-    initial_values = [{'bike': bike, 'rider': request.user}
-                      for bike in bikes]
-    try:
-        preferences = Preferences.objects.get(user=request.user)
-        for i in initial_values:
-            i['distance_units'] = preferences.distance_units
-    except Preferences.DoesNotExist:
-        pass
-    return initial_values
-
-
-@login_required(login_url=LOGIN_URL)
-def odometer_adjustment(request, ride_id=None, odo_reading_id=None, 
-                        success=reverse_lazy('bike:rides')):
-    if request.method == 'GET':
-        if ride_id is None:
-            return HttpResponse("Missing ride_id", status=400)
-        odo_reading = Odometer.objects.select_related('bike').get(
-            adjustment_ride=ride_id, rider=request.user)
-        odo_form = OdometerAdjustmentForm(instance=odo_reading)
-    else:
-        if odo_reading_id is None:
-            return HttpResponse("Missing odo_reading_id", status=400)
-        odo_reading = Odometer.objects.select_related('bike').get(
-            pk=odo_reading_id, rider=request.user)
-        odo_form = OdometerAdjustmentForm(request.POST, instance=odo_reading)
-        if odo_form.is_valid():
-            odo_form.save()
-            return HttpResponseRedirect(success)
-    return render(request, 'bike/odometer_adjustment.html',
-                  context={"odo_reading": odo_reading, "form": odo_form,
-                           "success_url": success})
-
-
 class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
     model = Preferences
     fields = ['distance_units', 'ascent_units']
@@ -494,65 +402,90 @@ class RideDelete(BikeLoginRequiredMixin, DeleteView):
         return super(RideDelete, self).dispatch(request, *args, **kwargs)
 
 
-@login_required(login_url=LOGIN_URL)
-def rides(request, bike_id=None):
+class RidesList(BikeLoginRequiredMixin):
+    """ this class is also used for OdometerList """
     # TODO: implement search rides with QuerySet.(description_icontains=xx)
     # TODO: search for year/month with Queryset.filter(date__year=xx)
-    if request.method == 'POST':
-        form = RideSelectionForm(
-            request.POST, bikes=Bike.objects.filter(owner=request.user).all())
+    entries = Ride.objects
+    plural_name = 'rides'
+    template_name = 'bike/rides.html'
+
+    @classmethod
+    def as_view(cls):
+        return cls.dispatch
+
+    @classmethod
+    def dispatch(cls, request, bike_id=None):
+        inst = cls()
+        inst.request = request
+        inst.bike_id = bike_id
+        if request.method == 'POST':
+            inst.POST()
+        elif request.method == 'GET':
+            inst.GET()
+        return render(request, cls.template_name,
+                  context={'form': inst.form, 'entries': inst.entries})
+
+    def POST(self):
+        self.form = form = RideSelectionForm(
+            self.request.POST,
+            bikes=Bike.objects.filter(owner=self.request.user).all())
         if form.is_valid():
-            rides = (Ride.objects.filter(rider=request.user)
+            entries = (self.entries.filter(rider=self.request.user)
                      .exclude(distance__range=(-0.01, 0.01)))
             bike = form.cleaned_data['bike']
             if bike:
-                rides = rides.filter(bike=bike)
+                entries = entries.filter(bike=bike)
             start_date = form.cleaned_data['start_date']
             if start_date:
                 start_date = dt.datetime.combine(start_date, dt.time(0),
                                                  tzinfo=CURRENT_TIMEZONE)
-                rides = rides.filter(date__gte=start_date)
+                entries = entries.filter(date__gte=start_date)
             end_date = form.cleaned_data['end_date']
             if end_date:
                 end_date = dt.datetime.combine(end_date, dt.time(23, 59, 59),
                                                tzinfo=CURRENT_TIMEZONE)
-                rides = rides.filter(date__lte=end_date)
-            rides = rides.order_by('-date').all()
-            num_rides = form.cleaned_data['num_rides']
-            if num_rides:
+                entries = entries.filter(date__lte=end_date)
+            entries = entries.order_by('-date').all()
+            num_entries = form.cleaned_data['max_entries']
+            if num_entries:
                 # log.info("Applying filter num_rides=%d", num_rides)
-                rides = rides[:num_rides]
+                entries = entries[:num_entries]
             # log.info("request.GET=%s", request.GET)
-            if not rides.exists():
-                form.add_error(None, "No rides found matching those criteria.")
-            elif request.GET.get('action') == 'download_as_csv':
+            self.entries = entries
+
+            if not self.entries.exists():
+                form.add_error(
+                    None, f"No {self.plural_name} found matching those criteria.")
+            elif self.request.GET.get('action') == 'download_as_csv':
                 log.info("csv download requested")
+                if self.plural_name != 'rides':
+                    return HttpResponse(
+                        "CSV download not supported for {plural_name}",
+                        status=501)
                 fields = ['date', 'bike', 'distance', 'distance_units_display',
                           'ascent', 'ascent_units_display', 'description']
-                return csv_data_response(request, 'rides.csv', rides, fields)
+                return csv_data_response(self.request, 'rides.csv', entries, fields)
         else:
-            rides = Ride.objects.order_by('-date').all()[:20]
-    else:
-        rides = Ride.objects
-        if bike_id is not None:
-            rides = rides.filter(bike_id=bike_id)
-        rides = rides.order_by('-date')[:20]
-        if rides:
-            start_date = rides[len(rides) - 1].date
-            end_date = max(rides[0].date, timezone.now())
+            self.entries = self.entries.order_by('-date').all()[:20]
+
+    def GET(self):
+        if self.bike_id is not None:
+            self.entries = self.entries.filter(bike_id=self.bike_id)
+        entries = self.entries = self.entries.order_by('-date')[:20]
+        
+        if entries:
+            start_date = entries[len(entries) - 1].date
+            end_date = max(entries[0].date, timezone.now())
         else:
             start_date = end_date = None
         
         initial={'start_date': start_date, 'end_date': end_date}
-        if bike_id is not None:
-            initial['bike'] = bike_id
-        form = RideSelectionForm(
-            bikes=Bike.objects.filter(owner=request.user).all(),
+        if self.bike_id is not None:
+            initial['bike'] = self.bike_id
+        self.form = RideSelectionForm(
+            bikes=Bike.objects.filter(owner=self.request.user).all(),
             initial=initial)
-        
-    return render(request, 'bike/rides.html',
-                  context={'form': form, 'rides': rides})
-
 
 
 def csv_data_response(_request, filename, queryset, fields):
@@ -564,6 +497,113 @@ def csv_data_response(_request, filename, queryset, fields):
         csv_row = [getattr(row, field_name) for field_name in fields]
         writer.writerow(csv_row)
     return response
+
+
+class OdometerList(RidesList):
+    """ display a list of Odometer readings, optionally selected by bike_id
+    and by start/end date """
+    # TODO: implement search rides with QuerySet.(description_icontains=xx)
+    # TODO: search for year/month with Queryset.filter(date__year=xx)
+    entries = Odometer.objects
+    plural_name = 'odometer readings'
+    template_name = 'bike/odometer_readings.html'
+
+
+@login_required(login_url=LOGIN_URL)
+def odometer_readings_new(request, bike_id=None):
+    """ enter new odometer readings for one or all bikes """
+    bikes = (Bike.objects.filter(owner=request.user)
+             .annotate(last_ride=Max('rides__date'))
+             .order_by('-last_ride'))
+    if bike_id is not None:
+        bikes = bikes.filter(pk=bike_id, owner=request.user)
+    if not bikes.exists():
+        return HttpResponse(
+            "No bikes found." if bike_id is None else "Bike not found.",
+            status=404)
+
+    initial_values = get_odometer_readings_initial_values(request, bikes)
+
+    if request.method == 'POST':
+        # process date/time form
+        dt_form = DateTimeForm(request.POST)
+        if dt_form.is_valid():
+            reading_dtime = dt_form.cleaned_data['reading_date_time']
+        formset = OdometerFormSet(
+            request.POST, initial=initial_values,
+            form_kwargs={'user': request.user, 'reading_dtime': reading_dtime})
+
+        # retrieve user & check it hasn't changed
+        orig_user = request.POST.get("user")
+        if orig_user != str(request.user):
+            log.error("Userid mismatch in odometer_readings_new: orig_user=%r,"
+                      " request.user=%r", orig_user, request.user)
+            return HttpResponse("User id mismatch", status=403)
+
+        # process odo readings
+        if formset.is_valid():
+            # want to only validate & save forms with odo reading entered
+            # ?custom validation & save: ignore unchanged forms even if invalid
+            formset.save()
+            next_url = request.GET.get('next') or reverse('bike:home')
+            return HttpResponseRedirect(next_url)
+
+    else:
+        # Initial GET.  Populate the formset, one form for each bike
+        dt_form = DateTimeForm()
+        formset = OdometerFormSet(queryset=Odometer.objects.none(),
+                                  initial=initial_values,
+                                  form_kwargs={'user': request.user})
+        formset.extra = len(initial_values)
+        user_bikes = request.user.bikes  # initialise the choice field
+        for form in formset:
+            form.fields['bike'].queryset = user_bikes
+            # OR:
+            form.fields['bike'].widget.attrs['readonly'] = True
+    return render(request, 'bike/odometer_readings_new.html',
+                  context={'formset': formset, 'dt_form': dt_form,
+                           'bike_id': bike_id, 'user': request.user})
+
+
+def get_odometer_readings_initial_values(request, bikes):
+    """ return values for bikes, with user and distance units for each bike """
+    initial_values = [{'bike': bike, 'rider': request.user}
+                      for bike in bikes]
+    try:
+        preferences = Preferences.objects.get(user=request.user)
+        for i in initial_values:
+            i['distance_units'] = preferences.distance_units
+    except Preferences.DoesNotExist:
+        pass
+    return initial_values
+
+
+@login_required(login_url=LOGIN_URL)
+def odometer_adjustment(request, ride_id=None, odo_reading_id=None, 
+                        success=reverse_lazy('bike:rides')):
+    if request.method == 'GET':
+        if ride_id is None:
+            if odo_reading_id is None:
+                return HttpResponse(
+                    "Missing ride_id or odo_reading_id", status=400)
+            odo_reading = Odometer.objects.select_related('bike').get(
+                pk=odo_reading_id, rider=request.user)
+        else:
+            odo_reading = Odometer.objects.select_related('bike').get(
+                adjustment_ride=ride_id, rider=request.user)
+        odo_form = OdometerAdjustmentForm(instance=odo_reading)
+    else:
+        if odo_reading_id is None:
+            return HttpResponse("Missing odo_reading_id", status=400)
+        odo_reading = Odometer.objects.select_related('bike').get(
+            pk=odo_reading_id, rider=request.user)
+        odo_form = OdometerAdjustmentForm(request.POST, instance=odo_reading)
+        if odo_form.is_valid():
+            odo_form.save()
+            return HttpResponseRedirect(success)
+    return render(request, 'bike/odometer_adjustment.html',
+                  context={"odo_reading": odo_reading, "form": odo_form,
+                           "success_url": success})
 
 
 class MaintActionList(BikeLoginRequiredMixin, ListView):
