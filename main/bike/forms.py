@@ -16,9 +16,8 @@ class RideSelectionForm(forms.Form):
         label="Maximum number of rides",
         help_text="Leave blank for all rides.")
     bike = forms.ChoiceField(required=False, choices=[])  # set in constructor
-    this_year_start = dt.date(year=dt.date.today().year, month=1, day=1)
-    start_date = forms.DateField(required=False, initial=this_year_start)
-    end_date = forms.DateField(required=False, initial=dt.date.today())
+    start_date = forms.DateField(required=False)
+    end_date = forms.DateField(required=False)
 
     def __init__(self, *args, bikes, **kwargs):
         super(RideSelectionForm, self).__init__(*args, **kwargs)

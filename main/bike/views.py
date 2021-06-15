@@ -533,9 +533,17 @@ def rides(request):
         else:
             rides = Ride.objects.order_by('-date').all()[:20]
     else:
-        form = RideSelectionForm(
-            bikes=Bike.objects.filter(owner=request.user).all())
         rides = Ride.objects.order_by('-date').all()[:20]
+        if rides:
+            start_date = rides[len(rides) - 1].date
+            end_date = max(rides[0].date, timezone.now())
+        else:
+            start_date = end_date = None
+        
+        form = RideSelectionForm(
+            bikes=Bike.objects.filter(owner=request.user).all(),
+            initial={'start_date': start_date, 'end_date': end_date})
+        
     return render(request, 'bike/rides.html',
                   context={'form': form, 'rides': rides})
 
