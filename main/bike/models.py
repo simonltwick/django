@@ -1,3 +1,4 @@
+from django import contrib
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -48,6 +49,14 @@ class Bike(models.Model):
         self.current_odo = DistanceUnits.sum(distances, target_units)
         # log.info("update_current_odo: new value=%s", self.current_odo)
 
+    @classmethod
+    def update_distance_units(cls, user, factor):
+        """ bulk update current_odo values multiplying by conversion factor """
+        log.warning("Updating %s.current_odo values * %s",
+                    cls.__name__, factor)
+        bikes = cls.objects.filter(owner=user, current_odo__isnull=False)
+        bikes.update(current_odo=F('current_odo') * factor)
+
 
 class DistanceUnits(IntEnum):
     MILES = 10
@@ -75,15 +84,20 @@ class DistanceUnits(IntEnum):
         return total_distance
 
     @classmethod
+    def conversion_factor(cls, from_units, to_units):
+        factors = {DistanceUnits.MILES: {DistanceUnits.MILES: 1,
+                                         DistanceUnits.KILOMETRES: 1.60934},
+                   DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 1/1.60934,
+                                              DistanceUnits.KILOMETRES: 1}}
+        return factors[from_units][to_units]
+
+
+    @classmethod
     def convert(cls, distance, from_units, to_units):
         if from_units == to_units:
             return distance
-        factors = {DistanceUnits.MILES: {DistanceUnits.MILES: 1,
-                                         DistanceUnits.KILOMETRES: 1.60934},
-                   DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 0.621371,
-                                              DistanceUnits.KILOMETRES: 1}}
         # log.info("convert %s from %s to %s", distance, from_units, to_units)
-        factor = factors[from_units][to_units]
+        factor = cls.conversion_factor(from_units, to_units)
         return distance * factor
 
 
@@ -114,6 +128,7 @@ class AscentUnits:
 
 
 class Preferences(models.Model):
+    __original_distance_units = None
     user = models.OneToOneField(User, on_delete=models.CASCADE,
                                 primary_key=True, related_name='preferences')
     distance_units = models.PositiveSmallIntegerField(
@@ -124,11 +139,29 @@ class Preferences(models.Model):
     class Meta:
         verbose_name_plural = 'preferences'
 
+    def __init__(self, *args, **kwargs):
+        super(Preferences, self).__init__(*args, **kwargs)
+        self.__original_distance_units = self.distance_units
+
     def get_absolute_url(self):
         return reverse('bike:preferences', kwargs={'pk': self.pk})
 
     def __str__(self):
         return f"Preferences for {self.user.username}"
+
+    def save(self, force_insert=False, force_update=False, *args, **kwargs):
+        if self.distance_units != self.__original_distance_units:
+            factor = DistanceUnits.conversion_factor(
+                self.__original_distance_units, self.distance_units)
+            log.warning(
+                "Preferences.distance_units changed from %s to %s: applying "
+                "conversion factor=%s", self.__original_distance_units,
+                self.distance_units, factor)
+            Bike.update_distance_units(self.user, factor)
+            MaintenanceType.update_distance_units(self.user, factor)
+            MaintenanceAction.update_distance_units(self.user, factor)
+        super(Preferences, self).save(force_insert=False, force_update=False,
+                                      *args, **kwargs)
 
 
 class Ride(DistanceMixin):
@@ -423,6 +456,21 @@ class MaintenanceType(MaintIntervalMixin):
     def get_absolute_url(self):
         return reverse('bike:maint_type', kwargs={'pk': self.id})
 
+    @classmethod
+    def update_distance_units(cls, user, factor):
+        """ bulk update maint_interval_distance values multiplying by
+        conversion factor """
+        log.warning("Updating %s.maintenance_interval_distances * %s",
+                    cls.__name__, factor)
+        items = cls.objects.filter(
+            user=user, maintenance_interval_distance__isnull=False)
+        items.update(maintenance_interval_distance=
+                     F('maintenance_interval_distance') * factor)
+
+    # @property  # @contrib.admin.display(ordering='user')
+    def user_preferences_distance_units(self):
+        return self.user.preferences.distance_units
+
 
 class MaintenanceAction(MaintIntervalMixin):
     # distance, distance_units - DistanceMixin
@@ -452,6 +500,23 @@ class MaintenanceAction(MaintIntervalMixin):
 
     def get_absolute_url(self):
         return reverse('bike:maint', kwargs={'pk': self.id})
+
+    @classmethod
+    def update_distance_units(cls, user, factor):
+        """ bulk update maint_interval_distance and due_distance values,
+        multiplying by conversion factor """
+        # update maintenance_interval_distance
+        log.warning("Updating %s.maintenance_interval_distances * %s",
+                    cls.__name__, factor)
+        items = cls.objects.filter(
+            user=user, maintenance_interval_distance__isnull=False)
+        items.update(maintenance_interval_distance=
+                     F('maintenance_interval_distance') * factor)
+        # update due_distance
+        log.warning("Updating %s.due_distances * %s", cls.__name__, factor)
+        items = cls.objects.filter(
+            user=user, due_distance__isnull=False)
+        items.update(due_distance=F('due_distance') * factor)
 
     @classmethod
     def history(
@@ -548,6 +613,7 @@ class MaintenanceAction(MaintIntervalMixin):
                if self.due_in_distance else None)]
         self._due_in = ', '.join(d for d in due if d is not None)
         return self._due_in
+
 
 """class TimeDiff(models.Func):
     function = 'timediff'  # only works on mysql

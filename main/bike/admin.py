@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from .models import (
     Component, ComponentType, Ride, Odometer, Preferences,
-    Bike, MaintenanceAction, MaintenanceActionHistory
+    Bike, MaintenanceType, MaintenanceAction, MaintenanceActionHistory
     )
 
 admin.site.register(Component)
@@ -15,16 +15,28 @@ admin.site.register(Preferences)
 # admin.site.register(MaintenanceActionHistory)
 
 
+@admin.register(MaintenanceType)
+class MaintActionTypeAdmin(admin.ModelAdmin):
+    readonly_fields=('component_type',)
+    fields=('component_type', 'description', 'reference_info', 
+            'recurring', 
+            (
+             'maintenance_interval_distance',
+             # 'user_preferences_distance_units',
+             ),
+            'maint_interval_days', )
+
+
 @admin.register(MaintenanceAction)
 class MaintActionAdmin(admin.ModelAdmin):
     readonly_fields=('bike', 'component', 'maint_type')
-    fields=('bike', 'component', 'maint_type',
-            'description', 'completed', 
+    fields=('bike', 'component', 'maint_type', 'description', 'completed', 
             'due_date', 'due_distance',
-            # 'distance', 
-            # 'completed_distance', 'distance_units', 'completed_date',
-            'recurring', 'maintenance_interval_distance',
-            'maint_interval_distance_units', 'maint_interval_days', )
+            'recurring', 
+            # (
+                'maintenance_interval_distance',
+             # 'user_preferences_distance_units',),
+            'maint_interval_days', )
 
 
 @admin.register(MaintenanceActionHistory)
