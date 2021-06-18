@@ -247,7 +247,9 @@ class ComponentCreate(BikeLoginRequiredMixin, CreateView):
                                     status=401)
                 form.instance.bike_id = bike_id
         form.instance.owner = self.request.user
-        return super(ComponentCreate, self).form_valid(form)
+        ret = super(ComponentCreate, self).form_valid(form)  # save inst
+        self.copy_maintenance_types(form.instance)
+        return ret
 
     def get_success_url(self):
         if self.request.method == 'POST':
@@ -255,6 +257,21 @@ class ComponentCreate(BikeLoginRequiredMixin, CreateView):
             if success_url:
                 return success_url
         return super(ComponentCreate, self).get_success_url()
+
+    def copy_maintenance_types(self, cpt):
+        """ if this cpt has a cpt_type, create new MaintenanceActions for this
+        cpt, based on the MaintenanceTypes for the cpt_type """
+        if (cpt_type := cpt.type) is None:
+            return
+        for maint_type in cpt_type.maintenance_types.filter(
+                user=cpt.owner).all():
+            ma = MaintenanceAction(
+                user=cpt.owner, bike=cpt.bike, component=cpt,
+                maint_type=maint_type, recurring=maint_type.recurring,
+                maintenance_interval_distance=maint_type
+                    .maintenance_interval_distance,
+                maint_interval_days=maint_type.maint_interval_days)
+            ma.save()
 
 
 class ComponentUpdate(BikeLoginRequiredMixin, UpdateView):

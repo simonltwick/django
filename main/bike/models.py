@@ -442,7 +442,7 @@ class MaintenanceType(MaintIntervalMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_types')
     component_type = models.ForeignKey(ComponentType, on_delete=models.CASCADE,
-                                       related_name='maintenance_type')
+                                       related_name='maintenance_types')
     description = models.CharField(max_length=200)
     reference_info = models.CharField(max_length=300, blank=True, null=True)
     recurring = models.BooleanField(default=False)
