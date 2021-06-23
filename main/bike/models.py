@@ -572,7 +572,7 @@ class MaintenanceAction(MaintIntervalMixin):
         return history
 
     def current_bike_odo(self):
-        if (bike := self.bike or self.component.bike):
+        if (bike := self.bike or self.component and self.component.bike):
             return bike.current_odo
         return None
 

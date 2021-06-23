@@ -38,8 +38,7 @@ class BikeLoginRequiredMixin(LoginRequiredMixin):
 @login_required(login_url=LOGIN_URL)
 def home(request):
     preferences_set = Preferences.objects.filter(user=request.user).exists()
-    maint = (upcoming_maint(request.user)
-                      if preferences_set else None)
+    maint = (upcoming_maint(request.user) if preferences_set else None)
     return render(request, 'bike/home.html',
                   context={'preferences_set': preferences_set,
                            'upcoming_maint': maint})
@@ -268,8 +267,8 @@ class ComponentCreate(BikeLoginRequiredMixin, CreateView):
             ma = MaintenanceAction(
                 user=cpt.owner, bike=cpt.bike, component=cpt,
                 maint_type=maint_type, recurring=maint_type.recurring,
-                maintenance_interval_distance=maint_type
-                    .maintenance_interval_distance,
+                maintenance_interval_distance=(
+                    maint_type.maintenance_interval_distance),
                 maint_interval_days=maint_type.maint_interval_days)
             ma.save()
 
@@ -441,7 +440,7 @@ class RidesList(BikeLoginRequiredMixin):
         elif request.method == 'GET':
             inst.GET()
         return render(request, cls.template_name,
-                  context={'form': inst.form, 'entries': inst.entries})
+                      context={'form': inst.form, 'entries': inst.entries})
 
     def POST(self):
         self.form = form = RideSelectionForm(
@@ -449,7 +448,7 @@ class RidesList(BikeLoginRequiredMixin):
             bikes=Bike.objects.filter(owner=self.request.user).all())
         if form.is_valid():
             entries = (self.entries.filter(rider=self.request.user)
-                     .exclude(distance__range=(-0.01, 0.01)))
+                       .exclude(distance__range=(-0.01, 0.01)))
             bike = form.cleaned_data['bike']
             if bike:
                 entries = entries.filter(bike=bike)
@@ -473,7 +472,8 @@ class RidesList(BikeLoginRequiredMixin):
 
             if not self.entries.exists():
                 form.add_error(
-                    None, f"No {self.plural_name} found matching those criteria.")
+                    None,
+                    f"No {self.plural_name} found matching those criteria.")
             elif self.request.GET.get('action') == 'download_as_csv':
                 log.info("csv download requested")
                 if self.plural_name != 'rides':
@@ -482,7 +482,8 @@ class RidesList(BikeLoginRequiredMixin):
                         status=501)
                 fields = ['date', 'bike', 'distance', 'distance_units_display',
                           'ascent', 'ascent_units_display', 'description']
-                return csv_data_response(self.request, 'rides.csv', entries, fields)
+                return csv_data_response(
+                    self.request, 'rides.csv', entries, fields)
         else:
             self.entries = self.entries.order_by('-date').all()[:20]
 
@@ -490,14 +491,14 @@ class RidesList(BikeLoginRequiredMixin):
         if self.bike_id is not None:
             self.entries = self.entries.filter(bike_id=self.bike_id)
         entries = self.entries = self.entries.order_by('-date')[:20]
-        
+
         if entries:
             start_date = entries[len(entries) - 1].date
             end_date = max(entries[0].date, timezone.now())
         else:
             start_date = end_date = None
-        
-        initial={'start_date': start_date, 'end_date': end_date}
+
+        initial = {'start_date': start_date, 'end_date': end_date}
         if self.bike_id is not None:
             initial['bike'] = self.bike_id
         self.form = RideSelectionForm(
@@ -596,7 +597,7 @@ def get_odometer_readings_initial_values(request, bikes):
 
 
 @login_required(login_url=LOGIN_URL)
-def odometer_adjustment(request, ride_id=None, odo_reading_id=None, 
+def odometer_adjustment(request, ride_id=None, odo_reading_id=None,
                         success=reverse_lazy('bike:rides')):
     if request.method == 'GET':
         if ride_id is None:
@@ -628,7 +629,7 @@ class MaintActionList(BikeLoginRequiredMixin, ListView):
     ordering = ('bike', 'component', 'distance', 'due_date')
 
     def get_queryset(self):
-        # passed in context as object_list 
+        # passed in context as object_list
         return upcoming_maint(self.request.user)
 
 
@@ -643,27 +644,25 @@ def upcoming_maint(user):
 
 class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceAction
+    # template_name_suffix = '_create_form'
     fields = ['bike', 'component', 'maint_type', 'description', 'due_date',
-              'due_distance', 'completed', 'recurring', 
+              'due_distance', 'completed', 'recurring',
               'maintenance_interval_distance', 'maint_interval_days']
 
     def get_form(self, *args, **kwargs):
         form = super(MaintActionCreate, self).get_form(*args, **kwargs)
         form.fields['bike'].queryset = self.request.user.bikes
         form.fields['component'].queryset = self.request.user.components
+        form.fields['maint_type'].queryset = self.request.user.maintenance_types
         return form
 
     def get_initial(self):
         initial = super(MaintActionCreate, self).get_initial()
         bike_id = self.request.GET.get('bike')
         if bike_id:
-            bike = get_object_or_404(Bike, owner=self.request.user, pk=bike_id)
-        else:
-            bike = Bike.objects.filter(
-                owner=self.request.user).order_by('-rides__date').first()
-        # copy, so we don't accidentally change a mutable dict
-        initial = initial.copy()
-        initial['bike'] = bike
+            # copy, so we don't accidentally change a mutable dict
+            initial = initial.copy()
+            initial['bike'] = bike_id
         return initial
 
     def form_valid(self, form):
@@ -692,7 +691,7 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
 @login_required
 def maint_action_update(request, pk: int):
     maintenanceaction = get_object_or_404(MaintenanceAction, pk=pk,
-                             user=request.user)
+                                          user=request.user)
     if request.method == 'GET':
         form = MaintenanceActionUpdateForm(instance=maintenanceaction)
     elif request.method == 'POST':
@@ -731,15 +730,15 @@ def maint_action_complete(request, pk: int):
         comp_distance = completion_form.cleaned_data['distance']
         maint_history = maint_action.maint_completed(comp_date, comp_distance)
         completion_form = MaintCompletionDetailsForm(initial={
-        'completed_date': timezone.now().date(),
-        'distance': maint_action.current_bike_odo(),
-        'distance_units': distance_units})
+            'completed_date': timezone.now().date(),
+            'distance': maint_action.current_bike_odo(),
+            'distance_units': distance_units})
         # or maint_action_form.data[field_name]=new_value
         # for due_distance and for completed
         maint_action_form = MaintenanceActionUpdateForm(instance=maint_action)
     else:
         maint_history = ''
-    
+
     return render(
         request, 'bike/maintenanceaction_form.html',
         context={'form': maint_action_form, 'maintenanceaction': maint_action,
@@ -871,6 +870,7 @@ class MaintTypeUpdate(BikeLoginRequiredMixin, UpdateView):
         context['distance_units'] = (self.request.user.preferences
                                      .get_distance_units_display())
         return context
+
 
 class MaintTypeDelete(BikeLoginRequiredMixin, DeleteView):
     model = MaintenanceType

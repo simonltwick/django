@@ -116,7 +116,7 @@ class MaintenanceActionUpdateForm(forms.ModelForm):
         model = MaintenanceAction
         fields = ['description', 'due_date', 'due_distance',
                   'recurring', 'maintenance_interval_distance',
-                   'maint_interval_days',
+                  'maint_interval_days',
                   ]
 
 

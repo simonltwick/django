@@ -25,13 +25,17 @@
     formaction="{% url 'bike:bike_new' %}?next={% url 'bike:bikes' %}">
 </p>{% endif %}
 
+</form>
+
 <h3>Upcoming Maintenance</h3>
 {% include 'bike/bike_maint_upcoming.html' %}
 
 {% if bike %}
   <p>
-  <input type="submit" class="btn btn-secondary" value="Add maint. action"
-    	 formaction="{% url 'bike:maint_new' %}?bike={{ bike.id }}">
+  <a class="btn btn-secondary"
+    href="{% url 'bike:maint_new' %}?bike={{ bike.id }}">
+	Add maint. action
+	</a>
   </p>
 
 {% endif %}
@@ -74,6 +78,5 @@
 	Add component</a>
 {% endif %}
 </p>
-</form>
 
 {% endblock %}
