@@ -6,6 +6,11 @@
 > {% breadcrumb_url "Delete" 'bike:bike_delete' bike.id %}
 {% endblock %}
 
+{% block title %}
+Confirm delete for {{ bike }} -
+{% endblock %}
+
+
 {% block content %}
 
 <h1>Confirm delete for {{ bike }}</h1>

@@ -1,5 +1,9 @@
 {% extends 'bike/base.html' %}
 
+{% block title %}
+Maintenance Action History: {{ maintenanceactionhistory }} -
+{% endblock %}
+
 {% block content %}
 <h1>Maintenance Action History: {{ maintenanceactionhistory.action }}</h1>
 <form method='POST'>

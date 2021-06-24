@@ -1,5 +1,9 @@
 {% extends 'bike/base.html' %}
 
+{% block title %}
+Enter Odometer Readings: {{ bike }} -
+{% endblock %}
+
 {% block content %}
 <h1>New Odometer readings:</h1>
 <form method='POST'>

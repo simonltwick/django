@@ -1,5 +1,9 @@
 {% extends 'bike/base.html' %}
 
+{% block title %}
+Mileage in {{ month|date:"M Y" }} -
+{% endblock %}
+
 {% block content %}
 {% load month_name %}
 

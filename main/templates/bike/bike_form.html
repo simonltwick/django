@@ -1,5 +1,9 @@
 {% extends 'bike/base.html' %}
 
+{% block title %}
+Bike details: {{ bike }} -
+{% endblock %}
+
 {% block content %}
 <h1>Bike details: {{ bike.name }}</h1>
 <form method='POST'>

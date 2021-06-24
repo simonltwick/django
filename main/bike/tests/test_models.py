@@ -31,7 +31,7 @@ class TestDistanceUnits(TestCase):
 
         self.assertEqual(Dconv(1, m, m), 1, "convert miles to miles")
         self.assertEqual(Dconv(1, km, km), 1, "convert km to km")
-        self.assertEqual(Dconv(1, km, m), 0.621371, "convert km to miles")
+        self.assertEqual(Dconv(1, km, m), 1/1.60934, "convert km to miles")
         self.assertEqual(Dconv(1, m, km), 1.60934, "convert miles to km")
 
     def test_sum(self):
@@ -44,19 +44,20 @@ class TestDistanceUnits(TestCase):
                                {'distance': 2, 'distance_units': m}],
                               target_units=m), 3, "no conversion")
         self.assertEqual(Dsum([{'distance': 1, 'distance_units': km}],
-                              target_units=m), 0.621371, "km to miles")
+                              target_units=m), 1/1.60934, "km to miles")
         self.assertEqual(Dsum([{'distance': 1, 'distance_units': m}],
                               target_units=km), 1.60934, "miles to km")
         self.assertEqual(Dsum([{'distance': 4, 'distance_units': m},
                                {'distance': 2, 'distance_units': m},
                                {'distance': 1, 'distance_units': km}],
-                              target_units=m), 6.621371, "mixed units sum")
+                              target_units=m), 6 + 1/1.60934,
+                         "mixed units sum")
 
 
 class TestOdometerAdjustmentRides(TestCase):
 
     """ adding an odo reading automatically calls update_adjustment_rides
-        adding/deleting/updating a ride between two odo readings 
+        adding/deleting/updating a ride between two odo readings
             updates adjustment ride
         """
 

@@ -1,5 +1,9 @@
 {% extends 'bike/base.html' %}
 
+{% block title %}
+Preferences for {{ request.user.username }} -
+{% endblock %}
+
 {% block content %}
 <h1>Units preferences for {{ request.user.username }}</h1>
 <form method='POST'>

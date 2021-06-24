@@ -1,5 +1,9 @@
 {% extends 'bike/base.html' %}
 
+{% block title %}
+Mileage{% if bike %} for {{ bike }}{% endif %} in {{ year }} -
+{% endblock %}
+
 {% block content %}
 {% load month_name %}
 
