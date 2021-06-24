@@ -162,6 +162,8 @@ class BikeUrlTest(TestCase):
                              kwargs={'ride_id': self.adjustment_ride.id}))
         self.try_url(reverse('bike:odometer_adjustment',
                              kwargs={'odo_reading_id': self.odo.id}))
+        self.try_url(reverse('bike:odometer_delete',
+                             kwargs={'pk': self.odo.id}))
         # add odometer_adjustment_ride <adj_ride_id>
         # can't add odometer_adjustment as requires POST method
 

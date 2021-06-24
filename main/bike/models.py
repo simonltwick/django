@@ -253,8 +253,7 @@ class Ride(DistanceMixin):
 
 class Odometer(DistanceRequiredMixin):
     rider = models.ForeignKey(User, on_delete=models.CASCADE)
-    initial_value = models.BooleanField(
-        default=False)  
+    initial_value = models.BooleanField(default=False)
     # , help_text="Only tick this for the initial value of new "
     #    "odometer or after resetting the odometer reading.")
     comment = models.CharField(max_length=100, null=True, blank=True)

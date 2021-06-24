@@ -29,7 +29,7 @@ urlpatterns = [
          name='maint_complete'),
     path('maint/<int:pk>/delete', views.MaintActionDelete.as_view(),
          name='maint_delete'),
-    
+
     path('maint/history/<int:pk>', views.MaintHistoryUpdate.as_view(),
          name='maint_history'),
     path('maint/history/<int:pk>/delete', views.MaintHistoryDelete.as_view(),
@@ -63,6 +63,8 @@ urlpatterns = [
          name='odometer_adjustment_ride'),
     path('odometer/adjustment/<int:odo_reading_id>', views.odometer_adjustment,
          name='odometer_adjustment'),
+    path('odometer/reading/<int:pk>/delete',
+         views.OdometerDelete.as_view(), name='odometer_delete'),
 
     path('components', views.components, name='components'),
     path('component/new', views.ComponentCreate.as_view(),

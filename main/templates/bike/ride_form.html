@@ -46,6 +46,10 @@ Ride details: {{ ride }} -
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
        formaction="{{ save_url }}?next={% url 'bike:home' %}">
+{% if ride %}
+<a href="{% url 'bike:ride_delete' pk=ride.id %}" class="btn btn-danger">
+  Delete</a>
+{% endif %}
 {% if bike_id %}
 <input type="submit" class="btn btn-secondary" value="Add maint. action"
        formaction="{{ save_url }}?next={% url 'bike:maint_new' %}?bike={{ bike_id }}">

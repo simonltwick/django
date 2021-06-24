@@ -1,0 +1,23 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Confirm Delete for {{ odometer }} -
+{% endblock %}
+
+{% block content %}
+
+<h1>Confirm delete for {{ odometer }}</h1>
+	<p class="errormsg">This Odometer reading will be deleted.</p>
+<h2>Are you sure?</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<p><a class="btn btn-secondary"
+	  href="{% url 'bike:odometer_adjustment' odo_reading_id=odometer.id %}">
+      Cancel</a>
+	<input type="submit" class="btn btn-danger" value="Delete">
+</form>
+
+
+{% endblock %}

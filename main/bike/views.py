@@ -624,6 +624,18 @@ def odometer_adjustment(request, ride_id=None, odo_reading_id=None,
                            "success_url": success})
 
 
+class OdometerDelete(BikeLoginRequiredMixin, DeleteView):
+    model = Odometer
+    fields = ['bike', 'date', 'comment']
+    success_url = reverse_lazy('bike:odometer_readings')
+
+    def dispatch(self, request, *args, **kwargs):
+        if not Odometer.objects.filter(pk=kwargs['pk'],
+                                       rider=request.user).exists():
+            return HttpResponse("Invalid odometer reading", status=401)
+        return super(OdometerDelete, self).dispatch(request, *args, **kwargs)
+
+
 class MaintActionList(BikeLoginRequiredMixin, ListView):
     model = MaintenanceAction
     ordering = ('bike', 'component', 'distance', 'due_date')
