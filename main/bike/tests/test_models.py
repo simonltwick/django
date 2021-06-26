@@ -8,13 +8,15 @@ from django.test import TestCase, override_settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.db.models import F, ExpressionWrapper, fields
+from django.db.models.functions import Now, TruncDate, ExtractDay
 
 import datetime as dt
 import logging
 
 from ..models import (
     Bike,  # ComponentType, Component, MaintenanceAction,
-    DistanceUnits, Odometer, Ride, Preferences
+    DistanceUnits, Odometer, Ride, Preferences, MaintenanceAction,
     # MaintenanceType,
     )
 
@@ -66,27 +68,23 @@ class TestOdometerAdjustmentRides(TestCase):
     def setUp(self):
         self.user = User.objects.create(
             username='tester', password=make_password('testpw'))
-        self.user.save()
-        preferences = Preferences.objects.create(user=self.user)
-        preferences.save()
+        _preferences = Preferences.objects.create(user=self.user)
         self.bike = Bike.objects.create(
             name='Test bike', description="test", owner=self.user)
-        self.bike.save()
         self.now = timezone.now()
         self.yr = dt.timedelta(days=365)
         self.ride = Ride.objects.create(rider=self.user, bike=self.bike,
                                         distance=1,
                                         date=self.now,
                                         distance_units=DistanceUnits.MILES)
-        self.ride.save()
-        self.odo1 = Odometer(bike=self.bike, rider=self.user,
-                             distance=20, distance_units=DistanceUnits.MILES,
-                             date=self.now-self.yr)
-        self.odo1.save()
-        self.odo2 = Odometer(bike=self.bike, rider=self.user,
-                             distance=40, distance_units=DistanceUnits.MILES,
-                             date=self.now+self.yr)
-        self.odo2.save()
+        self.odo1 = Odometer.objects.create(
+            bike=self.bike, rider=self.user,
+            distance=20, distance_units=DistanceUnits.MILES,
+            date=self.now-self.yr)
+        self.odo2 = Odometer.objects.create(
+            bike=self.bike, rider=self.user,
+            distance=40, distance_units=DistanceUnits.MILES,
+            date=self.now+self.yr)
 
     def test0_prev_next_odo(self):
         self.assertEqual(
@@ -216,3 +214,30 @@ class TestOdometerAdjustmentRides(TestCase):
         self.odo2.save()
         self.assertIsNotNone(self.odo2.adjustment_ride,
                              msg="restore adjustment ride if initial=False")
+
+
+class TestMaintenanceAction(TestCase):
+    @override_settings(
+        PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher', ])
+    def setUp(self):
+        self.user = User.objects.create(
+            username='tester', password=make_password('testpw'))
+        self.maint_action = MaintenanceAction.objects.create(
+            user=self.user, due_date=timezone.now()+dt.timedelta(days=1))
+
+    def test1(self):
+        # from django import get_version
+        # print(f"django version is {get_version()}")
+        due_in = ExpressionWrapper(
+            F('due_date') - TruncDate(Now()),
+            output_field=fields.DurationField()
+            )
+        # due_in_days = ExtractDay(due_in)  # error - requires native DB
+        #                                   # DurationField support
+        ma = MaintenanceAction.objects.annotate(due_in=due_in).first()
+
+        # today = dt.datetime.now().date()
+        # print(f"{ma=}, {today=!r}, {ma.due_date=!r}, {ma.due_in=!r}, "
+        #       f"{ma.due_in.days=!r}")
+        self.assertIsInstance(ma.due_in, dt.timedelta)
+        self.assertEqual(ma.due_in.days, 1)

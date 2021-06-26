@@ -2,8 +2,8 @@ from django import contrib
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Sum, F, ExpressionWrapper
-from django.db.models.functions import Now
+from django.db.models import Sum, F, ExpressionWrapper, fields
+from django.db.models.functions import Now, TruncDate
 from django.urls import reverse
 from django.utils import timezone
 
@@ -90,7 +90,6 @@ class DistanceUnits(IntEnum):
                    DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 1/1.60934,
                                               DistanceUnits.KILOMETRES: 1}}
         return factors[from_units][to_units]
-
 
     @classmethod
     def convert(cls, distance, from_units, to_units):
@@ -296,7 +295,7 @@ class Odometer(DistanceRequiredMixin):
         same as the difference between the odo readings.
         Mileage before a "reset" odo reading is not adjusted """
         # log.debug("Odometer.update_adjustment_rides(%s): initial_value=%s, "
-        #           "adjustment_ride=%s", self, self.initial_value, 
+        #           "adjustment_ride=%s", self, self.initial_value,
         #           self.adjustment_ride)
         if self.initial_value:  # after resetting odo: no adjustment ride
             if self.adjustment_ride:
@@ -463,8 +462,9 @@ class MaintenanceType(MaintIntervalMixin):
                     cls.__name__, factor)
         items = cls.objects.filter(
             user=user, maintenance_interval_distance__isnull=False)
-        items.update(maintenance_interval_distance=
-                     F('maintenance_interval_distance') * factor)
+        items.update(
+            maintenance_interval_distance=F('maintenance_interval_distance') *
+            factor)
 
     # @property  # @contrib.admin.display(ordering='user')
     def user_preferences_distance_units(self):
@@ -509,8 +509,9 @@ class MaintenanceAction(MaintIntervalMixin):
                     cls.__name__, factor)
         items = cls.objects.filter(
             user=user, maintenance_interval_distance__isnull=False)
-        items.update(maintenance_interval_distance=
-                     F('maintenance_interval_distance') * factor)
+        items.update(
+            maintenance_interval_distance=F('maintenance_interval_distance') *
+            factor)
         # update due_distance
         log.warning("Updating %s.due_distances * %s", cls.__name__, factor)
         items = cls.objects.filter(
@@ -518,8 +519,8 @@ class MaintenanceAction(MaintIntervalMixin):
         items.update(due_distance=F('due_distance') * factor)
 
     @classmethod
-    def history(
-            cls, user, bike_id=None, component_id=None, order_by='-completed_date'):
+    def history(cls, user, bike_id=None, component_id=None,
+                order_by='-completed_date'):
         """ return a list of maintenance action histories
         ordered by either date or maint action.
         """
@@ -555,7 +556,7 @@ class MaintenanceAction(MaintIntervalMixin):
             distance=comp_distance,
             distance_units=self.user.preferences.distance_units)
         if not self.recurring:
-            self.completed=True
+            self.completed = True
         else:
             if self.maint_interval_days:
                 self.due_date = comp_date + self.maint_interval_days
@@ -583,17 +584,14 @@ class MaintenanceAction(MaintIntervalMixin):
         upcoming = MaintenanceAction.objects.filter(completed=False, user=user)
         if bike_id is not None:
             upcoming = upcoming.filter(bike_id=bike_id)
-        upcoming = (upcoming
-                #    .annotate(
-                # due_in_time= ExpressionWrapper(
-                #     F('due_date') - timezone.now().date(),
-                #     output_field=models.DurationField())
-                # )
-            # .annotate(due_in_time = TimeDiff('due_distance', Now()))
-            .annotate(
-                due_in_distance=F('due_distance') - F('bike__current_odo')
-                )
+        due_in_duration = ExpressionWrapper(
+            F('due_date') - TruncDate(Now()),
+            output_field=fields.DurationField()
             )
+        upcoming = (upcoming.annotate(
+            due_in_duration=due_in_duration,
+            due_in_distance=F('due_distance') - F('bike__current_odo')
+            ))
         return upcoming
 
     def due_in(self, distance_units):
@@ -605,19 +603,15 @@ class MaintenanceAction(MaintIntervalMixin):
             pass
         if not hasattr(self, 'due_in_distance'):
             self.due_in_distance = None
-        self.due_in_time = ((self.due_date - timezone.now().date()).days
-                          if self.due_date is not None else None)
-        due = [f"{self.due_in_time} days" if self.due_in_time else None,
-               (f"{self.due_in_distance:0.0f} {distance_units}"
-               if self.due_in_distance else None)]
+        # self.due_in_duration = ((self.due_date - timezone.now().date()).days
+        #                         if self.due_date is not None else None)
+        due = [
+            (f"{self.due_in_duration.days} days"
+             if self.due_in_duration else None),
+            (f"{self.due_in_distance:0.0f} {distance_units}"
+             if self.due_in_distance else None)]
         self._due_in = ', '.join(d for d in due if d is not None)
         return self._due_in
-
-
-"""class TimeDiff(models.Func):
-    function = 'timediff'  # only works on mysql
-    output_field = models.TimeField() """
-    # you could also implement __init__ to enforce only two date fields
 
 
 class MaintenanceActionHistory(DistanceMixin):
