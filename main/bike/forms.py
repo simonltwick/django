@@ -1,13 +1,28 @@
 from django import forms
 from django.forms import modelformset_factory
+from django.utils.dateparse import parse_duration
 import datetime as dt
 import logging
 
 from .models import (
-    Component, Ride, Odometer, MaintenanceAction, MaintenanceActionHistory)
+    Component, Ride, Odometer, MaintenanceAction, MaintenanceActionHistory,
+    Preferences)
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
+
+
+class DaysDurationInput(forms.TextInput):
+    """ custom widget for DurationField.
+        Ignores hh:mm:ss, simply returns dd days """
+
+    def format_value(self, value):
+        log.debug("DaysDurationInput(%r)", value)
+        if not value:
+            return ''
+
+        duration = parse_duration(value)
+        return f'{duration.days} days'
 
 
 class RideSelectionForm(forms.Form):
@@ -31,6 +46,15 @@ ComponentFormSet = modelformset_factory(
     fields=('bike', 'subcomponent_of', 'name', 'type'))
 
 
+class PreferencesForm(forms.ModelForm):
+    class Meta:
+        model = Preferences
+        fields = ('distance_units', 'ascent_units',
+                  'maint_distance_limit', 'maint_time_limit')
+        widgets = {
+            'maint_time_limit': DaysDurationInput()}
+
+
 class RideForm(forms.ModelForm):
     class Meta:
         model = Ride
@@ -46,7 +70,7 @@ class OdometerAdjustmentForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['distance'].widget.attrs['class']='odometer'
+        self.fields['distance'].widget.attrs['class'] = 'odometer'
 
 
 class OdometerForm(forms.ModelForm):
@@ -57,7 +81,7 @@ class OdometerForm(forms.ModelForm):
         self.user = user
         self.reading_dtime = reading_dtime
         super().__init__(*args, **kwargs)
-        self.fields['distance'].widget.attrs['class']='odometer'
+        self.fields['distance'].widget.attrs['class'] = 'odometer'
 
     # specialised handling of is_valid and save: forms with no distance data
     # are ignored (no validation, and no save)
@@ -98,10 +122,10 @@ OdometerFormSet = modelformset_factory(
     Odometer,
     formset=BaseOdometerFormSet,
     form=OdometerForm,
-    fields=[# 'rider', 
+    fields=[  # 'rider',
             'bike', 'distance', 'distance_units', 'initial_value',
-            'comment',], 
-            # 'date'],
+            'comment', ],
+    #       'date'],
     extra=1  # overridden in view
     )
 

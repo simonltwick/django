@@ -19,7 +19,7 @@ from .models import (
     DistanceUnits, MaintenanceActionHistory, MaintenanceType, Odometer,
     )
 from .forms import (
-    RideSelectionForm, RideForm,
+    RideSelectionForm, RideForm, PreferencesForm,
     MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm)
 
@@ -100,9 +100,10 @@ def bikes(request):
 
 
 class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
+    form_class = PreferencesForm
     model = Preferences
-    fields = ['distance_units', 'ascent_units',
-              'maint_distance_limit', 'maint_time_limit']
+    # fields = ['distance_units', 'ascent_units',
+    #           'maint_distance_limit', 'maint_time_limit']
 
     def form_valid(self, form):
         obj = form.save(commit=False)
@@ -111,8 +112,9 @@ class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
 
 
 class PreferencesUpdate(BikeLoginRequiredMixin, UpdateView):
+    form_class = PreferencesForm
     model = Preferences
-    fields = PreferencesCreate.fields
+    # fields = PreferencesCreate.fields
 
     def dispatch(self, request, *args, **kwargs):
         if 'pk' not in self.kwargs:
