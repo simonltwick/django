@@ -101,7 +101,8 @@ def bikes(request):
 
 class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
     model = Preferences
-    fields = ['distance_units', 'ascent_units']
+    fields = ['distance_units', 'ascent_units',
+              'maint_distance_limit', 'maint_time_limit']
 
     def form_valid(self, form):
         obj = form.save(commit=False)
@@ -111,7 +112,7 @@ class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
 
 class PreferencesUpdate(BikeLoginRequiredMixin, UpdateView):
     model = Preferences
-    fields = ['distance_units', 'ascent_units']
+    fields = PreferencesCreate.fields
 
     def dispatch(self, request, *args, **kwargs):
         if 'pk' not in self.kwargs:
@@ -665,7 +666,8 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
         form = super(MaintActionCreate, self).get_form(*args, **kwargs)
         form.fields['bike'].queryset = self.request.user.bikes
         form.fields['component'].queryset = self.request.user.components
-        form.fields['maint_type'].queryset = self.request.user.maintenance_types
+        form.fields['maint_type'].queryset = \
+            self.request.user.maintenance_types
         return form
 
     def get_initial(self):

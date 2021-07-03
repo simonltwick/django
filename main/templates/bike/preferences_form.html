@@ -11,6 +11,12 @@ Preferences for {{ request.user.username }} -
 {{ form }}
 {% csrf_token %}
 </table>
+<p><small class='form-text text-muted'>Maintenance time and distance limits are 
+used to decide whether to show
+upcoming maintenance.   If they are left blank, all upcoming maintenance is
+shown.   Enter the time limit in days (hh:mm:ss is optional), and the
+distance limit using the chosen distance units.</small></p>
+
 {% if preferences %}
 <input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"

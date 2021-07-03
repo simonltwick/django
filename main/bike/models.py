@@ -2,7 +2,7 @@ from django import contrib
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Sum, F, ExpressionWrapper, fields
+from django.db.models import Sum, F, Q, ExpressionWrapper, fields
 from django.db.models.functions import Now, TruncDate
 from django.urls import reverse
 from django.utils import timezone
@@ -134,6 +134,12 @@ class Preferences(models.Model):
         choices=DistanceUnits.choices(), default=DistanceUnits.MILES)
     ascent_units = models.PositiveSmallIntegerField(
         choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
+    maint_distance_limit = models.PositiveSmallIntegerField(
+        default=100, blank=True, null=True,
+        verbose_name='Upcoming maintenance distance limit')
+    maint_time_limit = models.DurationField(
+        default=dt.timedelta(days=10), blank=True, null=True,
+        verbose_name='Upcoming maintenance time limit')
 
     class Meta:
         verbose_name_plural = 'preferences'
@@ -592,7 +598,18 @@ class MaintenanceAction(MaintIntervalMixin):
             due_in_duration=due_in_duration,
             due_in_distance=F('due_distance') - F('bike__current_odo')
             ))
-        return upcoming
+        return cls.apply_prefs_limits(upcoming, user)
+
+    @classmethod
+    def apply_prefs_limits(cls, upcoming, user):
+        prefs = user.preferences
+        # maint actions with neither due date or distance always show up
+        q = Q(due_in_distance__isnull=True, due_in_duration__isnull=True)
+        if prefs and prefs.maint_distance_limit:
+            q |= Q(due_in_distance__lte=prefs.maint_distance_limit)
+        if prefs and prefs.maint_time_limit:
+            q |= Q(due_in_duration__lte=prefs.maint_time_limit)
+        return upcoming.filter(q)
 
     def due_in(self, distance_units):
         """ return a string with "Due in xxx days, xxx <distance units".
