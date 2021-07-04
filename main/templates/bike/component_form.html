@@ -47,10 +47,22 @@ Component details: {{ component }} -
   <p>(no sub-components)
 {% endfor %}
 
+{% url 'bike:component' component.id as success_url %}
+
 <a class="btn btn-secondary"
-   href="{% url 'bike:component_new' %}?subcomponent_of={{ component.id }}&next={% url 'bike:component' component.id %}">
+   href="{% url 'bike:component_new' %}?subcomponent_of={{ component.id }}&next={{ success_url }}">
    Add sub-component
    </a></p>
+
+<h3>Upcoming maintenance</h3>
+{% include 'bike/maint_upcoming.html' %}
+<p><a class="btn btn-secondary"
+   href="{% url 'bike:maint_new' %}?component_id={{ component.id }}&next={{ success_url }}">
+   Add maintenance action
+   </a></p>
+
+{% include 'bike/maint_history.html' %}
+
 {% endif %}
 
 {% endblock %}

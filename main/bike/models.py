@@ -583,13 +583,15 @@ class MaintenanceAction(MaintIntervalMixin):
         return None
 
     @classmethod
-    def upcoming(cls, user, bike_id: int=None):
+    def upcoming(cls, user, bike_id: int=None, component_id=None):
         """ return a queryset of incomplete maintenance actions
             due_in_time is a datetime.timedelta object,
             due_in_distance is a float using preferences.distance_units """
         upcoming = MaintenanceAction.objects.filter(completed=False, user=user)
         if bike_id is not None:
             upcoming = upcoming.filter(bike_id=bike_id)
+        if component_id is not None:
+            upcoming = upcoming.filter(component_id=component_id)
         due_in_duration = ExpressionWrapper(
             F('due_date') - TruncDate(Now()),
             output_field=fields.DurationField()

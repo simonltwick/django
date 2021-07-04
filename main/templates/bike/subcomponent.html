@@ -1,7 +1,8 @@
 {# display clickable subcomponent details #}
  
  <tr><td>{{ subcomponent.type }}</td>
-	<td><a href="{% url 'bike:component' subcomponent.id %}">{{ subcomponent.name }}
+	<td><a href="{% url 'bike:component' subcomponent.id %}?next={{ success_url }}">
+	{{ subcomponent.name }}
 	</a></td>
 	<td>{{ subcomponent.specification }}</td>
 	</tr>

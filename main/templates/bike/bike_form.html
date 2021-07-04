@@ -43,21 +43,10 @@ Bike details: {{ bike }} -
   </p>
 
 {% endif %}
-
-{% for action in maint_history %}
-  {% if forloop.first %}<h3>Maintenance history</h3><table>{% endif %}
-  <tr><td>{{ action.completed_date }}</td>
-    
-    <td><a href="{% url 'bike:maint_history' action.id %}?success={% url 'bike:bike' bike.id %}">
-	  {{ action.action }}</a></td>
-	<td>{% if action.distance %}
-	  {{ action.distance}} {{ action.distance_units_display }}
-      {% endif %}
-	</td>
-  </tr>
-  {% if forloop.last %}</table>{% endif %}
-{% endfor %}
+{% url 'bike:bike' bike.id as success_url %}
+{% include 'bike/maint_history.html' %}
 <br>
+
 {% for subcomponent in components %}
   {% if forloop.first %}
     <h3>Components</h3>
@@ -78,7 +67,7 @@ Bike details: {{ bike }} -
 <p>
 {% if bike %}
 	<a class="btn btn-secondary"
-	  href="{% url 'bike:component_new' %}?bike={{ bike.id }}&next={% url 'bike:bike' bike.id %}">
+	  href="{% url 'bike:component_new' %}?bike={{ bike.id }}&next={{ success_url }}">
 	Add component</a>
 {% endif %}
 </p>

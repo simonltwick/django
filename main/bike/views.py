@@ -164,25 +164,7 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
         context = super(BikeUpdate, self).get_context_data(**kwargs)
         pk = self.kwargs['pk']
         context['components'] = Component.objects.filter(bike_id=pk)
-        context['distance_units'] = distance_units = (
-            self.request.user.preferences.get_distance_units_display())
-        """context['maint'] = MaintenanceAction.objects.filter(
-            bike_id=pk, completed=False)"""
-        upcoming = MaintenanceAction.upcoming(
-            bike_id=pk, user=self.request.user).all()
-        for ma in upcoming:
-            """ma.due_in_time = ((ma.due_date - timezone.now().date()).days
-                              if ma.due_date is not None else None)
-            due = [f"{ma.due_in_time} days" if ma.due_in_time else None,
-                   (f"{ma.due_in_distance:0.0f} {distance_units}"
-                   if ma.due_in_distance else None)]
-            ma.due = ', '.join(d for d in due if d is not None)"""
-            ma.due = ma.due_in(distance_units)
-        context['maint'] = upcoming
-        if pk is not None:
-            context['maint_history'] = MaintenanceAction.history(
-                user=self.request.user, bike_id=pk)
-        return context
+        return add_maint_context(context, self.request.user, bike_id=pk)
 
     def form_valid(self, form):
         resp = super(BikeUpdate, self).form_valid(form)
@@ -193,6 +175,23 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
         if next_url:
             return next_url
         return super(BikeUpdate, self).get_success_url()
+
+
+def add_maint_context(context: dict, user, bike_id=None, component_id=None):
+    """ add upcoming maintenance & maintenance history for a bike or cpt """
+    distance_units = user.preferences.get_distance_units_display()
+    context['distance_units'] = distance_units
+    if bike_id is None and component_id is None:
+        return context
+
+    context['maint_upcoming'] = upcoming = MaintenanceAction.upcoming(
+        user=user, bike_id=bike_id, component_id=component_id).all()
+    for ma in upcoming:
+        ma.due = ma.due_in(distance_units)
+
+    context['maint_history'] = MaintenanceAction.history(
+        user=user, bike_id=bike_id, component_id=component_id)
+    return context
 
 
 class BikeDelete(BikeLoginRequiredMixin, DeleteView):
@@ -293,11 +292,12 @@ class ComponentUpdate(BikeLoginRequiredMixin, UpdateView):
         return super(ComponentUpdate, self).get_success_url()
 
     def get_context_data(self):
-        context_data = super(ComponentUpdate, self).get_context_data()
+        context = super(ComponentUpdate, self).get_context_data()
         subcomponents = Component.objects.filter(
             subcomponent_of=self.object).all()
-        context_data['subcomponents'] = subcomponents
-        return context_data
+        context['subcomponents'] = subcomponents
+        return add_maint_context(
+            context, self.request.user, component_id=self.object.id)
 
 
 class ComponentDelete(BikeLoginRequiredMixin, DeleteView):
@@ -675,10 +675,14 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     def get_initial(self):
         initial = super(MaintActionCreate, self).get_initial()
         bike_id = self.request.GET.get('bike')
-        if bike_id:
+        component_id = self.request.GET.get('component_id')
+        if bike_id or component_id:
             # copy, so we don't accidentally change a mutable dict
             initial = initial.copy()
-            initial['bike'] = bike_id
+            if bike_id:
+                initial['bike'] = bike_id
+            if component_id:
+                initial['component'] = component_id
         return initial
 
     def form_valid(self, form):

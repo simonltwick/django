@@ -2,7 +2,7 @@
      Requires context = MaintenanceAction.upcoming() -->
 
 
-{% for action in maint %}
+{% for action in maint_upcoming %}
   {% if forloop.first %}<ul>{% endif %}
   <li><a href="{% url 'bike:maint' action.id %}">{{ action }}</a>
   {% if action.due_date or action.due_distance %}
