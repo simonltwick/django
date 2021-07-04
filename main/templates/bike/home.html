@@ -21,7 +21,7 @@ Record a ride</a></p>
 {% if upcoming_maint %}
 <h3>Upcoming Maintenance</h3>
 {% regroup upcoming_maint by bike as maint_per_bike %}
-{% include 'bike/upcoming_maint.html' %}
+{% include 'bike/bikes_maint_upcoming.html' %}
 {% endif %}
 
 <h3>About Bike</h3>

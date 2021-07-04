@@ -2,7 +2,7 @@
 
 {% for bike_maint in maint_per_bike %}
 <p>Bike: {{ bike_maint.grouper }}</p>
-{% with bike_maint.list as maint %}
+{% with bike_maint.list as maint_upcoming %}
 {% include 'bike/bike_maint_upcoming.html' %}
 {% endwith %}
 {% endfor %}
