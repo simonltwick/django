@@ -28,14 +28,13 @@ Component details: {{ component }} -
 </form>
 
 {% if component %}
+{% url 'bike:component' component.id as success_url %}
+
 {% for subcomponent in subcomponents %}
   {% if forloop.first %}
   <h3>Sub-components</h3>
   <table class="table">
-    <tr><th>Type</th>
-	<th>Description</th>
-	<th>Specification</th>
-	</tr>
+    <tr><th>Type</th><th>Description</th><th>Specification</th></tr>
   {% endif %}
 
   {% include 'bike/subcomponent.html' %}
@@ -47,7 +46,6 @@ Component details: {{ component }} -
   <p>(no sub-components)
 {% endfor %}
 
-{% url 'bike:component' component.id as success_url %}
 
 <a class="btn btn-secondary"
    href="{% url 'bike:component_new' %}?subcomponent_of={{ component.id }}&next={{ success_url }}">

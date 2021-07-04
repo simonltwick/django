@@ -4,15 +4,16 @@
 
 {% for action in maint_upcoming %}
   {% if forloop.first %}<ul>{% endif %}
-  <li><a href="{% url 'bike:maint' action.id %}">{{ action }}</a>
-  {% if action.due_date or action.due_distance %}
-  due in {{ action.due }}:
-    {{ action.due_date|default_if_none:"" }}
-    {% if action.due_date and action_due_distance %} or {% endif %}
-    {% if action.due_distance %}
-      at {{ action.due_distance }} {{ distance_units }}
+  <li><a href="{% url 'bike:maint' action.id %}?next={{ success_url }}">
+    {{ action }}</a>
+    {% if action.due_date or action.due_distance %}
+      due in {{ action.due }}:
+      {{ action.due_date|default_if_none:"" }}
+      {% if action.due_date and action_due_distance %} or {% endif %}
+      {% if action.due_distance %}
+        at {{ action.due_distance }} {{ distance_units }}
+      {% endif %}
     {% endif %}
-  {% endif %}
   </li>
   {% if forloop.last %}</ul>{% endif %}
 {% empty %}<p>(None)</p>

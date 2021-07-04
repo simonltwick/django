@@ -31,19 +31,19 @@ Bike details: {{ bike }} -
 
 </form>
 
+{% url 'bike:bike' bike.id as success_url %}
 <h3>Upcoming Maintenance</h3>
 {% include 'bike/maint_upcoming.html' %}
 
 {% if bike %}
   <p>
   <a class="btn btn-secondary"
-    href="{% url 'bike:maint_new' %}?bike={{ bike.id }}">
+    href="{% url 'bike:maint_new' %}?bike={{ bike.id }}&next={{ success_url }}">
 	Add maint. action
 	</a>
   </p>
 
 {% endif %}
-{% url 'bike:bike' bike.id as success_url %}
 {% include 'bike/maint_history.html' %}
 <br>
 
