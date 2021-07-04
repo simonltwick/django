@@ -17,7 +17,6 @@ class DaysDurationInput(forms.TextInput):
         Ignores hh:mm:ss, simply returns dd days """
 
     def format_value(self, value):
-        log.debug("DaysDurationInput(%r)", value)
         if not value:
             return ''
 
