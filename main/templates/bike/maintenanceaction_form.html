@@ -39,8 +39,7 @@ Maintenance Action details: {{ maintenanceaction }} -
 	on {{ maintenanceaction.completed_date }}
   {% endif %}
   {% if maintenanceaction.completed_distance %}
-    at {{ maintenanceaction.completed_distance }}
-    {{ distance_units }}
+    at {{ maintenanceaction.completed_distance }} {{ distance_units }}
   {% endif %}</p>
 {% endif %}
   {% csrf_token %}
