@@ -5,13 +5,13 @@ Component type: {{ componenttype }} -
 {% endblock %}
 
 {% block content %}
-<h1>Component Type details:</h1>
+<h1>Component Type details: {{ componenttype }}</h1>
 <form method='POST'>
 <table class="table">
 {{ form }}
 {% csrf_token %}
 </table>
-<input type="submit" class="btn btn-secondary" value="Apply">
+<p><input type="submit" class="btn btn-secondary" value="Apply">
 <input type="submit" class="btn btn-primary" value="OK"
    {% if componenttype %}
    formaction="{% url 'bike:component_type' componenttype.id %}?success={% url 'bike:component_types' %}">
@@ -21,10 +21,12 @@ Component type: {{ componenttype }} -
    {% endif %}
 <a class="btn btn-secondary" href="{% url 'bike:component_type_new' %}">
    Add another component type
-</a>
+</a></p>
 </form>
 
 {% if componenttype %}
+
+{% include 'bike/subcomponents.html' %}
 
 {% for subcomponent in subcomponent_types %}
   {% if forloop.first %}

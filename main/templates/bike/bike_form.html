@@ -46,23 +46,7 @@ Bike details: {{ bike }} -
 {% endif %}
 {% include 'bike/maint_history.html' %}
 <br>
-
-{% for subcomponent in components %}
-  {% if forloop.first %}
-    <h3>Components</h3>
-    <table class="table">
-    <tr><th>Type</th>
-	  <th>Description</th>
-	  <th>Specification</th>
-	</tr>
-  {% endif %}
-
-  {% include 'bike/subcomponent.html' %}
-
-  {% if forloop.last %}</table>{% endif %}
-  {% empty %}
-  <p>(no components.)</p>
-{% endfor %}
+{% include 'bike/subcomponents.html' %}
 
 <p>
 {% if bike %}

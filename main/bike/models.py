@@ -409,7 +409,8 @@ class Component(models.Model):
         help_text="Leave blank if this is a subcomponent of another part of a "
         "bike.")
     name = models.CharField(max_length=100)
-    type = models.ForeignKey(ComponentType, on_delete=models.PROTECT)
+    type = models.ForeignKey(ComponentType, related_name='components',
+                             on_delete=models.PROTECT)
     specification = models.CharField(max_length=200, null=True, blank=True)
     subcomponent_of = models.ForeignKey(
         'Component', related_name='components', on_delete=models.PROTECT,

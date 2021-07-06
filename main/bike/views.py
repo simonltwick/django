@@ -342,6 +342,11 @@ class ComponentTypeUpdate(BikeLoginRequiredMixin, UpdateView):
         return super(ComponentTypeUpdate, self).dispatch(
             request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        context = super(ComponentTypeUpdate, self).get_context_data(**kwargs)
+        context['components'] = self.object.components.all()
+        return context
+
     def get_success_url(self):
         if 'success' in self.request.GET:
             return self.request.GET['success']
