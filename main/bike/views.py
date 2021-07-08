@@ -206,6 +206,7 @@ class BikeDelete(BikeLoginRequiredMixin, DeleteView):
         return super(BikeDelete, self).dispatch(request, *args, **kwargs)
 
 
+@login_required(login_url=LOGIN_URL)
 def components(request):
     components = (Component.objects
                   .filter(owner=request.user)
@@ -311,6 +312,7 @@ class ComponentDelete(BikeLoginRequiredMixin, DeleteView):
         return super(ComponentDelete, self).dispatch(request, *args, **kwargs)
 
 
+@login_required(login_url=LOGIN_URL)
 def component_types(request):
     component_types = ComponentType.objects.filter(user=request.user).all()
     return render(request, 'bike/component_types.html',
@@ -424,6 +426,29 @@ class RideDelete(BikeLoginRequiredMixin, DeleteView):
                                    rider=request.user).exists():
             return HttpResponse("Unauthorised ride", status=401)
         return super(RideDelete, self).dispatch(request, *args, **kwargs)
+
+
+@login_required(login_url=LOGIN_URL)
+def rides_month(request, year, month):
+    """ display rides for a particular month, using the same template as
+    RidesList below, which can then be used to refine the query """
+    entries = Ride.objects.filter(rider=request.user, date__year=year,
+                                  date__month=month)
+    # initialise filter form
+    start_date = dt.date(year=year, month=month, day=1)
+    if month > 11:
+        end_date = dt.date(year=year+1, month=1, day=1)
+    else:
+        end_date = dt.date(year=year, month=month + 1, day=1)
+    end_date -= dt.timedelta(days=1)
+    initial = {'start_date': start_date, 'end_date': end_date,
+               'max_entries': None}
+    form = RideSelectionForm(
+        bikes=Bike.objects.filter(owner=request.user).all(),
+        initial=initial)
+    return render(request, 'bike/rides.html',
+                  context={'form': form, 'form_action': reverse('bike:rides'),
+                           'entries': entries})
 
 
 class RidesList(BikeLoginRequiredMixin):
@@ -952,13 +977,3 @@ def get_prev_next_yr(year: int, years: List[int]
         prev_yr = years[next_index-2] if next_index > 1 else None
     # log.info("get_prev_next_yr -> prev_yr=%s, next_yr=%s", prev_yr, next_yr)
     return prev_yr, next_yr
-
-
-class RideMonthArchiveView(BikeLoginRequiredMixin, MonthArchiveView):
-    """ called with kwargs year=None, bike_id=None, detail=False """
-    make_object_list = True
-    date_field = 'date'
-    month_format = '%m'  # int
-
-    def get_queryset(self):
-        return Ride.objects.filter(rider=self.request.user)
