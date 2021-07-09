@@ -52,7 +52,9 @@ Component details: {{ component }} -
    Add sub-component
    </a></p>
 
-<h3>Upcoming maintenance</h3>
+<h3>Upcoming maintenance
+  <a class="addlink" href="{% url 'bike:maint_new' %}?component_id={{ component.id }}&next={{ success_url }}">
+  Add</a></h3>
 {% include 'bike/maint_upcoming.html' %}
 <p><a class="btn btn-secondary"
    href="{% url 'bike:maint_new' %}?component_id={{ component.id }}&next={{ success_url }}">

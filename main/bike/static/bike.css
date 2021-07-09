@@ -37,3 +37,13 @@ ul.bike-breadcrumb li a:hover {
   color: #01447e;
   text-decoration: underline;
 }
+
+/* "add new" links */
+a.addlink {
+	font-size: 14px;
+    font-family: "Roboto","Lucida Grande","DejaVu Sans","Bitstream Vera Sans",Verdana,Arial,sans-serif;
+    color: #333;
+    background: #fff;
+	padding-left: 16px;
+    background: url(/static/admin/img/icon-addlink.svg) 0 1px no-repeat;
+}

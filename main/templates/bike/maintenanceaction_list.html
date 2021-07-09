@@ -7,7 +7,8 @@ Upcoming Maintenance: {{ bike }} -
 {% block content %}
 {% load static %}
 
-<h1>Upcoming Maintenance</h1>
+<h1>Upcoming Maintenance
+  <a class="addlink" href="{% url 'bike:maint_new' %}">Add</a></h1>
 {% regroup object_list by bike as maint_per_bike %}
 {% include 'bike/bikes_maint_upcoming.html' %}
 
