@@ -6,7 +6,9 @@ Component types -
 
 {% block content %}
 {% load static %}
-<h1>Component Types</h1>
+<h1>Component Types
+  <a class="addlink" href="{% url 'bike:component_type_new' %}&next={% url 'bike:component_types' %}">
+  Add</a></h1>
 
 {% for component_type in component_types.all %}
 {% if forloop.first %}<ul>{% endif %}
@@ -20,7 +22,5 @@ Component types -
 {% empty %}
 <p>No component types found :-(</p>
 {% endfor %}
-
-<p><a class="btn btn-success" href="{% url 'bike:component_type_new' %}">New component type</a></p>
 
 {% endblock %}

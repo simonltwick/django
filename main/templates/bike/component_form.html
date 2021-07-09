@@ -30,9 +30,12 @@ Component details: {{ component }} -
 {% if component %}
 {% url 'bike:component' component.id as success_url %}
 
+<h3>Sub-components
+  <a class="addlink"
+	href="{% url 'bike:component_new' %}?subcomponent_of={{ component.id }}&next={{ success_url }}">
+	Add</a></h3>
 {% for subcomponent in subcomponents %}
   {% if forloop.first %}
-  <h3>Sub-components</h3>
   <table class="table">
     <tr><th>Type</th><th>Description</th><th>Specification</th></tr>
   {% endif %}
@@ -40,26 +43,16 @@ Component details: {{ component }} -
   {% include 'bike/subcomponent.html' %}
 
   {% if forloop.last %}
-	</table><p>
+	</table>
   {% endif %}
 {% empty %}
-  <p>(no sub-components)
+  <p>(no sub-components)</p>
 {% endfor %}
-
-
-<a class="btn btn-secondary"
-   href="{% url 'bike:component_new' %}?subcomponent_of={{ component.id }}&next={{ success_url }}">
-   Add sub-component
-   </a></p>
 
 <h3>Upcoming maintenance
   <a class="addlink" href="{% url 'bike:maint_new' %}?component_id={{ component.id }}&next={{ success_url }}">
   Add</a></h3>
 {% include 'bike/maint_upcoming.html' %}
-<p><a class="btn btn-secondary"
-   href="{% url 'bike:maint_new' %}?component_id={{ component.id }}&next={{ success_url }}">
-   Add maintenance action
-   </a></p>
 
 {% include 'bike/maint_history.html' %}
 

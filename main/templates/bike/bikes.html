@@ -1,13 +1,14 @@
 {% extends 'bike/base.html' %}
 
-{% block title %}
+{% block title %} 
 Bikes -
 {% endblock %}
 
 {% block content %}
 {% load static %}
 
-<h1>Bikes</h1>
+<h1>Bikes
+  <a class="addlink" href="{% url 'bike:bike_new' %}">N+1</a></h1>
 {% for bike in bikes %}
 {% if forloop.first %}
 <table class="table">
@@ -54,8 +55,6 @@ Bikes -
 {% empty %}
 <p>No bikes found :-(</p>
 {% endfor %}
-
-<p><a class="btn btn-success" href="{% url 'bike:bike_new' %}">New bike</a></p>
 
 {% for activity in request.user.maint_activities.all %}
 {% if forloop.first %}

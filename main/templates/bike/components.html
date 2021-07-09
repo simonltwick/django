@@ -6,7 +6,8 @@ Components -
 
 {% block content %}
 {% load static %}
-<h1>Components</h1>
+<h1>Components
+  <a class="addlink" href="{% url 'bike:component_new' %}">New</a></h1>
 
 {% for component in components.all %}
 {% if forloop.first %}<ul>
@@ -28,7 +29,5 @@ Components -
 {% empty %}
 <p>No components found :-(</p>
 {% endfor %}
-
-<p><a class="btn btn-success" href="{% url 'bike:component_new' %}">New component</a></p>
 
 {% endblock%}

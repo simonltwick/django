@@ -7,7 +7,10 @@ Maintenance Types -
 {% block content %}
 {% load static %}
 
-<h1>Maintenance Types</h1>
+<h1>Maintenance Types
+  <a class="addlink"
+  href="{% url 'bike:maint_type_new' %}?next={% url 'bike:maint_types' %}">
+  Add</a></h1>
 {% for maint in object_list %}
 {% if forloop.first %}
 <ul>
@@ -21,8 +24,5 @@ Maintenance Types -
 {% empty %}
 <p>No maintenance types found :-(</p>
 {% endfor %}
-
-<p><a class="btn btn-success" href="{% url 'bike:maint_type_new' %}">
-New maintenance type</a></p>
 
 {% endblock%}

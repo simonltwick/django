@@ -228,7 +228,8 @@ class ComponentCreate(BikeLoginRequiredMixin, CreateView):
         # Copy the dictionary so we don't accidentally change a mutable dict
         bike_id = self.request.GET.get('bike')
         subcomp_of_id = self.request.GET.get('subcomponent_of')
-        if bike_id or subcomp_of_id:
+        component_type_id = self.request.GET.get('component_type')
+        if bike_id or subcomp_of_id or component_type_id:
             initial = initial.copy()
             if bike_id is not None:
                 bike = get_object_or_404(
@@ -238,6 +239,10 @@ class ComponentCreate(BikeLoginRequiredMixin, CreateView):
                 subcomp_of = get_object_or_404(
                     Component, pk=subcomp_of_id, owner=self.request.user)
                 initial['subcomponent_of'] = subcomp_of
+            if component_type_id is not None:
+                ctype = get_object_or_404(ComponentType, pk=component_type_id,
+                                          user=self.request.user)
+                initial['type'] = component_type_id
         return initial
 
     def form_valid(self, form):
@@ -322,6 +327,18 @@ def component_types(request):
 class ComponentTypeCreate(BikeLoginRequiredMixin, CreateView):
     model = ComponentType
     fields = ['type', 'subtype_of', 'description']
+
+    def get_initial(self):
+        # Get the initial dictionary from the superclass method
+        initial = super(ComponentTypeCreate, self).get_initial()
+        # Copy the dictionary so we don't accidentally change a mutable dict
+        subtype_of = self.request.GET.get('subtype_of')
+        if subtype_of is not None:
+            initial = initial.copy()
+            get_object_or_404(
+                ComponentType, pk=subtype_of, user=self.request.user)
+            initial['subtype_of'] = subtype_of
+        return initial
 
     def form_valid(self, form):
         form.instance.user = self.request.user
