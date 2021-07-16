@@ -791,7 +791,7 @@ def maint_action_complete(request, pk: int):
     maint_action_form = MaintenanceActionUpdateForm(
         request.POST, instance=maint_action)
     completion_form = MaintCompletionDetailsForm(request.POST)
-    distance_units = request.user.preferences.distance_units
+    distance_units = request.user.preferences.get_distance_units_display()
     if maint_action_form.is_valid() and completion_form.is_valid():
         comp_date = completion_form.cleaned_data['completed_date']
         comp_distance = completion_form.cleaned_data['distance']
