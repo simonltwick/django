@@ -6,7 +6,7 @@ import logging
 
 from .models import (
     Component, Ride, Odometer, MaintenanceAction, MaintenanceActionHistory,
-    Preferences)
+    Preferences, MaintActionLink)
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -127,6 +127,10 @@ OdometerFormSet = modelformset_factory(
     #       'date'],
     extra=1  # overridden in view
     )
+
+
+MaintActionLinkFormSet = modelformset_factory(
+    MaintActionLink, fields=['description', 'link_url'])
 
 
 class DateTimeForm(forms.Form):

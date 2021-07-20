@@ -33,6 +33,11 @@ Maintenance Action details: {{ maintenanceaction }} -
   </td>
 </tr>
 {% endfor %}
+  {% csrf_token %}
+  </table>
+
+<p>Links:</p>
+<table class="table">{{ link_formset }}</table>
 
 {% if maintenanceaction.completed %}<p>This maintenance action is complete.
   {% if maintenanceaction.completed_date %}
@@ -42,8 +47,6 @@ Maintenance Action details: {{ maintenanceaction }} -
     at {{ maintenanceaction.completed_distance }} {{ distance_units }}
   {% endif %}</p>
 {% endif %}
-  {% csrf_token %}
-  </table>
 
   <p>
   <input type="submit" class="btn btn-primary" value="Save">

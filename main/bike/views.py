@@ -17,11 +17,13 @@ from typing import List, Tuple, Optional
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
     DistanceUnits, MaintenanceActionHistory, MaintenanceType, Odometer,
+    MaintActionLink
     )
 from .forms import (
     RideSelectionForm, RideForm, PreferencesForm,
     MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
-    OdometerFormSet, OdometerAdjustmentForm, DateTimeForm)
+    OdometerFormSet, OdometerAdjustmentForm, DateTimeForm,
+    MaintActionLinkFormSet)
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -752,6 +754,8 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
         # Add in a QuerySet of all the books
         context['distance_units'] = (self.request.user.preferences
                                      .get_distance_units_display())
+        context['link_formset'] = MaintActionLinkFormSet(
+            queryset=MaintActionLink.objects.none())
         return context
 
 
@@ -769,6 +773,8 @@ def maint_action_update(request, pk: int):
             if 'next' in request.GET:
                 return HttpResponseRedirect(request.GET['next'])
 
+    link_formset = MaintActionLinkFormSet(
+        queryset=maintenanceaction.links.all())
     completion_form = MaintCompletionDetailsForm(initial={
         'completed_date': timezone.now().date(),
         'distance': maintenanceaction.current_bike_odo()})
@@ -777,7 +783,8 @@ def maint_action_update(request, pk: int):
         request, 'bike/maintenanceaction_form.html',
         context={'form': form, 'maintenanceaction': maintenanceaction,
                  'completion_form': completion_form,
-                 'distance_units': distance_units})
+                 'distance_units': distance_units,
+                 'link_formset': link_formset})
 
 
 @login_required

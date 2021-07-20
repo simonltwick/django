@@ -169,6 +169,16 @@ class Preferences(models.Model):
                                       *args, **kwargs)
 
 
+class Link(models.Model):
+    """ abstract model for concrete classes with foreign key to owning model
+    """
+    link_url = models.URLField()
+    description = models.CharField(max_length=50, blank=True, null=True)
+
+    class Meta:
+        abstract = True
+
+
 class Ride(DistanceMixin):
     rider = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='rides')
@@ -176,7 +186,7 @@ class Ride(DistanceMixin):
     is_adjustment = models.BooleanField(
         default=False, help_text="If true, signifies this is not a real ride"
         " but a ride distance adjustment between odometer readings.")
-    description = models.CharField(max_length=400, null=True, blank=True)
+    description = models.TextField(max_length=400, null=True, blank=True)
     ascent = models.FloatField(null=True, blank=True)
     ascent_units = models.PositiveSmallIntegerField(
         choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
@@ -422,7 +432,7 @@ class Component(models.Model):
     date_acquired = models.DateField(default=dt.date.today, null=True,
                                      blank=True)
     supplier = models.CharField(max_length=200, null=True, blank=True)
-    notes = models.CharField(max_length=400, null=True, blank=True)
+    notes = models.TextField(max_length=400, null=True, blank=True)
 
     def __str__(self):
         return f"{self.type}: {self.name} on {self.bike}"
@@ -632,6 +642,11 @@ class MaintenanceAction(MaintIntervalMixin):
              if self.due_in_distance else None)]
         self._due_in = ', '.join(d for d in due if d is not None)
         return self._due_in
+
+
+class MaintActionLink(Link):
+    maint_action = models.ForeignKey(
+        MaintenanceAction, on_delete=models.CASCADE, related_name='links')
 
 
 class MaintenanceActionHistory(DistanceMixin):
