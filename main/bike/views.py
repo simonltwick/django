@@ -755,7 +755,7 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
         context['distance_units'] = (self.request.user.preferences
                                      .get_distance_units_display())
         context['link_formset'] = MaintActionLinkFormSet(
-            queryset=MaintActionLink.objects.none())
+            instance=MaintenanceAction.objects.none())
         return context
 
 
@@ -765,16 +765,23 @@ def maint_action_update(request, pk: int):
                                           user=request.user)
     if request.method == 'GET':
         form = MaintenanceActionUpdateForm(instance=maintenanceaction)
+        link_formset = MaintActionLinkFormSet(instance=maintenanceaction)
     elif request.method == 'POST':
         form = MaintenanceActionUpdateForm(
             request.POST, instance=maintenanceaction)
+        link_formset = MaintActionLinkFormSet(
+            request.POST, instance=maintenanceaction)
         if form.is_valid():
             maintenanceaction = form.save()
-            if 'next' in request.GET:
-                return HttpResponseRedirect(request.GET['next'])
+            if link_formset.is_valid():
+                link_formset.save(commit=False)
+                for link_form in link_formset:
+                    link_form.instance.maint_action = maintenanceaction
+                link_formset.save()
 
-    link_formset = MaintActionLinkFormSet(
-        queryset=maintenanceaction.links.all())
+                if 'next' in request.GET:
+                    return HttpResponseRedirect(request.GET['next'])
+
     completion_form = MaintCompletionDetailsForm(initial={
         'completed_date': timezone.now().date(),
         'distance': maintenanceaction.current_bike_odo()})

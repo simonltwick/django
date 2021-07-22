@@ -7,6 +7,8 @@ Maintenance Action details: {{ maintenanceaction }} -
 {% block content %}
 <h1>Maintenance Action details: {{ maintenanceaction }}</h1>
 <form method='POST'>
+{% csrf_token %}
+
 <table class="table">
 {% if maintenanceaction %}
   <p>Bike:{{ maintenanceaction.bike|default_if_none:"-" }};
@@ -33,11 +35,9 @@ Maintenance Action details: {{ maintenanceaction }} -
   </td>
 </tr>
 {% endfor %}
-  {% csrf_token %}
   </table>
 
-<p>Links:</p>
-<table class="table">{{ link_formset }}</table>
+{% include 'bike/links.html' %}
 
 {% if maintenanceaction.completed %}<p>This maintenance action is complete.
   {% if maintenanceaction.completed_date %}

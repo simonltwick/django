@@ -1,0 +1,42 @@
+{% comment %} %included from another template with link_formset in context
+{% endcomment %}
+
+<p>Links:</p>
+{{ link_formset.management_form }}
+    <table class="table-sm">
+        {% for form in link_formset %}
+        <tr id="link_{{ form.id.auto_id }}"> <!-- "form_id_links-0-id" -->
+        <td class="link-link">
+        {% if form.link_url.value %}
+		  <a href="{{ form.link_url.value }}" class="link">
+          {% if form.description.value %}
+            {{ form.description.value }}
+          {% else %}
+            {{ form.link_url.value }}
+          {% endif %}
+          </a>
+		  <button class="changelink"
+		    onClick="change_link_visibility('{{ form.id.auto_id }}')"
+		    type="button">edit</button>
+        {% else %}  {# form to add new link #}
+			<button class="addlink"
+			onClick="change_link_visibility('{{ form.id.auto_id }}')"
+		    type="button">add link</button>
+        {% endif %}
+		</td>
+	    <td>{{ form.non_field_errors }}
+          {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+		</td>
+		{% for field in form.visible_fields %}
+		  <td class="link-form hidden"><div class="fieldWrapper">
+        	{{ field.errors }}
+        	{{ field.label_tag }} {{ field }}
+        	{% if field.help_text %}
+        	  <p class="help">{{ field.help_text|safe }}</p>
+			{% endif %}
+    	  </div></td>
+		{% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+<p></p>

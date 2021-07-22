@@ -1,5 +1,5 @@
 from django import forms
-from django.forms import modelformset_factory
+from django.forms import modelformset_factory, inlineformset_factory
 from django.utils.dateparse import parse_duration
 import datetime as dt
 import logging
@@ -129,8 +129,9 @@ OdometerFormSet = modelformset_factory(
     )
 
 
-MaintActionLinkFormSet = modelformset_factory(
-    MaintActionLink, fields=['description', 'link_url'])
+MaintActionLinkFormSet = inlineformset_factory(
+    MaintenanceAction, MaintActionLink,
+    fields=('description', 'link_url'), extra=1)  # , can_delete=True)
 
 
 class DateTimeForm(forms.Form):
