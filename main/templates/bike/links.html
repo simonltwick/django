@@ -16,8 +16,11 @@
           {% endif %}
           </a>
 		  <button class="changelink"
-		    onClick="change_link_visibility('{{ form.id.auto_id }}')"
+		    onClick="change_link_visibility('{{ form.id.auto_id }}');"
 		    type="button">edit</button>
+		  <button class="deletelink"
+			onClick="mark_link_deleted('{{ form.id.auto_id }}');"
+			type="button">delete</button>
         {% else %}  {# form to add new link #}
 			<button class="addlink"
 			onClick="change_link_visibility('{{ form.id.auto_id }}')"
