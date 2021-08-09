@@ -751,11 +751,10 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super().get_context_data(**kwargs)
-        # Add in a QuerySet of all the books
         context['distance_units'] = (self.request.user.preferences
                                      .get_distance_units_display())
-        context['link_formset'] = MaintActionLinkFormSet(
-            instance=MaintenanceAction.objects.none())
+        # context['link_formset'] = MaintActionLinkFormSet(
+        #     instance=MaintenanceAction.objects.none())
         return context
 
 
