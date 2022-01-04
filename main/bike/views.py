@@ -488,11 +488,10 @@ class RidesList(BikeLoginRequiredMixin):
         inst.request = request
         inst.bike_id = bike_id
         if request.method == 'POST':
-            inst.POST()
+            return inst.POST()
         elif request.method == 'GET':
-            inst.GET()
-        return render(request, cls.template_name,
-                      context={'form': inst.form, 'entries': inst.entries})
+            return inst.GET()
+        raise ValueError(f"Invalid method {request.method}")
 
     def POST(self):
         self.form = form = RideSelectionForm(
@@ -538,6 +537,8 @@ class RidesList(BikeLoginRequiredMixin):
                     self.request, 'rides.csv', entries, fields)
         else:
             self.entries = self.entries.order_by('-date').all()[:20]
+        return render(self.request, self.template_name,
+                      context={'form': self.form, 'entries': self.entries})
 
     def GET(self):
         if self.bike_id is not None:
@@ -556,16 +557,24 @@ class RidesList(BikeLoginRequiredMixin):
         self.form = RideSelectionForm(
             bikes=Bike.objects.filter(owner=self.request.user).all(),
             initial=initial)
+        return render(self.request, self.template_name,
+                      context={'form': self.form, 'entries': self.entries})
 
 
-def csv_data_response(_request, filename, queryset, fields):
-    response = HttpResponse(content_type='text/csv')
+def csv_data_response(request, filename, queryset, fields):
+    log.info("csv_data_response: request.headers[accept]=%s",
+             request.headers['accept'])
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    log.info("csv_data_response: sending %d records for %s", len(queryset),
+             filename)
     writer = csv.writer(response)
     writer.writerow(fields)  # header row
     for row in queryset.all():
         csv_row = [getattr(row, field_name) for field_name in fields]
         writer.writerow(csv_row)
+    log.info("csv_data_response: response=%s, headers=%s", response,
+             response.headers)
     return response
 
 
