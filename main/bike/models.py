@@ -576,7 +576,8 @@ class MaintenanceAction(MaintIntervalMixin):
             self.completed = True
         else:
             if self.maint_interval_days:
-                self.due_date = comp_date + self.maint_interval_days
+                self.due_date = comp_date + dt.timedelta(
+                    self.maint_interval_days)
             else:
                 self.due_date = None
             if self.maintenance_interval_distance:
