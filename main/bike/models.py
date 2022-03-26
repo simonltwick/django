@@ -1,4 +1,4 @@
-from django import contrib
+# from django import contrib
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -206,7 +206,7 @@ class Ride(DistanceMixin):
         super().save(*args, **kwargs)
         if not self.is_adjustment:
             # allow updating of following odometer adjustment ride, if any
-            Odometer.ride_updated(self)
+            Odometer.ride_updated(self.date, self.bike_id)
             self.bike.update_current_odo()
             self.bike.save()
 
@@ -265,6 +265,14 @@ class Ride(DistanceMixin):
                            for month, value in monthly_mileage.items()}
         return monthly_mileage
 
+    @staticmethod
+    def on_post_delete(_sender, instance, **_kwargs):
+        """ signal handler: handle ride delete & update odometer readings
+        This is connected to the post_delete signal in signals.py """
+        # log.info("handling post_delete for ride %s", instance)
+        Odometer.ride_updated(instance.date, instance.bike_id)
+        instance.bike.update_current_odo()
+
 
 class Odometer(DistanceRequiredMixin):
     rider = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -294,13 +302,13 @@ class Odometer(DistanceRequiredMixin):
         self.bike.save()
 
     @classmethod
-    def ride_updated(cls, ride):
+    def ride_updated(cls, ride_date, bike_id):
         """ called when a ride is saved, to allow adjustment of following
         odometer adjustment ride, if any.  Most times there will be none """
-        next_odo = cls.next_odo(ride.bike_id, ride.date)
+        next_odo = cls.next_odo(bike_id, ride_date)
         if next_odo is None:
             return
-        prev_odo = cls.previous_odo(ride.bike_id, ride.date)
+        prev_odo = cls.previous_odo(bike_id, ride_date)
         if prev_odo is None:
             return
         cls.update_adjustment_ride(next_odo, prev_odo)
@@ -590,7 +598,8 @@ class MaintenanceAction(MaintIntervalMixin):
         return history
 
     def current_bike_odo(self):
-        if (bike := self.bike or self.component and self.component.bike):
+        bike = self.bike
+        if (bike or self.component and self.component.bike):
             return bike.current_odo
         return None
 
