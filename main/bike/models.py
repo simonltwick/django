@@ -604,13 +604,18 @@ class MaintenanceAction(MaintIntervalMixin):
         return None
 
     @classmethod
-    def upcoming(cls, user, bike_id: int=None, component_id=None):
+    def upcoming(cls, user, bike_id: int=None, component_id=None,
+                 filter_by_limits=True):
         """ return a queryset of incomplete maintenance actions
             due_in_time is a datetime.timedelta object,
-            due_in_distance is a float using preferences.distance_units """
+            due_in_distance is a float using preferences.distance_units
+            if filter_by_limits is set, only maint actions within limits in
+                prefs_limits are returned """
         upcoming = MaintenanceAction.objects.filter(completed=False, user=user)
         if bike_id is not None:
             upcoming = upcoming.filter(bike_id=bike_id)
+        else:
+            upcoming = upcoming.order_by('bike_id')
         if component_id is not None:
             upcoming = upcoming.filter(component_id=component_id)
         due_in_duration = ExpressionWrapper(
@@ -621,7 +626,10 @@ class MaintenanceAction(MaintIntervalMixin):
             due_in_duration=due_in_duration,
             due_in_distance=F('due_distance') - F('bike__current_odo')
             ))
-        return cls.apply_prefs_limits(upcoming, user)
+        if filter_by_limits:
+            return cls.apply_prefs_limits(upcoming, user)
+        else:
+            return upcoming
 
     @classmethod
     def apply_prefs_limits(cls, upcoming, user):

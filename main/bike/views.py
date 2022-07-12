@@ -187,7 +187,8 @@ def add_maint_context(context: dict, user, bike_id=None, component_id=None):
         return context
 
     context['maint_upcoming'] = upcoming = MaintenanceAction.upcoming(
-        user=user, bike_id=bike_id, component_id=component_id).all()
+        user=user, bike_id=bike_id, component_id=component_id,
+        filter_by_limits=False).all()
     for ma in upcoming:
         ma.due = ma.due_in(distance_units)
 
@@ -706,10 +707,10 @@ class MaintActionList(BikeLoginRequiredMixin, ListView):
         return upcoming_maint(self.request.user)
 
 
-def upcoming_maint(user):
+def upcoming_maint(user, filter_by_limits=True):
     distance_units = user.preferences.get_distance_units_display()
     upcoming = MaintenanceAction.upcoming(
-        user=user).select_related('bike')
+        user=user, filter_by_limits=filter_by_limits).select_related('bike')
     for ma in upcoming:
         ma.due = ma.due_in(distance_units)
     return upcoming
