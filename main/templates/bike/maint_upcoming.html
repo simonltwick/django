@@ -11,7 +11,7 @@
       {{ action.due_date|default_if_none:"" }}
       {% if action.due_date and action_due_distance %} or {% endif %}
       {% if action.due_distance %}
-        at {{ action.due_distance }} {{ distance_units }}
+        at {{ action.due_distance|floatformat }} {{ distance_units }}
       {% endif %}
     {% endif %}
   </li>
