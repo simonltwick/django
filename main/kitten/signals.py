@@ -10,7 +10,8 @@ import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-signal_game_start = Signal(providing_args=['game'])
+signal_game_start = Signal()
+# providing_args=['game']
 
 
 @receiver(signal_game_start)

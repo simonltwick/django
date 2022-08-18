@@ -9,9 +9,9 @@ Usage: see below
 
 
 from django import template
-from django.template import loader, Node, Variable
+from django.template import Node, Variable
 # smart_unicode for python2 renamed to smart_text in python3
-from django.utils.encoding import smart_str, smart_text as smart_unicode
+from django.utils.encoding import force_str as smart_unicode
 from django.template.defaulttags import url
 from django.template import VariableDoesNotExist
 
