@@ -434,6 +434,7 @@ class Component(models.Model):
         'Component', related_name='components', on_delete=models.PROTECT,
         null=True, blank=True,
         help_text="leave blank if this is a direct subcomponent of a bike")
+    HIERARCHY_LIMIT = 10  # max chain of cpt -> cpt relationships
     # fk maintenance history
     # fk component history
     # fk subcomponent history
@@ -441,12 +442,82 @@ class Component(models.Model):
                                      blank=True)
     supplier = models.CharField(max_length=200, null=True, blank=True)
     notes = models.TextField(max_length=400, null=True, blank=True)
+    previous_distance = models.FloatField(
+        default=0, help_text="odometer from previous bikes, in distance "
+        "units from preferences.")
+    start_odo = models.FloatField(
+        default=0, help_text="odometer when added to this bike, in distance "
+        "units from preferences.")
 
     def __str__(self):
         return f"{self.type}: {self.name} on {self.bike}"
 
     def get_absolute_url(self):
         return reverse('bike:component', kwargs={'pk': self.id})
+
+    def current_distance(self) -> float:
+        """ return distance travelled by this cpt, current + prev bikes """
+        return self.previous_distance + self.bike_distance()
+
+    def bike_distance(self) -> float:
+        """ return distance travelled on current bike, which may be through
+        a parent component """
+        current_bike = self.current_bike()
+        if current_bike is not None:
+            return current_bike.current_odo - self.start_odo
+        return 0.0
+
+    def current_bike(self, depth=0) -> Optional[Bike]:
+        """ return bike, which may be through a parent component """
+        if self.bike:
+            return self.bike
+        parent_component = self.subcomponent_of
+        if parent_component is not None:
+            if depth > self.HIERARCHY_LIMIT:
+                raise RecursionError("Suspected circular component hierarchy "
+                                     f"for {self}, id={self.id}")
+            return parent_component.current_bike(depth+1)
+
+    def update_bike_info(self, old_self):
+        old_bike = old_self.current_bike()
+        current_bike = self.current_bike()
+        if old_bike == current_bike:
+            return
+        old_bike_odo = old_bike.current_odo if old_bike else None
+        current_bike_odo = current_bike.current_odo if current_bike else 0.0
+        self.update_distances(old_bike_odo, current_bike_odo)
+        # TODO: Update all child component odos if no bike defined
+        self.update_subcomponent_distances(old_bike_odo, current_bike_odo)
+
+    def update_distances(self, old_bike_odo, current_bike_odo):
+        if old_bike_odo:
+            self.previous_distance += old_bike_odo - self.start_odo
+        self.start_odo = current_bike_odo
+        # force save so we don't increment previous_distance twice
+        self.save(update_fields=[
+            'bike', 'subcomponent_of', 'start_odo', 'previous_distance'])
+
+    def update_subcomponent_distances(
+            self, old_bike_odo, current_bike_odo, depth=0):
+        """ update distances for all subcomponents unless they are attached
+        directly to a bike """
+        for subcomponent in self.components:
+            if subcomponent.bike_id:
+                continue
+            subcomponent.update_distances(old_bike_odo, current_bike_odo)
+            if depth > self.HIERARCHY_LIMIT:
+                raise RecursionError("Suspected circular component hierarchy "
+                                     f"for {self}, id={self.id}")
+            subcomponent.update_subcomponent_distances(
+                old_bike_odo, current_bike_odo, depth+1)
+
+    def save(self, *args, **kwargs):
+        """ update start_odo if creating new instance """
+        if not self.pk:
+            current_bike = self.current_bike()
+            if current_bike:
+                self.start_odo = current_bike.current_odo
+        super().save(*args, **kwargs)
 
 
 class MaintIntervalMixin(models.Model):
@@ -695,6 +766,13 @@ class MaintenanceActionHistory(DistanceMixin):
         when = ' '.join(item for item in when
                         if item is not None)
         return f"{self.action} on {when}"
+
+
+class ReplacementActionHistory(MaintenanceActionHistory):
+    """ documents a replacement action and the replaced component """
+    replaced_component = models.ForeignKey(
+        Component, on_delete=models.CASCADE, null=True, blank=True,
+        help_text='you only need to specify one of bike or component.')
 
 
 class ComponentChange(DistanceMixin):
