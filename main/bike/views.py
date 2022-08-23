@@ -245,7 +245,7 @@ class ComponentCreate(BikeLoginRequiredMixin, CreateView):
             if component_type_id is not None:
                 ctype = get_object_or_404(ComponentType, pk=component_type_id,
                                           user=self.request.user)
-                initial['type'] = component_type_id
+                initial['type'] = ctype
         return initial
 
     def form_valid(self, form):
@@ -271,7 +271,8 @@ class ComponentCreate(BikeLoginRequiredMixin, CreateView):
     def copy_maintenance_types(self, cpt):
         """ if this cpt has a cpt_type, create new MaintenanceActions for this
         cpt, based on the MaintenanceTypes for the cpt_type """
-        if (cpt_type := cpt.type) is None:
+        cpt_type = cpt.type
+        if cpt_type is None:
             return
         for maint_type in cpt_type.maintenance_types.filter(
                 user=cpt.owner).all():

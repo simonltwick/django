@@ -481,15 +481,17 @@ class Component(models.Model):
     def update_bike_info(self, old_self):
         old_bike = old_self.current_bike()
         current_bike = self.current_bike()
-        if old_bike == current_bike:
+        if (old_bike == current_bike
+                and old_self.subcomponent_of == self.subcomponent_of):
             return
         old_bike_odo = old_bike.current_odo if old_bike else None
         current_bike_odo = current_bike.current_odo if current_bike else 0.0
         self.update_distances(old_bike_odo, current_bike_odo)
-        # TODO: Update all child component odos if no bike defined
         self.update_subcomponent_distances(old_bike_odo, current_bike_odo)
 
     def update_distances(self, old_bike_odo, current_bike_odo):
+        # log.debug("updating %d:%s from bike odo %s to %s",
+        #           self.pk, self, old_bike_odo, current_bike_odo)
         if old_bike_odo:
             self.previous_distance += old_bike_odo - self.start_odo
         self.start_odo = current_bike_odo
@@ -501,8 +503,8 @@ class Component(models.Model):
             self, old_bike_odo, current_bike_odo, depth=0):
         """ update distances for all subcomponents unless they are attached
         directly to a bike """
-        for subcomponent in self.components:
-            if subcomponent.bike_id:
+        for subcomponent in self.components.all():
+            if subcomponent.bike_id is not None:
                 continue
             subcomponent.update_distances(old_bike_odo, current_bike_odo)
             if depth > self.HIERARCHY_LIMIT:

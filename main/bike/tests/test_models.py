@@ -9,15 +9,15 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db.models import F, ExpressionWrapper, fields
-from django.db.models.functions import Now, TruncDate, ExtractDay
+from django.db.models.functions import Now, TruncDate
 
+from copy import deepcopy
 import datetime as dt
 import logging
 
 from ..models import (
-    Bike,  # ComponentType, Component, MaintenanceAction,
+    Bike, ComponentType, Component,  # MaintenanceAction,
     DistanceUnits, Odometer, Ride, Preferences, MaintenanceAction,
-    # MaintenanceType,
     )
 
 
@@ -241,3 +241,94 @@ class TestMaintenanceAction(TestCase):
         #       f"{ma.due_in.days=!r}")
         self.assertIsInstance(ma.due_in, dt.timedelta)
         self.assertEqual(ma.due_in.days, 1)
+
+
+class TestComponent(TestCase):
+    @override_settings(
+        PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher', ])
+    def setUp(self):
+        self.user = User.objects.create(
+            username='tester', password=make_password('testpw'))
+        self.bike = Bike.objects.create(
+            name='Test bike', description="test", owner=self.user,
+            current_odo=1000)
+        self.bike2 = Bike.objects.create(
+            name='Test bike2', description="test", owner=self.user,
+            current_odo=2000)
+        self.user.save()
+        self.bike.save()
+        cpt_type = ComponentType(user=self.user, type="Test cpt_type")
+        cpt_type.save()
+        self.cpt = Component.objects.create(
+            owner=self.user, name="Test component", type=cpt_type)
+        self.cpt.save()
+        self.subcpt = Component.objects.create(
+            owner=self.user, name="Test sub_component", type=cpt_type,
+            subcomponent_of=self.cpt)
+        self.subcpt.save()
+        self.subcpt2 = Component.objects.create(
+            owner=self.user, name="Test sub_component 2", type=cpt_type,
+            bike=self.bike2, subcomponent_of=self.cpt)
+        self.subcpt2.save()
+
+    def test1_create_with_bike(self):
+        "Not tested yet: subcpts created with a bike, have start_odo set."
+        self.assertEqual(self.subcpt2.start_odo, 2000,
+                         "check subcpt created with a bike has start_odo set")
+
+    def test2_add_remove_bike(self):
+        """ add bike: cpt.start_odo set to bike.current_odo
+                      subcpts.start_odo  --- " ---
+            remove bike:  cpt.prev_odo set to bike.current_odo - cpt.start_odo
+                          cpt.start_odo set to zero
+                          same for subcpts.
+            subcomponents which belong to a different bike, are not updated.
+        """
+        # add bike
+        old_cpt = deepcopy(self.cpt)
+        self.cpt.bike = self.bike
+        self.cpt.update_bike_info(old_cpt)
+        self.subcpt.refresh_from_db()
+        self.subcpt2.refresh_from_db()
+        self.assertEqual(self.cpt.start_odo, self.bike.current_odo,
+                         "add bike: check start_odo is updated")
+        self.assertEqual(self.subcpt.start_odo, self.bike.current_odo,
+                         "add bike: check subcpt start_odo is updated")
+        self.assertEqual(self.subcpt2.start_odo, 2000,
+                         "add bike: check subcpt2 start_odo is NOT updated"
+                         " as it belongs to a different bike")
+        self.assertEqual(self.cpt.current_distance(), 0,
+                         "add bike: check cpt distance hasn't changed")
+        # go for a ride
+        RIDE_DISTANCE = 5
+        self.bike.current_odo += RIDE_DISTANCE
+        self.bike.save()
+        self.assertEqual(self.cpt.current_distance(), RIDE_DISTANCE,
+                         "ride bike: check cpt distance is updated")
+        # remove bike
+        old_cpt1 = deepcopy(self.cpt)
+        self.cpt.bike = None
+        self.cpt.update_bike_info(old_cpt1)
+        self.subcpt.refresh_from_db()
+        self.subcpt2.refresh_from_db()
+        self.assertEqual(self.cpt.start_odo, 0,
+                         "remove bike: check start_odo set to zero")
+        self.assertEqual(self.subcpt.start_odo, 0,
+                         "add bike: check subcpt start_odo set to zero")
+        self.assertEqual(self.cpt.previous_distance, RIDE_DISTANCE,
+                         "remove bike: check prev_dist set to ride distance")
+        self.assertEqual(self.subcpt.previous_distance, RIDE_DISTANCE,
+                         "remove bike: check subcpt prev_dist set to "
+                         "ride distance")
+        self.assertEqual(self.subcpt2.start_odo, 2000,
+                         "remove bike: check subcpt2 start_odo is NOT updated"
+                         " as it belongs to a different bike")
+        self.assertEqual(self.subcpt2.previous_distance, 0,
+                         "remove bike: check subcpt2 previous_distance is NOT "
+                         "updated as it belongs to a different bike")
+        self.assertEqual(self.cpt.current_distance(), RIDE_DISTANCE,
+                         "remove bike: check cpt distance hasn't changed")
+
+    def test3_change_units(self):
+        """ check that if preferences.distance_units changed, distances are
+        converted in components """
