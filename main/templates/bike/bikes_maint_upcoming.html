@@ -1,10 +1,16 @@
 <!-- to be %included. expects context = maint_per_bike {bike: [maintactions]}-->
 
 {% for bike_maint in maint_per_bike %}
-<p>{{ bike_maint.grouper|default:"(Bike: none)" }}
+<p>
+  {% if bike_maint.grouper %}
+  <a href="{% url 'bike:bike' pk=bike_maint.grouper.pk %}">
+    {{ bike_maint.grouper }}</a>
+  {% else %}(Bike: none)
+  {% endif %}
   <a class="addlink"
      href="{% url 'bike:maint_new' %}?bike={{ bike_maint.grouper.id }}">
-     Add maint. action</a></p>
+     Add maint. action</a>
+</p>
 {% with bike_maint.list as maint_upcoming %}
 {% include 'bike/maint_upcoming.html' %}
 {% endwith %}
