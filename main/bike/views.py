@@ -7,7 +7,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic.list import ListView
-from django.views.generic.dates import MonthArchiveView
+# from django.views.generic.dates import MonthArchiveView
 
 import csv
 import datetime as dt
@@ -17,7 +17,7 @@ from typing import List, Tuple, Optional
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
     DistanceUnits, MaintenanceActionHistory, MaintenanceType, Odometer,
-    MaintActionLink
+    # MaintActionLink
     )
 from .forms import (
     RideSelectionForm, RideForm, PreferencesForm,

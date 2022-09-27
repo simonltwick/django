@@ -23,6 +23,7 @@ from ..models import (
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class TestDistanceUnits(TestCase):
@@ -259,6 +260,7 @@ class TestComponent(TestCase):
         self.bike.save()
         cpt_type = ComponentType(user=self.user, type="Test cpt_type")
         cpt_type.save()
+        self.cpt_type = cpt_type
         self.cpt = Component.objects.create(
             owner=self.user, name="Test component", type=cpt_type)
         self.cpt.save()
@@ -270,9 +272,33 @@ class TestComponent(TestCase):
             owner=self.user, name="Test sub_component 2", type=cpt_type,
             bike=self.bike2, subcomponent_of=self.cpt)
         self.subcpt2.save()
+        self.subcpt3 = Component.objects.create(
+            owner=self.user, name="Test sub_sub_component 3", type=cpt_type,
+            subcomponent_of=self.subcpt)
+        self.subcpt3.save()
+
+    def test0_current_bike(self):
+        self.assertIsNone(self.cpt.current_bike(),
+                          "check no bike defined for cpt")
+        self.assertIsNone(self.subcpt.current_bike(),
+                          "check no bike defined for subcpt")
+        self.assertEqual(self.subcpt2.current_bike(), self.bike2,
+                         "check bike2 defined for subcpt2")
+        self.assertIsNone(self.subcpt3.current_bike(),
+                          "check no bike defined for subcpt3")
+        subcpt4 = Component.objects.create(
+            owner=self.user, name="Test sub_sub_component 4",
+            type=self.cpt_type, subcomponent_of=self.subcpt2)
+        self.assertEqual(subcpt4.current_bike(), self.bike2,
+                         "check bike2 defined for subcpt4")
+        # check that we can move a cpt and new bike is picked up
+        self.subcpt3.subcomponent_of = self.subcpt2
+        self.subcpt3.save()
+        self.assertEqual(self.subcpt3.current_bike(), self.bike2,
+                         "check bike2 is now defined for subcpt3")
 
     def test1_create_with_bike(self):
-        "Not tested yet: subcpts created with a bike, have start_odo set."
+        """cpts created with a bike, have start_odo set."""
         self.assertEqual(self.subcpt2.start_odo, 2000,
                          "check subcpt created with a bike has start_odo set")
 
@@ -329,6 +355,30 @@ class TestComponent(TestCase):
         self.assertEqual(self.cpt.current_distance(), RIDE_DISTANCE,
                          "remove bike: check cpt distance hasn't changed")
 
+    def test3_move_subcpt(self):
+        """ move subcpt3 between cpts, as for move between bikes """
+        self.assertEqual(self.subcpt3.start_odo, 0,
+                         "start_odo not initially set")
+        # move to subcpt2 (attached to bike2)
+        old_subcpt3 = deepcopy(self.subcpt3)
+        self.assertIsNone(self.subcpt3.current_bike(),
+                          "subcpt3 before update has no bike")
+        self.subcpt3.subcomponent_of = self.subcpt2
+        self.subcpt3.save()
+        self.assertEqual(self.subcpt3.current_bike(), self.bike2,
+                         "subcpt3 after update has bike2")
+        self.subcpt3.update_bike_info(old_subcpt3)
+        self.assertEqual(self.subcpt3.start_odo, 2000,
+                         "check start_odo updated to match bike2")
+        # move back to subcpt (no bike defined)
+        old_subcpt3b = deepcopy(self.subcpt3)
+        self.subcpt3.subcomponent_of = self.subcpt
+        self.subcpt3.save()
+        self.subcpt3.update_bike_info(old_subcpt3b)
+        self.assertEqual(self.subcpt3.start_odo, 0,
+                         "check start_odo updated to match no bike")
+
     def test3_change_units(self):
         """ check that if preferences.distance_units changed, distances are
         converted in components """
+        ...

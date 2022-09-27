@@ -419,6 +419,8 @@ class ComponentType(models.Model):
 
 
 class Component(models.Model):
+    """ IMPORTANT: you must save() after updating bike or subcomponent_of,
+    otherwise mileage tracking won't work """
     owner = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='components')
     bike = models.ForeignKey(
@@ -469,7 +471,9 @@ class Component(models.Model):
 
     def current_bike(self, depth=0) -> Optional[Bike]:
         """ return bike, which may be through a parent component """
-        if self.bike:
+        # log.debug("%scpt.current_bike for %s: .bike=%s, subcomponent_of=%s",
+        #           depth * '>', self, self.bike, self.subcomponent_of)
+        if self.bike is not None:
             return self.bike
         parent_component = self.subcomponent_of
         if parent_component is not None:
@@ -481,6 +485,8 @@ class Component(models.Model):
     def update_bike_info(self, old_self):
         old_bike = old_self.current_bike()
         current_bike = self.current_bike()
+        # log.debug("cpt.update_bike_info for %s:%s bike=%s->%s",
+        #           self.pk, self, old_bike, current_bike)
         if (old_bike == current_bike
                 and old_self.subcomponent_of == self.subcomponent_of):
             return
