@@ -11,7 +11,10 @@ Maintenance Action details: {{ maintenanceaction }} -
 
 <table class="table">
 {% if maintenanceaction %}
-  <p>Bike:{{ maintenanceaction.bike|default_if_none:"-" }};
+  <p>Bike:{% if maintenanceaction.bike %}<a 
+  	  href="{% url 'bike:bike' maintenanceaction.bike.id %}"
+      >{{ maintenanceaction.bike|default_if_none:"-" }}</a>;
+    {% else %}-;{% endif %}
   Component:{{ maintenanceaction.component|default_if_none:"-" }};
   Maintenance type:{{ maintenanceaction.maint_type }}</p>
 {% endif %}
