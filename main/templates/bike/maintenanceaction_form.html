@@ -15,8 +15,14 @@ Maintenance Action details: {{ maintenanceaction }} -
   	  href="{% url 'bike:bike' maintenanceaction.bike.id %}"
       >{{ maintenanceaction.bike|default_if_none:"-" }}</a>;
     {% else %}-;{% endif %}
-  Component:{{ maintenanceaction.component|default_if_none:"-" }};
-  Maintenance type:{{ maintenanceaction.maint_type }}</p>
+  Component:{% if maintenanceaction.component %}<a
+    href="{% url 'bike:component' maintenanceaction.component.id %}"
+    >{{ maintenanceaction.component|default_if_none:"-" }}</a>;
+    {% else %}-;{% endif %}
+  Maintenance type:{% if maintenanceaction.maint_type %}<a
+    href="{% url 'bike:maint_type' maintenanceaction.maint_type.id %}"
+    >{{ maintenanceaction.maint_type }}</a>
+    {% else %}-{% endif %}</p>
 {% endif %}
 
 {{ form.non_field_errors }}
