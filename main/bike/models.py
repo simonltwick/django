@@ -452,7 +452,7 @@ class Component(models.Model):
         "units from preferences.")
 
     def __str__(self):
-        return f"{self.type}: {self.name} on {self.bike}"
+        return f"{self.type}: {self.name}"
 
     def get_absolute_url(self):
         return reverse('bike:component', kwargs={'pk': self.id})
