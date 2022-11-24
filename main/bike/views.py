@@ -296,12 +296,12 @@ class ComponentUpdate(BikeLoginRequiredMixin, UpdateView):
             return HttpResponse("Unauthorised component", status=401)
         return super(ComponentUpdate, self).dispatch(request, *args, **kwargs)
 
-    def form_valid(self):
+    def form_valid(self, form):
         """ save the form and redirect to get_success_url() """
-        instance = self.instance
+        instance = form.instance
         old_instance = Component.objects.get(pk=instance.pk)
         instance.update_bike_info(old_instance)
-        return super().form_valid(self)
+        return super().form_valid(form)
 
     def get_success_url(self):
         if 'next' in self.request.GET:
