@@ -7,6 +7,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic.list import ListView
+from django.views.generic.detail import DetailView
 # from django.views.generic.dates import MonthArchiveView
 
 import csv
@@ -135,6 +136,21 @@ class PreferencesUpdate(BikeLoginRequiredMixin, UpdateView):
         if 'next' in self.request.GET:
             return self.request.GET['next']
         return super(PreferencesUpdate, self).get_success_url()
+
+
+class BikeDetail(BikeLoginRequiredMixin, DetailView):
+    model = Bike
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["next_url"] = (
+            self.request.GET["next"] if "next" in self.request.GET
+            else reverse("bike:home"))
+        preferences = Preferences.objects.get(user=self.request.user)
+        context['distance_units'] = preferences.get_distance_units_display()
+        pk = self.kwargs['pk']
+        context['components'] = Component.objects.filter(bike_id=pk)
+        return add_maint_context(context, self.request.user, bike_id=pk)
 
 
 class BikeCreate(BikeLoginRequiredMixin, CreateView):

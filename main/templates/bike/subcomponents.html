@@ -1,14 +1,15 @@
 <!-- %included from another template - expects components = a list of 
   sub-components -->
 
+<h3>Components
+  <a class="addlink"
+    href="{% url 'bike:component_new' %}?{% if bike %}bike={{ bike.id }}{% elif componenttype %}component_type={{ componenttype.id }}{% endif %}&success={{ success_url }}">
+    Add</a></h3>
 {% for subcomponent in components %}
   {% if forloop.first %}
-    <h3>Components
-    <a class="addlink"
-	  href="{% url 'bike:component_new' %}?{% if bike %}bike={{ bike.id }}{% elif componenttype %}component_type={{ componenttype.id }}{% endif %}&success={{ success_url }}">
-	  Add</a></h3>
     <table class="table">
-    <tr><th>Type</th>
+    <tr>
+      <th>Type</th>
 	  <th>Description</th>
 	  <th>Specification</th>
 	</tr>

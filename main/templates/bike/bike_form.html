@@ -33,21 +33,7 @@ Bike details: {{ bike }} -
 
 {% if bike %}
 {% url 'bike:bike' bike.id as success_url %}
-<h3>Upcoming Maintenance
-  <a class="addlink"
-   href="{% url 'bike:maint_new' %}?bike={{ bike.id }}&next={{ success_url }}">
-   Add</a></h3>
-{% include 'bike/maint_upcoming.html' %}
-
-{% include 'bike/maint_history.html' %}
-<br>
-{% include 'bike/subcomponents.html' %}
-
-<p>
-	<a class="btn btn-secondary"
-	  href="{% url 'bike:component_new' %}?bike={{ bike.id }}&next={{ success_url }}">
-	Add component</a>
-</p>
+{% include 'bike/bike_extra.html' %}
 {% endif %}
 
 {% endblock %}

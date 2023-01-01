@@ -165,8 +165,9 @@ class Preferences(models.Model):
             Bike.update_distance_units(self.user, factor)
             MaintenanceType.update_distance_units(self.user, factor)
             MaintenanceAction.update_distance_units(self.user, factor)
-        super(Preferences, self).save(force_insert=False, force_update=False,
-                                      *args, **kwargs)
+        super(Preferences, self).save(
+            force_insert=force_insert, force_update=force_update,
+            *args, **kwargs)
 
 
 class Link(models.Model):

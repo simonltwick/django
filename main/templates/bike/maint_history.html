@@ -1,7 +1,8 @@
 <!-- included- from other templates.  Expects context=maint_history -->
 
 {% for action in maint_history %}
-  {% if forloop.first %}<h3>Maintenance history</h3><table>{% endif %}
+  {% if forloop.first %}<h3>Maintenance history</h3><table class="table">
+  {% endif %}
   <tr><td>{{ action.completed_date }}</td>
     
     <td><a href="{% url 'bike:maint_history' action.id %}?success={{ success_url }}">

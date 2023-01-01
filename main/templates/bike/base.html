@@ -46,8 +46,7 @@
     	</title>
 </head>
 <body>
-<div class="container-fluid masthead">
-
+<header class="container-fluid masthead">
 
   <nav class="navbar navbar-expand-sm navbar-dark bg-primary">
     <a class="navbar-brand text-warning" href="{% url 'bike:home' %}"
@@ -161,17 +160,17 @@
     </li></ul>
 
   </div>
-</div>
+</header>
 
 
-<div class="container">
+<main class="container">
 
 {% block content %}
 {% endblock %}
 
-</div>
-<div class="container">
-  <p class="small text-muted float-right">&copy Simon Lambourn 2020-21</p>
-</div>
+</main>
+<footer class="container">
+  <p class="small text-muted float-right">&copy Simon Lambourn 2020-22</p>
+</footer>
 </body>
 </html>
