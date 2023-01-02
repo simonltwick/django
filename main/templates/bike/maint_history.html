@@ -8,7 +8,7 @@
     <td><a href="{% url 'bike:maint_history' action.id %}?success={{ success_url }}">
 	  {{ action.action }}</a></td>
 	<td>{% if action.distance %}
-	  {{ action.distance}} {{ action.distance_units_display }}
+	  {{ action.distance|floatformat }} {{ action.distance_units_display }}
       {% endif %}
 	</td>
   </tr>
