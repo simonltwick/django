@@ -7,11 +7,11 @@ from django.db.models.functions import Now, TruncDate
 from django.urls import reverse
 from django.utils import timezone
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 import datetime as dt
 from enum import IntEnum
 import logging
-from typing import Optional
+from typing import Optional, List, Dict
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -245,25 +245,44 @@ class Ride(DistanceMixin):
                 )
 
     @classmethod
-    def mileage_by_month(cls, user, year: int, bike=None):
-        """ return total mileage by month and by mileage unit,
-        for a given year [and bike] """
-        rides = cls.objects.filter(rider=user, date__year=year)
+    def mileage_by_month(cls, user, years: int | List[int], bike=None
+                         ) -> Dict[int, Dict[str, Dict[str, int]]]:
+        """ return total mileage by month, by year and by mileage unit,
+        for a given year [and optionally bike] """
+        if not isinstance(years, (int, list)):
+            raise TypeError(
+                f"years parameter must be list or int, not {type(years)}")
+        if isinstance(years, list):
+            rides = cls.objects.filter(rider=user, date__year__in=years)
+        else:
+            rides = cls.objects.filter(rider=user, date__year=years)
         if bike is not None:
             rides = rides.filter(bike=bike)
 
-        rides = rides.order_by('date', 'distance_units').all()
-        monthly_mileage = defaultdict(lambda: defaultdict(int))
+        rides = rides.order_by(
+            'date__month', 'date__year', 'distance_units').all()
+        # monthly mileage: {month: {year: {distanceunit: distance}}}
 
+        # monthly_mileage = defaultdict(lambda: defaultdict(Counter))
+        # use long-winded approach rather than defaultdict:
+        # templates won't iterate over defaultdict
+        # also template dict lookup doesn't work with numeric keys (year)
+        # but iteration over dict.items does work with numeric keys (month)
+        monthly_mileage = {}
         for ride in rides:
             if ride.distance is not None:
-                monthly_mileage[ride.date.month][
-                    ride.distance_units_display] += ride.distance
+                month = ride.date.month
+                # template dict lookup doesn't work with numeric keys
+                year = str(ride.date.year)
+                units = ride.distance_units_display
+                if month not in monthly_mileage:
+                    monthly_mileage[month] = {}
+                if year not in monthly_mileage[month]:
+                    monthly_mileage[month][year] = {}
+                if units not in monthly_mileage[month][year]:
+                    monthly_mileage[month][year][units] = 0.0
+                monthly_mileage[month][year][units] += ride.distance
 
-        # return a dict, not defaultdict: templates won't iterate over
-        #     defaultdict
-        monthly_mileage = {month: {k: v for k, v in value.items()}
-                           for month, value in monthly_mileage.items()}
         return monthly_mileage
 
     @staticmethod

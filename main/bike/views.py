@@ -13,7 +13,7 @@ from django.views.generic.detail import DetailView
 import csv
 import datetime as dt
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
@@ -999,45 +999,80 @@ class MaintTypeDelete(BikeLoginRequiredMixin, DeleteView):
 
 
 @login_required(login_url=LOGIN_URL)
-def mileage(request, year=None, bike_id=None):
-    # odometer and recent mileage stuff for bikes / a bike ...
-    """ show a monthly summary of mileage, with detail if requested """
+def mileage(request, year: Optional[int]=None, bike_id=None):
+    """ show a monthly summary of mileage, with detail if requested
+    if year provided, show details for that year and the preceding year. """
+    # retrieve available years with rides recorded, for pagination
     years_dt = Ride.objects.dates('date', "year")
     years = [y_dt.year for y_dt in years_dt]
     if year is None:
-        # or use Queryset.latest() to retrieve latest ride on blog
-        year = years[-1]
-    prev_yr, next_yr = get_prev_next_yr(year, years)
+        # or use Queryset.latest() to retrieve latest ride on db
+        sel_yrs = years[-2:]
+    else:
+        prev_yr = next((yr for yr in reversed(years) if yr < year), None)
+        sel_yrs = [year] if prev_yr is None else [prev_yr, year]
+    sel_yrs.sort()
+    if all((yr not in years for yr in sel_yrs),):
+        log.warning("mileage requested for a year with no recorded rides.")
+    log.info("years=%s, sel sel_yrs=%s", years, sel_yrs)
+    prev_yr, next_yr = get_prev_next_yr(sel_yrs, years)
     if bike_id is not None:
         bike = get_object_or_404(Bike, pk=bike_id, owner=request.user)
     else:
         bike = None
-    monthly_mileage = Ride.mileage_by_month(request.user, year, bike_id)
-    distance_units = {distance_unit
-                      for dstunit_dst in monthly_mileage.values()
-                      for distance_unit in dstunit_dst}
-    total = {distance_unit: sum((monthly_mileage[month][distance_unit]
-                                 for month in monthly_mileage),)
-             for distance_unit in distance_units}
-    return render(request, 'bike/ride_archive_year.html',
+    monthly_mileage = Ride.mileage_by_month(request.user, sel_yrs, bike_id)
+    totals = annual_mileage_totals(monthly_mileage, years)
+    sel_yrs = [str(yr) for yr in sel_yrs]
+    for month, month_summary in monthly_mileage.items():
+        for yr in sel_yrs:
+            if yr not in month_summary:
+                month_summary[yr] = {}
+        monthly_mileage[month] = dict(sorted(month_summary.items()))
+    # log.info("monthly_mileage=%s, sel_yrs=%r, prev_yr=%s, next_yr=%s",
+    #          monthly_mileage, sel_yrs, prev_yr, next_yr)
+    return render(request, 'bike/mileage_monthly.html',
                   context={'monthly_mileage': monthly_mileage,
                            'bike': bike, 'bike_id': bike_id,
-                           'year': year, 'total': total,
+                           'sel_yrs': sel_yrs, 'totals': totals,
                            'prev_yr': prev_yr, 'next_yr': next_yr})
 
 
-def get_prev_next_yr(year: int, years: List[int]
+def annual_mileage_totals(
+        monthly_mileage: Dict[int, Dict[str, Dict[str, int]]], years: List[int]
+        ) -> Dict[str, Dict[str, int]]:
+    """ calculate totals by year for included years
+    monthly_mileage is {month: {year: {distance_unit: mileage}}}
+    totals is {year: {distance_unit: mileage}} """
+    totals = {str(year): {} for year in years}
+    # year is a string in monthly_mileage
+    for mileage in monthly_mileage.values():
+        for year, units_and_dist in mileage.items():
+            for distance_unit, dist in units_and_dist.items():
+                try:
+                    totals[str(year)][distance_unit] += dist
+                except KeyError:
+                    totals[str(year)][distance_unit] = dist
+    return totals
+
+
+def get_prev_next_yr(sel_years: List[int], years: List[int]
                      ) -> Tuple[Optional[int], Optional[int]]:
     """ return the previous and next year in years, or None
     years must be sorted in ascending order"""
-    # return index of first element > year or None
-    # log.info("get_prev_next_yr: year=%s, years=%s", year, years)
-    next_index = next((x[0] for x in enumerate(years) if x[1] > year), None)
-    next_yr = next_index and years[next_index]
-    if next_index is None:
-        next_index = len(years)
-    prev_yr = years[next_index-1] if next_index > 0 else None
-    if prev_yr == year:
-        prev_yr = years[next_index-2] if next_index > 1 else None
+    log.info("get_prev_next_yr: sel_years=%s, years=%s", sel_years, years)
+    assert sel_years, "sel_years parameter must be provided"
+    if not years:
+        return None, None  # no years to choose from
+
+    if not isinstance(sel_years, list):
+        sel_years = list[sel_years]
+    else:
+        sel_years.sort()
+    next_yr = next((x for x in years if x > max(sel_years)), None)
+    if len(sel_years) > 1:
+        prev_yr = sel_years[0]
+    else:
+        prev_yr = next(
+            (x for x in reversed(years) if x < min(sel_years)), None)
     # log.info("get_prev_next_yr -> prev_yr=%s, next_yr=%s", prev_yr, next_yr)
     return prev_yr, next_yr
