@@ -11,7 +11,7 @@ from collections import defaultdict, Counter
 import datetime as dt
 from enum import IntEnum
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -245,7 +245,7 @@ class Ride(DistanceMixin):
                 )
 
     @classmethod
-    def mileage_by_month(cls, user, years: int | List[int], bike=None
+    def mileage_by_month(cls, user, years: Union[int, List[int]], bike=None
                          ) -> Dict[int, Dict[str, Dict[str, int]]]:
         """ return total mileage by month, by year and by mileage unit,
         for a given year [and optionally bike] """
