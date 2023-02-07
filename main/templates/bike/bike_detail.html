@@ -10,7 +10,7 @@ Bike details: {{ bike }}
 <dt>Description</dt><dd>{{ bike.description }}</dd>
 <dt>Calculated odometer</dt><dd>{{ bike.current_odo }} {{ distance_units }}</dd>
 </dl>
-{% url 'bike:bike_details' bike.id as success_url %}
+{% url 'bike:bike' bike.id as success_url %}
 {% include 'bike/bike_extra.html' %}
 <a href="{% url 'bike:rides' bike_id=bike.id %}" class="btn btn-secondary">
   Ride history</a>
