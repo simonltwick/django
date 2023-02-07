@@ -1,0 +1,42 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Maintenance Action details: {{ maintenanceaction }}
+{% endblock %}
+
+{% block content %}
+<h1>Maintenance Action details: {{ maintenanceaction }}</h1>
+
+
+<p>Bike:<a href="{% url 'bike:bike' maintenanceaction.bike_id %}"
+  >{{ maintenanceaction.bike }}</a>
+Maint. type:{% if maintenanceaction.maint_type %}
+  <a href="{% url 'bike:maint_type' maintenanceaction.maint_type.id %}"
+  >{{ maintenanceaction.maint_type }}</a>
+  {% else %}-
+  {% endif %}</p>
+
+<p>Component:{% if maintenanceaction.component %}
+  <a href="{% url 'bike:component' maintenanceaction.component_id %}"
+  >{{ maintenanceaction.component }}</a>
+  {% else %}-
+  {% endif %}
+Component Type:{% if maintenanceaction.componenttype %}
+  <a href="{% url 'bike:componenttype' maintenanceaction.componenttype.id %}"
+  >{{ maintenanceaction.componenttype }}</a>
+  {% else %}-
+  {% endif %}</p>
+
+<dl>
+<dt>Description</dt><dd>{{ maintenanceaction.description }}</dd>
+<dt>Recurring</dt><dd>{% if maintenanceaction.recurring %}Yes{% else %}No{% endif %}</dd>
+<dt>Completed</dt><dd>{% if maintenanceaction.completed %}Yes{% else %}No{% endif %}</dd>
+<dt>Due date</dt><dd>{{ maintenanceaction.due_date|default_if_none:"-" }}</dd>
+<dt>Due distance</dt><dd>{{ maintenanceaction.due_distance|default_if_none:"-" }} {{ distance_units }}</dd>
+<dt>Due in</dt><dd>{{ due_in|default_if_none:"-" }}</dd>
+</dl>
+<a class="btn btn-secondary" 
+  href="{% url 'bike:maint_edit' pk=maintenanceaction.id %}?next={{ next_url }}">
+  Edit</a>
+<a class="btn btn-primary" href="{{ next_url }}">OK</a>
+{% endblock %}

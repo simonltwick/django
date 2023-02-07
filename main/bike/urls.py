@@ -27,7 +27,9 @@ urlpatterns = [
 
     path('maint', views.MaintActionList.as_view(), name='maint_actions'),
     path('maint/new', views.MaintActionCreate.as_view(), name='maint_new'),
-    path('maint/<int:pk>', views.maint_action_update, name='maint'),
+    path('maint/<int:pk>/detail', views.MaintActionDetail.as_view(),
+         name='maint'),
+    path('maint/<int:pk>/edit', views.maint_action_update, name='maint_edit'),
     # path('maint/<int:pk>', views.MaintActionUpdate.as_view(), name='maint'),
     path('maint/<int:pk>/complete', views.maint_action_complete,
          name='maint_complete'),

@@ -861,6 +861,31 @@ def maint_action_complete(request, pk: int):
                  'distance_units': distance_units})
 
 
+class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
+    model = MaintenanceAction
+
+    def get_queryset(self):
+        return MaintenanceAction.objects.filter(
+            user=self.request.user, pk=self.kwargs["pk"]
+                ).annotate(
+                due_in_distance=MaintenanceAction.due_in_distance,
+                due_in_duration=MaintenanceAction.due_in_duration
+                ).select_related("bike", "component", "component__type",
+                                 "maint_type", "user__preferences")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["next_url"] = (
+            self.request.GET["next"] if "next" in self.request.GET
+            else reverse("bike:home"))
+        # preferences = Preferences.objects.get(user=self.request.user)
+        distance_units = (
+            self.object.user.preferences.get_distance_units_display())
+        context['distance_units'] = distance_units
+        context["due_in"] = self.object.due_in(distance_units)
+        return context
+
+
 class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
     model = MaintenanceAction
     success_url = reverse_lazy('bike:maint_actions')

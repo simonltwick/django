@@ -612,6 +612,12 @@ class MaintenanceAction(MaintIntervalMixin):
     completed = models.BooleanField(default=False)
     due_date = models.DateField(null=True, blank=True, default=dt.date.today)
     due_distance = models.FloatField(null=True, blank=True)
+    # Expressions to be used in .annotate(...).  See upcoming()
+    due_in_duration = ExpressionWrapper(
+            F('due_date') - TruncDate(Now()),
+            output_field=fields.DurationField()
+            )
+    due_in_distance = F('due_distance') - F('bike__current_odo')
 
     class Meta:
         unique_together = ('user', 'bike', 'component', 'maint_type',
@@ -717,13 +723,9 @@ class MaintenanceAction(MaintIntervalMixin):
             upcoming = upcoming.order_by('bike_id')
         if component_id is not None:
             upcoming = upcoming.filter(component_id=component_id)
-        due_in_duration = ExpressionWrapper(
-            F('due_date') - TruncDate(Now()),
-            output_field=fields.DurationField()
-            )
         upcoming = (upcoming.annotate(
-            due_in_duration=due_in_duration,
-            due_in_distance=F('due_distance') - F('bike__current_odo')
+            due_in_duration=cls.due_in_duration,
+            due_in_distance=cls.due_in_distance
             ))
         if filter_by_limits:
             return cls.apply_prefs_limits(upcoming, user)
@@ -744,6 +746,8 @@ class MaintenanceAction(MaintIntervalMixin):
     def due_in(self, distance_units):
         """ return a string with "Due in xxx days, xxx <distance units".
         Used after calling Maintaction.upcoming """
+        log.debug("Maintenanceaction.due_in: due_in_duration=%s",
+                  self.due_in_duration)
         try:
             return self._due_in
         except AttributeError:
