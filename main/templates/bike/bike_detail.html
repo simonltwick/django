@@ -8,7 +8,7 @@ Bike details: {{ bike }}
 <h1>Bike details: {{ bike.name }}</h1>
 <dl>
 <dt>Description</dt><dd>{{ bike.description }}</dd>
-<dt>Calculated odometer</dt><dd>{{ bike.current_odo }} {{ distance_units }}</dd>
+<dt>Calculated odometer</dt><dd>{{ bike.current_odo|floatformat }} {{ distance_units }}</dd>
 </dl>
 {% url 'bike:bike' bike.id as success_url %}
 {% include 'bike/bike_extra.html' %}
