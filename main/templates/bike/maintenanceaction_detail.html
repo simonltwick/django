@@ -8,8 +8,12 @@ Maintenance Action details: {{ maintenanceaction }}
 <h1>Maintenance Action details: {{ maintenanceaction }}</h1>
 
 
-<p>Bike:<a href="{% url 'bike:bike' maintenanceaction.bike_id %}"
+<p>Bike:{% if maintenanceaction.bike_id %}
+<a href="{% url 'bike:bike' maintenanceaction.bike_id %}"
   >{{ maintenanceaction.bike }}</a>
+  {% else %}-
+  {% endif %}
+
 Maint. type:{% if maintenanceaction.maint_type %}
   <a href="{% url 'bike:maint_type' maintenanceaction.maint_type.id %}"
   >{{ maintenanceaction.maint_type }}</a>
