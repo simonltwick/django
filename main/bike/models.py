@@ -7,7 +7,7 @@ from django.db.models.functions import Now, TruncDate
 from django.urls import reverse
 from django.utils import timezone
 
-from collections import defaultdict, Counter
+from collections import defaultdict
 import datetime as dt
 from enum import IntEnum
 import logging
@@ -246,7 +246,7 @@ class Ride(DistanceMixin):
 
     @classmethod
     def mileage_by_month(cls, user, years: Union[int, List[int]], bike=None
-                         ) -> Dict[int, Dict[str, Dict[str, int]]]:
+                         ) -> Dict[int, Dict[str, Dict[str, float]]]:
         """ return total mileage by month, by year and by mileage unit,
         for a given year [and optionally bike] """
         if not isinstance(years, (int, list)):
@@ -268,7 +268,7 @@ class Ride(DistanceMixin):
         # templates won't iterate over defaultdict
         # also template dict lookup doesn't work with numeric keys (year)
         # but iteration over dict.items does work with numeric keys (month)
-        monthly_mileage = {}
+        monthly_mileage: Dict[int, Dict[str, Dict[str, float]]] = {}
         for ride in rides:
             if ride.distance is not None:
                 month = ride.date.month
@@ -496,11 +496,12 @@ class Component(models.Model):
         if self.bike is not None:
             return self.bike
         parent_component = self.subcomponent_of
-        if parent_component is not None:
-            if depth > self.HIERARCHY_LIMIT:
-                raise RecursionError("Suspected circular component hierarchy "
-                                     f"for {self}, id={self.id}")
-            return parent_component.current_bike(depth+1)
+        if parent_component is None:
+            return None
+        if depth > self.HIERARCHY_LIMIT:
+            raise RecursionError("Suspected circular component hierarchy "
+                                 f"for {self}, id={self.id}")
+        return parent_component.current_bike(depth+1)
 
     def update_bike_info(self, old_self):
         old_bike = old_self.current_bike()
@@ -711,8 +712,8 @@ class MaintenanceAction(MaintIntervalMixin):
         return None
 
     @classmethod
-    def upcoming(cls, user, bike_id: int=None, component_id=None,
-                 filter_by_limits=True):
+    def upcoming(cls, user, bike_id: int|None=None,
+                 component_id: int|None=None, filter_by_limits=True):
         """ return a queryset of incomplete maintenance actions
             due_in_time is a datetime.timedelta object,
             due_in_distance is a float using preferences.distance_units
