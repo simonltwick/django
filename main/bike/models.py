@@ -704,8 +704,10 @@ class MaintenanceAction(MaintIntervalMixin):
 
     def current_bike_odo(self):
         bike = self.bike
-        if (bike or self.component and self.component.bike):
+        if bike:
             return bike.current_odo
+        if self.component and self.component.bike:
+            return self.component.bike.current_odo
         return None
 
     @classmethod
