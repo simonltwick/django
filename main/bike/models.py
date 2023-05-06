@@ -746,8 +746,8 @@ class MaintenanceAction(MaintIntervalMixin):
     def due_in(self, distance_units):
         """ return a string with "Due in xxx days, xxx <distance units".
         Used after calling Maintaction.upcoming """
-        log.debug("Maintenanceaction.due_in: due_in_duration=%s",
-                  self.due_in_duration)
+        # log.debug("Maintenanceaction.due_in: due_in_duration=%s",
+        #           self.due_in_duration)
         try:
             return self._due_in
         except AttributeError:
