@@ -43,4 +43,11 @@ Component Type:{% if maintenanceaction.componenttype %}
   href="{% url 'bike:maint_edit' pk=maintenanceaction.id %}?next={{ next_url }}">
   Edit</a>
 <a class="btn btn-primary" href="{{ next_url }}">OK</a>
+<p>
+    {% if completion_msg %}Completed: {{ completion_msg }}</p><p>{% endif %}
+    {% if not maintenanceaction.completed %}
+      <input type="submit" class="btn btn-primary" value="Mark as Done"
+      formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
+      {{ completion_form }} {{ distance_units }}
+    {% endif %}
 {% endblock %}
