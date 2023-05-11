@@ -712,8 +712,8 @@ class MaintenanceAction(MaintIntervalMixin):
         return None
 
     @classmethod
-    def upcoming(cls, user, bike_id: int|None=None,
-                 component_id: int|None=None, filter_by_limits=True):
+    def upcoming(cls, user, bike_id: Optional[int]=None,
+                 component_id: Optional[int]=None, filter_by_limits=True):
         """ return a queryset of incomplete maintenance actions
             due_in_time is a datetime.timedelta object,
             due_in_distance is a float using preferences.distance_units
