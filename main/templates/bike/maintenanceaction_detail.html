@@ -39,15 +39,20 @@ Component Type:{% if maintenanceaction.componenttype %}
 <dt>Due distance</dt><dd>{{ maintenanceaction.due_distance|default_if_none:"-" }} {{ distance_units }}</dd>
 <dt>Due in</dt><dd>{{ due_in|default_if_none:"-" }}</dd>
 </dl>
+<p>
 <a class="btn btn-secondary" 
   href="{% url 'bike:maint_edit' pk=maintenanceaction.id %}?next={{ next_url }}">
   Edit</a>
 <a class="btn btn-primary" href="{{ next_url }}">OK</a>
+</p>
 <p>
     {% if completion_msg %}Completed: {{ completion_msg }}</p><p>{% endif %}
     {% if not maintenanceaction.completed %}
+      <form method="POST">
+      {% csrf_token %}
       <input type="submit" class="btn btn-primary" value="Mark as Done"
       formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
       {{ completion_form }} {{ distance_units }}
+      </form>
     {% endif %}
 {% endblock %}

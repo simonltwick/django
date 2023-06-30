@@ -883,6 +883,9 @@ class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
             self.object.user.preferences.get_distance_units_display())
         context['distance_units'] = distance_units
         context["due_in"] = self.object.due_in(distance_units)
+        context['completion_form'] = MaintCompletionDetailsForm(initial={
+            'completed_date': timezone.now().date(),
+            'distance': self.object.current_bike_odo()})
         return context
 
 
@@ -971,8 +974,8 @@ class MaintTypeCreate(BikeLoginRequiredMixin, CreateView):
         # Call the base implementation first to get a context
         context = super().get_context_data(**kwargs)
         # Add in a QuerySet of all the books
-        context['distance_units'] = (self.request.user.preferences
-                                     .get_distance_units_display())
+        context['distance_units'] = (
+            self.request.user.preferences.get_distance_units_display())
         return context
 
     def form_valid(self, form):
@@ -1006,8 +1009,8 @@ class MaintTypeUpdate(BikeLoginRequiredMixin, UpdateView):
         # Call the base implementation first to get a context
         context = super().get_context_data(**kwargs)
         # Add in a QuerySet of all the books
-        context['distance_units'] = (self.request.user.preferences
-                                     .get_distance_units_display())
+        context['distance_units'] = (
+            self.request.user.preferences.get_distance_units_display())
         return context
 
 
