@@ -187,7 +187,7 @@ class Ride(DistanceMixin):
     is_adjustment = models.BooleanField(
         default=False, help_text="If true, signifies this is not a real ride"
         " but a ride distance adjustment between odometer readings.")
-    description = models.TextField(max_length=400, null=True, blank=True)
+    description = models.TextField(max_length=400, null=False, blank=False)
     ascent = models.FloatField(null=True, blank=True)
     ascent_units = models.PositiveSmallIntegerField(
         choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
