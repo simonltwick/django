@@ -835,11 +835,35 @@ def maint_action_complete(request, pk: int):
 
     maint_action = get_object_or_404(
         MaintenanceAction, pk=pk, user=request.user)
-    maint_action_form = MaintenanceActionUpdateForm(
-        request.POST, instance=maint_action)
     completion_form = MaintCompletionDetailsForm(request.POST)
     distance_units = request.user.preferences.get_distance_units_display()
-    if maint_action_form.is_valid() and completion_form.is_valid():
+    if "mark-complete-from-maint-details" not in request.POST:
+        # a MaintenanceActionUpdateForm was submitted: validate that first
+        maint_action_form = MaintenanceActionUpdateForm(
+            request.POST, instance=maint_action)
+        link_formset = MaintActionLinkFormSet(
+            request.POST, instance=maint_action)
+        if not maint_action_form.is_valid():
+            return render(
+                request, 'bike/maintenanceaction_form.html',
+                context={'form': maint_action_form,
+                         'maintenanceaction': maint_action,
+                         'completion_form': completion_form,
+                         'distance_units': distance_units,
+                         'link_formset': link_formset})
+        else:  # MaintenanceActionUpdateForm is valid
+            maint_action = maint_action_form.save()
+            if link_formset.is_valid():
+                link_formset.save(commit=False)
+                for link_form in link_formset:
+                    link_form.instance.maint_action = maint_action
+                link_formset.save()
+    # now, we are going to validate the completion form and mark complete,
+    # returning a maint details instance
+    # get augmented maint action details plus context for detail template
+    maint_action = get_maint_action_detail_queryset(request.user, pk).first()
+    details_context = add_maint_action_detail_context_data({}, maint_action)
+    if completion_form.is_valid():
         comp_date = completion_form.cleaned_data['completed_date']
         comp_distance = completion_form.cleaned_data['distance']
         maint_history = maint_action.maint_completed(comp_date, comp_distance)
@@ -854,40 +878,46 @@ def maint_action_complete(request, pk: int):
         maint_history = ''
 
     return render(
-        request, 'bike/maintenanceaction_form.html',
+        request, 'bike/maintenanceaction_detail.html',
         context={'form': maint_action_form, 'maintenanceaction': maint_action,
                  'completion_form': completion_form,
                  'completion_msg': maint_history,
-                 'distance_units': distance_units})
+                 'distance_units': distance_units} | details_context)
 
 
 class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
     model = MaintenanceAction
 
     def get_queryset(self):
-        return MaintenanceAction.objects.filter(
-            user=self.request.user, pk=self.kwargs["pk"]
-                ).annotate(
-                due_in_distance=MaintenanceAction.due_in_distance,
-                due_in_duration=MaintenanceAction.due_in_duration
-                ).select_related("bike", "component", "component__type",
-                                 "maint_type", "user__preferences")
+        return get_maint_action_detail_queryset(
+            self.request.user, self.kwargs["pk"])
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["next_url"] = (
             self.request.GET["next"] if "next" in self.request.GET
             else reverse("bike:home"))
-        # preferences = Preferences.objects.get(user=self.request.user)
-        distance_units = (
-            self.object.user.preferences.get_distance_units_display())
-        context['distance_units'] = distance_units
-        context["due_in"] = self.object.due_in(distance_units)
         context['completion_form'] = MaintCompletionDetailsForm(initial={
             'completed_date': timezone.now().date(),
             'distance': self.object.current_bike_odo()})
-        return context
+        return add_maint_action_detail_context_data(context, self.object)
 
+
+def get_maint_action_detail_queryset(user, pk):
+    return MaintenanceAction.objects.filter(user=user, pk=pk
+                ).annotate(
+                due_in_distance=MaintenanceAction.due_in_distance,
+                due_in_duration=MaintenanceAction.due_in_duration
+                ).select_related("bike", "component", "component__type",
+                                 "maint_type", "user__preferences")
+
+def add_maint_action_detail_context_data(context, instance):
+        distance_units = (
+            instance.user.preferences.get_distance_units_display())
+        context['distance_units'] = distance_units
+        context["due_in"] = instance.due_in(distance_units)
+        return context
+    
 
 class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
     model = MaintenanceAction
@@ -1071,7 +1101,7 @@ def annual_mileage_totals(
     """ calculate totals by year for included years
     monthly_mileage is {month: {year: {distance_unit: mileage}}}
     totals is {year: {distance_unit: mileage}} """
-    totals = {str(year): {} for year in years}
+    totals: Dict[str, Dict[str, float]] = {str(year): {} for year in years}
     # year is a string in monthly_mileage
     for mileage in monthly_mileage.values():
         for year, units_and_dist in mileage.items():

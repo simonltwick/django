@@ -51,6 +51,7 @@ Component Type:{% if maintenanceaction.componenttype %}
       <form method="POST">
       {% csrf_token %}
       <input type="submit" class="btn btn-primary" value="Mark as Done"
+      name="mark-complete-from-maint-details"
       formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
       {{ completion_form }} {{ distance_units }}
       </form>
