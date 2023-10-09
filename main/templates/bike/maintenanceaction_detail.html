@@ -41,7 +41,7 @@ Component Type:{% if maintenanceaction.componenttype %}
 </dl>
 <p>
 <a class="btn btn-secondary" 
-  href="{% url 'bike:maint_edit' pk=maintenanceaction.id %}?next={{ next_url }}">
+  href="{% url 'bike:maint_edit' pk=maintenanceaction.id %}">
   Edit</a>
 <a class="btn btn-primary" href="{{ next_url }}">OK</a>
 </p>

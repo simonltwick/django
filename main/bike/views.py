@@ -862,7 +862,6 @@ def maint_action_complete(request, pk: int):
     # returning a maint details instance
     # get augmented maint action details plus context for detail template
     maint_action = get_maint_action_detail_queryset(request.user, pk).first()
-    details_context = add_maint_action_detail_context_data({}, maint_action)
     if completion_form.is_valid():
         comp_date = completion_form.cleaned_data['completed_date']
         comp_distance = completion_form.cleaned_data['distance']
@@ -877,12 +876,16 @@ def maint_action_complete(request, pk: int):
     else:
         maint_history = ''
 
+    context = {'form': maint_action_form, 'maintenanceaction': maint_action,
+               'completion_form': completion_form,
+               'completion_msg': maint_history,
+               'distance_units': distance_units,
+               'due_in': maint_action.due_in(distance_units)
+               }
+    log.info("maint_action_complete: maint_action=%s, maint_action.id=%s",
+             maint_action, maint_action.id)
     return render(
-        request, 'bike/maintenanceaction_detail.html',
-        context={'form': maint_action_form, 'maintenanceaction': maint_action,
-                 'completion_form': completion_form,
-                 'completion_msg': maint_history,
-                 'distance_units': distance_units} | details_context)
+        request, 'bike/maintenanceaction_detail.html', context=context)
 
 
 class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
