@@ -57,12 +57,7 @@ class TestDistanceUnits(TestCase):
                          "mixed units sum")
 
 
-class TestOdometerAdjustmentRides(TestCase):
-
-    """ adding an odo reading automatically calls update_adjustment_rides
-        adding/deleting/updating a ride between two odo readings
-            updates adjustment ride
-        """
+class TestOdometerAdjustment(TestCase):
 
     @override_settings(
         PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher', ])
@@ -72,20 +67,90 @@ class TestOdometerAdjustmentRides(TestCase):
         _preferences = Preferences.objects.create(user=self.user)
         self.bike = Bike.objects.create(
             name='Test bike', description="test", owner=self.user)
+        self.bike2 = Bike.objects.create(
+            name='Test bike 2', description="test2", owner=self.user)
         self.now = timezone.now()
         self.yr = dt.timedelta(days=365)
-        self.ride = Ride.objects.create(rider=self.user, bike=self.bike,
-                                        distance=1,
-                                        date=self.now,
-                                        distance_units=DistanceUnits.MILES)
+        # odo before ride
         self.odo1 = Odometer.objects.create(
             bike=self.bike, rider=self.user,
             distance=20, distance_units=DistanceUnits.MILES,
             date=self.now-self.yr)
+        self.odo3 = Odometer.objects.create(
+            bike=self.bike2, rider=self.user,
+            distance=100, distance_units=DistanceUnits.MILES,
+            date=self.now-self.yr)
+
+        self.ride = Ride.objects.create(rider=self.user, bike=self.bike,
+                                        distance=1,
+                                        date=self.now,
+                                        distance_units=DistanceUnits.MILES)
+
+        # odo after ride
         self.odo2 = Odometer.objects.create(
             bike=self.bike, rider=self.user,
             distance=40, distance_units=DistanceUnits.MILES,
             date=self.now+self.yr)
+        self.odo4 = Odometer.objects.create(
+            bike=self.bike2, rider=self.user,
+            distance=150, distance_units=DistanceUnits.MILES,
+            date=self.now+self.yr)
+
+
+class TestRide(TestOdometerAdjustment):
+    """ changing bike for a ride automatically updates odo adjustment ride
+    AND bike_odo for both old & new bike, unless they are null """
+    def test0_change_bike_adjustment_rides(self):
+        """ change the bike for self.ride to bike2
+            -> adjusts both adjustment rides """
+        odo2_adjustment_ride = self.odo2.adjustment_ride
+        odo4_adjustment_ride = self.odo4.adjustment_ride
+        self.assertEqual(odo2_adjustment_ride.distance, 19,
+                         "odo2: 19 miles adjustment before changing bike")
+        self.assertEqual(odo4_adjustment_ride.distance, 50,
+                         "odo2: 50 miles adjustment before changing bike")
+
+        self.ride.bike_id = self.bike2.id
+        self.ride.save()
+        
+        odo2_adjustment_ride.refresh_from_db()
+        odo4_adjustment_ride.refresh_from_db()
+
+        self.assertEqual(odo2_adjustment_ride.distance, 20,
+                         "odo2: 20 miles adjustment after changing bike")
+        self.assertEqual(odo4_adjustment_ride.distance, 49,
+                         "odo4: 49 miles adjustment after changing bike")
+
+    def test1_change_bike_current_odo(self):
+        """ change the bike for self ride (after last odo reading) to bike2
+            --> adjusts both bike.current_odo """
+        ride2 = Ride.objects.create(rider=self.user, bike=self.bike,
+                                        distance=7,
+                                        date=self.now + 2 * self.yr,
+                                        distance_units=DistanceUnits.MILES)
+
+        self.assertEqual(self.bike.current_odo, 47,
+                         "bike odo: 47 before changing bike (odo2+ride2)")
+        self.assertEqual(self.bike2.current_odo, 150,
+                         "bike2 odo: 150 before changing bike (odo4)")
+
+        ride2.bike_id = self.bike2.id
+        ride2.save()
+        self.bike.refresh_from_db()
+        self.bike2.refresh_from_db()
+
+        self.assertEqual(self.bike.current_odo, 40,
+                         "bike odo: 40 after changing bike (odo2)")
+        self.assertEqual(self.bike2.current_odo, 157,
+                         "bike2 odo: 157 after changing bike (odo4+ride2)")
+
+
+class TestOdometerAdjustmentRides(TestOdometerAdjustment):
+
+    """ adding an odo reading automatically calls update_adjustment_rides
+        adding/deleting/updating a ride between two odo readings
+            updates adjustment ride
+        """
 
     def test0_prev_next_odo(self):
         self.assertEqual(

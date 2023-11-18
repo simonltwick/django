@@ -204,12 +204,24 @@ class Ride(DistanceMixin):
         return reverse('bike:ride', kwargs={'pk': self.id})
 
     def save(self, *args, **kwargs):
+        """ update odometer adjustment ride(s), if any """
+        # update odo adj ride for "old" bike if bike has been changed
+        try:
+            old_ride = Ride.objects.get(id=self.id)
+            old_bike = old_ride.bike
+        except Ride.DoesNotExist:
+            old_bike = None
         super().save(*args, **kwargs)
         if not self.is_adjustment:
+            if self.bike_id:
             # allow updating of following odometer adjustment ride, if any
-            Odometer.ride_updated(self.date, self.bike_id)
-            self.bike.update_current_odo()
-            self.bike.save()
+                Odometer.ride_updated(self.date, self.bike_id)
+                self.bike.update_current_odo()
+                self.bike.save()
+            if old_bike and old_bike != self.bike:
+                Odometer.ride_updated(self.date, old_bike.id)
+                old_bike.update_current_odo()
+                old_bike.save()
 
     @property
     def ascent_units_display(self):

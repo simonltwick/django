@@ -1075,7 +1075,7 @@ def mileage(request, year: Optional[int]=None, bike_id=None):
     sel_yrs.sort()
     if all((yr not in years for yr in sel_yrs),):
         log.warning("mileage requested for a year with no recorded rides.")
-    log.info("years=%s, sel sel_yrs=%s", years, sel_yrs)
+    # log.info("years=%s, sel sel_yrs=%s", years, sel_yrs)
     prev_yr, next_yr = get_prev_next_yr(sel_yrs, years)
     if bike_id is not None:
         bike = get_object_or_404(Bike, pk=bike_id, owner=request.user)
@@ -1099,8 +1099,8 @@ def mileage(request, year: Optional[int]=None, bike_id=None):
 
 
 def annual_mileage_totals(
-        monthly_mileage: Dict[int, Dict[str, Dict[str, int]]], years: List[int]
-        ) -> Dict[str, Dict[str, int]]:
+        monthly_mileage: Dict[int, Dict[str, Dict[str, float]]], years: List[int]
+        ) -> Dict[str, Dict[str, float]]:
     """ calculate totals by year for included years
     monthly_mileage is {month: {year: {distance_unit: mileage}}}
     totals is {year: {distance_unit: mileage}} """
@@ -1120,7 +1120,7 @@ def get_prev_next_yr(sel_years: List[int], years: List[int]
                      ) -> Tuple[Optional[int], Optional[int]]:
     """ return the previous and next year in years, or None
     years must be sorted in ascending order"""
-    log.info("get_prev_next_yr: sel_years=%s, years=%s", sel_years, years)
+    # log.info("get_prev_next_yr: sel_years=%s, years=%s", sel_years, years)
     assert sel_years, "sel_years parameter must be provided"
     if not years:
         return None, None  # no years to choose from
