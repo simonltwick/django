@@ -261,15 +261,7 @@ class Ride(DistanceMixin):
                          ) -> Dict[int, Dict[str, Dict[str, float]]]:
         """ return total mileage by month, by year and by mileage unit,
         for a given year [and optionally bike] """
-        if not isinstance(years, (int, list)):
-            raise TypeError(
-                f"years parameter must be list or int, not {type(years)}")
-        if isinstance(years, list):
-            rides = cls.objects.filter(rider=user, date__year__in=years)
-        else:
-            rides = cls.objects.filter(rider=user, date__year=years)
-        if bike is not None:
-            rides = rides.filter(bike=bike)
+        rides = cls.rides_for_years(user, years, bike)
 
         rides = rides.order_by(
             'date__month', 'date__year', 'distance_units').all()
@@ -296,6 +288,42 @@ class Ride(DistanceMixin):
                 monthly_mileage[month][year][units] += ride.distance
 
         return monthly_mileage
+
+    @classmethod
+    def mileage_ytd(cls, user, years: Union[int, List[int]], bike=None, 
+                    date_now: Optional[dt.datetime] = None  # for testing
+                    ) -> Dict[int, Dict[str, float]]:
+        rides = cls.rides_for_years(user, years, bike)
+        now = date_now or dt.datetime.utcnow()
+        ytd_filter = Q(date__month__lt=now.month)| Q(
+            date__month=now.month, date__day__lte=now.day)
+        rides = rides.filter(ytd_filter)
+        mileage_ytd: Dict[int, Dict[str, float]] = {}
+        for ride in rides:
+            if ride.distance is None:
+                continue
+            year = ride.date.year
+            units = ride.distance_units_display
+            if year not in mileage_ytd:
+                mileage_ytd[year] = {}
+            if units not in mileage_ytd[year]:
+                mileage_ytd[year][units] = 0.0
+            mileage_ytd[year][units] += ride.distance
+        return mileage_ytd
+
+    @classmethod
+    def rides_for_years(cls, user, years: Union[int, List[int]],
+                        bike: Optional[int]):
+        if not isinstance(years, (int, list)):
+            raise TypeError(
+                f"years parameter must be list or int, not {type(years)}")
+        if isinstance(years, list):
+            rides = cls.objects.filter(rider=user, date__year__in=years)
+        else:
+            rides = cls.objects.filter(rider=user, date__year=years)
+        if bike is not None:
+                rides = rides.filter(bike=bike)
+        return rides
 
     @staticmethod
     def on_post_delete(_sender, instance, **_kwargs):

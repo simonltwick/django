@@ -14,6 +14,7 @@ from django.db.models.functions import Now, TruncDate
 from copy import deepcopy
 import datetime as dt
 import logging
+from typing import Optional
 
 from ..models import (
     Bike, ComponentType, Component,  # MaintenanceAction,
@@ -143,6 +144,36 @@ class TestRide(TestOdometerAdjustment):
                          "bike odo: 40 after changing bike (odo2)")
         self.assertEqual(self.bike2.current_odo, 157,
                          "bike2 odo: 157 after changing bike (odo4+ride2)")
+
+    def test_mileage_ytd(self):
+        """ note that this test will not work if date is within -2 or +4 days
+        of year-end, as the dates will not fall in the same year """
+        for distance, time_delta in ((3, -1), (5, -2), (13, +4)):
+            # also have (1, 0) created in setup
+            ride_date = self.now + dt.timedelta(days=time_delta)
+            assert ride_date.year == self.now.year, (
+                "this test will fail because not all dates fall within the "
+                "same year")
+            Ride.objects.create(
+                rider=self.user, bike=self.bike,
+                distance=distance,
+                date=ride_date,
+                distance_units=DistanceUnits.MILES)
+
+        for date, expected_result in ((None, 9), (-1, 8), (+5, 22)):
+            self.check_mileage_ytd(date, expected_result)
+
+    def check_mileage_ytd(self, date: Optional[int], expected_result: int):
+        date_now = None if date is None else self.now + dt.timedelta(days=date)
+        ytd1 = Ride.mileage_ytd(
+            self.user, bike=None, years=self.now.year, date_now=date_now)
+        self.assertIsInstance(ytd1, dict)
+        self.assertEqual(len(ytd1), 1)
+        ytd1_this_year = ytd1[self.now.year]
+        self.assertIsInstance(ytd1_this_year, dict)
+        self.assertEqual(len(ytd1_this_year), 1)
+        ytd_miles = next(iter(ytd1_this_year.values()))  # 1st and only value
+        self.assertEqual(ytd_miles, expected_result)
 
 
 class TestOdometerAdjustmentRides(TestOdometerAdjustment):
