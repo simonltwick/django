@@ -257,11 +257,11 @@ class Ride(DistanceMixin):
                 )
 
     @classmethod
-    def mileage_by_month(cls, user, years: Union[int, List[int]], bike=None
+    def mileage_by_month(cls, user, years: Union[int, List[int]], bike_id=None
                          ) -> Dict[int, Dict[str, Dict[str, float]]]:
         """ return total mileage by month, by year and by mileage unit,
         for a given year [and optionally bike] """
-        rides = cls.rides_for_years(user, years, bike)
+        rides = cls.rides_for_years(user, years, bike_id)
 
         rides = rides.order_by(
             'date__month', 'date__year', 'distance_units').all()
@@ -290,10 +290,10 @@ class Ride(DistanceMixin):
         return monthly_mileage
 
     @classmethod
-    def mileage_ytd(cls, user, years: Union[int, List[int]], bike=None, 
+    def mileage_ytd(cls, user, years: Union[int, List[int]], bike_id=None, 
                     date_now: Optional[dt.datetime] = None  # for testing
                     ) -> Dict[int, Dict[str, float]]:
-        rides = cls.rides_for_years(user, years, bike)
+        rides = cls.rides_for_years(user, years, bike_id)
         now = date_now or dt.datetime.utcnow()
         ytd_filter = Q(date__month__lt=now.month)| Q(
             date__month=now.month, date__day__lte=now.day)
@@ -313,7 +313,7 @@ class Ride(DistanceMixin):
 
     @classmethod
     def rides_for_years(cls, user, years: Union[int, List[int]],
-                        bike: Optional[int]):
+                        bike_id: Optional[int]):
         if not isinstance(years, (int, list)):
             raise TypeError(
                 f"years parameter must be list or int, not {type(years)}")
@@ -321,8 +321,8 @@ class Ride(DistanceMixin):
             rides = cls.objects.filter(rider=user, date__year__in=years)
         else:
             rides = cls.objects.filter(rider=user, date__year=years)
-        if bike is not None:
-                rides = rides.filter(bike=bike)
+        if bike_id is not None:
+                rides = rides.filter(bike_id=bike_id)
         return rides
 
     @staticmethod

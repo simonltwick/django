@@ -46,6 +46,16 @@ Mileage{% if bike %} for {{ bike }}{% endif %} in {{ sel_yrs|join:", " }}
 	    {% endfor %}
 	  </tr>
     {% endif %}
+
+	{% if mileage_ytd %}
+	  <tr><th>YTD:</th>
+		{% for ytd in mileage_ytd.values %}
+		  {% for mileage_units, miles in ytd.items %}
+		  <td>{{ miles|floatformat }} {{ mileage_units }}</td>
+		  {% endfor %}
+		{% endfor %}
+	  </tr>
+	{% endif %}
 </table>
   
 <p>{% if prev_yr %}

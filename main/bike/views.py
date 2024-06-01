@@ -1083,6 +1083,7 @@ def mileage(request, year: Optional[int]=None, bike_id=None):
         bike = None
     monthly_mileage = Ride.mileage_by_month(request.user, sel_yrs, bike_id)
     totals = annual_mileage_totals(monthly_mileage, years)
+    mileage_ytd = Ride.mileage_ytd(request.user, sel_yrs, bike_id)
     sel_yrs = [str(yr) for yr in sel_yrs]
     for month, month_summary in monthly_mileage.items():
         for yr in sel_yrs:
@@ -1095,6 +1096,7 @@ def mileage(request, year: Optional[int]=None, bike_id=None):
                   context={'monthly_mileage': monthly_mileage,
                            'bike': bike, 'bike_id': bike_id,
                            'sel_yrs': sel_yrs, 'totals': totals,
+                           'mileage_ytd': mileage_ytd,
                            'prev_yr': prev_yr, 'next_yr': next_yr})
 
 
