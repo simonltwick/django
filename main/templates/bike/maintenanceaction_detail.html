@@ -45,15 +45,19 @@ Component Type:{% if maintenanceaction.componenttype %}
   Edit</a>
 <a class="btn btn-primary" href="{{ next_url }}">OK</a>
 </p>
-<p>
-    {% if completion_msg %}Completed: {{ completion_msg }}</p><p>{% endif %}
+    {% if completion_msg %}
+      <p>Completed: {{ completion_msg }}</p>
+    {% endif %}
     {% if not maintenanceaction.completed %}
       <form method="POST">
       {% csrf_token %}
+      <p>
       <input type="submit" class="btn btn-primary" value="Mark as Done"
       name="mark-complete-from-maint-details"
       formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
+      </p><p>
       {{ completion_form }} {{ distance_units }}
+      </p>
       </form>
     {% endif %}
 {% endblock %}
