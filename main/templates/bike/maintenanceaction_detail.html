@@ -39,7 +39,7 @@ Component Type:{% if maintenanceaction.componenttype %}
 <dt>Due distance</dt><dd>{{ maintenanceaction.due_distance|default_if_none:"-" }} {{ distance_units }}</dd>
 <dt>Due in</dt><dd>{{ due_in|default_if_none:"-" }}</dd>
 </dl>
-<p>
+<p> 
 <a class="btn btn-secondary" 
   href="{% url 'bike:maint_edit' pk=maintenanceaction.id %}">
   Edit</a>
