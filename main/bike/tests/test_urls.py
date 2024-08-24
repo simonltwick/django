@@ -176,6 +176,7 @@ class BikeUrlTest(TestCase):
         self.try_url(reverse('bike:component_delete', kwargs={'pk': comp.id}),
                      context={'component': comp})
         self.try_url(reverse('bike:component_new'),)
+        self.try_url(reverse('bike:component_replace', kwargs={'pk': comp.id}))
 
     def test_component_type(self):
         ct = self.ct

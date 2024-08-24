@@ -1,0 +1,61 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Replace Component: {{ cpt }} 
+{% endblock %}
+
+{% block content %}
+<h1>Replace Component: {{ cpt }}</h1>
+
+<form method='POST'>
+{% csrf_token %}
+{% if subcomponents %}
+<p class="text-danger">WARNING:  all subcomponents will also be recorded as replaced</p>
+{% endif %}
+
+<table>
+<tr><th>Bike:</th><td>{{ cpt.bike|default:"-" }}</td></tr>
+<tr><th>Subcomponent of:</th><td>{{ cpt.subcomponent_of|default:"-" }}</td></tr>
+</table>
+
+
+<h3>Old component</h3>
+<table class="table">
+{{ old_cpt_form }}
+</table>
+
+<h3>Replacement component</h3>
+<table class="table">
+{{ new_cpt_form }}
+</table>
+  <p>
+  <input type="submit" class="btn btn-primary" value="OK">
+  <a class="btn btn-secondary" href="{% url 'bike:component' cpt.id %}">Cancel</a>
+  </p>
+</form>
+  {% comment %}
+
+{% if old_cpt %}
+{% url 'bike:component' old_cpt.id as success_url %}
+<h3>Sub-components
+  <a class="addlink"
+	href="{% url 'bike:component_new' %}?subcomponent_of={{ cpt.id }}&next={{ success_url }}">
+	Add</a></h3>
+{% for subcomponent in subcomponents %}
+  {% if forloop.first %}
+  <table class="table">
+    <tr><th>Type</th><th>Description</th><th>Specification</th></tr>
+  {% endif %}
+
+  {% include 'bike/subcomponent.html' %}
+
+  {% if forloop.last %}
+	</table>
+  {% endif %}
+{% empty %}
+  <p>(no sub-components)</p>
+{% endfor %}
+
+{% endif %}
+{% endcomment %}
+{% endblock %}

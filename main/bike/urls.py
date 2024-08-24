@@ -78,6 +78,8 @@ urlpatterns = [
          name='component'),
     path(r'component/<int:pk>/delete', views.ComponentDelete.as_view(),
          name='component_delete'),
+    path(r'component/<int:pk>/replace', views.component_replace,
+        name='component_replace'),
 
     path('component_types', views.component_types, name='component_types'),
     path('component_type/new', views.ComponentTypeCreate.as_view(),

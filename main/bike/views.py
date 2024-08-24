@@ -18,13 +18,14 @@ from typing import List, Tuple, Optional, Dict
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
     DistanceUnits, MaintenanceActionHistory, MaintenanceType, Odometer,
-    # MaintActionLink
+    ReplacementActionHistory,  # MaintActionLink
     )
 from .forms import (
     RideSelectionForm, RideForm, PreferencesForm,
     MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm,
-    MaintActionLinkFormSet)
+    MaintActionLinkFormSet, ComponentForm, NewComponentForm)
+
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -342,6 +343,46 @@ class ComponentDelete(BikeLoginRequiredMixin, DeleteView):
                                         owner=request.user).exists():
             return HttpResponse("Unauthorised component", status=401)
         return super(ComponentDelete, self).dispatch(request, *args, **kwargs)
+
+
+@login_required(login_url=LOGIN_URL)
+def component_replace(request, pk: int):
+    """ record replacement of a component AND ALL SUBCOMPONENTS """
+    old_cpt = get_object_or_404(Component, pk=pk, owner=request.user)
+    subcomponents = Component.objects.filter(
+            subcomponent_of=old_cpt).all()
+    # TODO: allow user to update timezone
+    if request.method == 'GET':
+        # create old_form and new_form with duplicate info & present
+        old_cpt_form = ComponentForm(instance=old_cpt)
+        new_cpt_form = NewComponentForm(instance=old_cpt)
+    elif request.method == 'POST':
+        # save old_cpt (blank out bike & parent cpt) & new_cpt,
+        # and create maintenance action
+        old_cpt_form = ComponentForm(request.POST, instance=old_cpt)
+        new_cpt_form = NewComponentForm(request.POST)
+        if old_cpt_form.is_valid() and new_cpt_form.is_valid():
+            new_cpt = new_cpt_form.save(commit=False)
+            old_cpt_form.save(commit=False)  # update instance
+
+            maint_action = ReplacementActionHistory(
+                user=request.user, bike=old_cpt.bike, 
+                replaced_component=old_cpt, component=new_cpt,
+                description='Replaced', completed_date=timezone.now())
+            old_cpt.bike = None
+            old_cpt.subcomponent_of = None
+            old_cpt.save()
+            maint_action.save()
+            next_url = request.GET.get('next') or reverse('bike:home')
+            return HttpResponseRedirect(next_url)
+    else:
+        return HttpResponse("Invalid HTTP method", status=405)
+    log.info("old_cpt=%s, pk=%s", old_cpt, old_cpt.id)
+    return render(request, 'bike/component_replace.html',
+              context={'pk': pk, 'cpt': old_cpt,
+                       'subcomponents': subcomponents,
+                       'old_cpt_form': old_cpt_form,
+                       'new_cpt_form': new_cpt_form}) 
 
 
 @login_required(login_url=LOGIN_URL)

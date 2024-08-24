@@ -45,6 +45,18 @@ ComponentFormSet = modelformset_factory(
     fields=('bike', 'subcomponent_of', 'name', 'type'))
 
 
+class ComponentForm(forms.ModelForm):
+    class Meta:
+        model=Component
+        fields=['name', 'specification', 'date_acquired', 'supplier', 'notes']
+
+
+class NewComponentForm(ComponentForm):
+    # identical to ComponentForm but a different name, so it can be used in the
+    # same template & POST
+    pass
+
+
 class PreferencesForm(forms.ModelForm):
     class Meta:
         model = Preferences
