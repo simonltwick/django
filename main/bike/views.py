@@ -18,13 +18,13 @@ from typing import List, Tuple, Optional, Dict
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
     DistanceUnits, MaintenanceActionHistory, MaintenanceType, Odometer,
-    ReplacementActionHistory,  # MaintActionLink
+    # MaintActionLink
     )
 from .forms import (
     RideSelectionForm, RideForm, PreferencesForm,
     MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm,
-    MaintActionLinkFormSet, ComponentForm, NewComponentForm)
+    MaintActionLinkFormSet, ComponentForm)
 
 
 log = logging.getLogger(__name__)
@@ -330,6 +330,8 @@ class ComponentUpdate(BikeLoginRequiredMixin, UpdateView):
         subcomponents = Component.objects.filter(
             subcomponent_of=self.object).all()
         context['subcomponents'] = subcomponents
+        context['distance_units'] = (
+            self.request.user.preferences.get_distance_units_display())
         return add_maint_context(
             context, self.request.user, component_id=self.object.id)
 
@@ -347,42 +349,75 @@ class ComponentDelete(BikeLoginRequiredMixin, DeleteView):
 
 @login_required(login_url=LOGIN_URL)
 def component_replace(request, pk: int):
-    """ record replacement of a component AND ALL SUBCOMPONENTS """
+    """ record replacement of a component AND ALL SUBCOMPONENTS.
+    And transfer all maintenance actions to new component."""
     old_cpt = get_object_or_404(Component, pk=pk, owner=request.user)
     subcomponents = Component.objects.filter(
             subcomponent_of=old_cpt).all()
+    distance_units = request.user.preferences.get_distance_units_display()
     # TODO: allow user to update timezone
     if request.method == 'GET':
         # create old_form and new_form with duplicate info & present
-        old_cpt_form = ComponentForm(instance=old_cpt)
-        new_cpt_form = NewComponentForm(instance=old_cpt)
+        old_cpt_form = ComponentForm(instance=old_cpt, prefix='old')
+        new_cpt_form = ComponentForm(instance=old_cpt, prefix='new')
+
     elif request.method == 'POST':
         # save old_cpt (blank out bike & parent cpt) & new_cpt,
         # and create maintenance action
-        old_cpt_form = ComponentForm(request.POST, instance=old_cpt)
-        new_cpt_form = NewComponentForm(request.POST)
+        old_cpt_form = ComponentForm(request.POST, instance=old_cpt,
+                                     prefix='old')
+        new_cpt_form = ComponentForm(request.POST, prefix='new')
+        
         if old_cpt_form.is_valid() and new_cpt_form.is_valid():
             new_cpt = new_cpt_form.save(commit=False)
             old_cpt_form.save(commit=False)  # update instance
+            # collect all maint actions from old to new cpt, to transfer later
+            maint_actions_for_cpt = MaintenanceAction.objects.filter(
+                component=old_cpt).all()
 
-            maint_action = ReplacementActionHistory(
-                user=request.user, bike=old_cpt.bike, 
-                replaced_component=old_cpt, component=new_cpt,
-                description='Replaced', completed_date=timezone.now())
+            repl_maint_action = MaintenanceAction(
+                user=request.user,
+                bike=old_cpt.bike,
+                component=old_cpt,
+                description=(f'Replaced after {old_cpt.current_distance()} '
+                             f'{distance_units}')
+                )
+            # complete missing fields in new_cpt
+            # form covers name, specification, date_acquired, supplier, notes
+            new_cpt.owner = old_cpt.owner
+            new_cpt.type = old_cpt.type
+            new_cpt.bike = old_cpt.bike
+            new_cpt.subcomponent_of = old_cpt.subcomponent_of
+
+
             old_cpt.bike = None
             old_cpt.subcomponent_of = None
+
             old_cpt.save()
-            maint_action.save()
+            new_cpt.save()
+            log.info("Replace component:\n%s: %s\n->%s: %s",
+                     old_cpt.id, old_cpt, new_cpt.id, new_cpt)
+            # transfer maint actions (after saving new_cpt)
+            for maint_action in maint_actions_for_cpt:
+                maint_action.component = new_cpt
+                maint_action.save()
+
+            repl_maint_action.save()
+            repl_maint_action.maint_completed()  # saves maint_action & history
+
             next_url = request.GET.get('next') or reverse('bike:home')
             return HttpResponseRedirect(next_url)
+
     else:
         return HttpResponse("Invalid HTTP method", status=405)
+
     log.info("old_cpt=%s, pk=%s", old_cpt, old_cpt.id)
     return render(request, 'bike/component_replace.html',
               context={'pk': pk, 'cpt': old_cpt,
                        'subcomponents': subcomponents,
                        'old_cpt_form': old_cpt_form,
-                       'new_cpt_form': new_cpt_form}) 
+                       'new_cpt_form': new_cpt_form,
+                       'distance_units': distance_units}) 
 
 
 @login_required(login_url=LOGIN_URL)

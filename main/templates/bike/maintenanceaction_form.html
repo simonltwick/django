@@ -61,10 +61,15 @@ Maintenance Action details: {{ maintenanceaction }}
   <input type="submit" class="btn btn-primary" value="Save">
 
   {% if maintenanceaction %}
-     <a class="btn btn-danger" href="{% url 'bike:maint_delete' maintenanceaction.id %}">
-    Delete</a>
-    <a class="btn btn-secondary" href="{% url 'bike:maint_type_new' %}?component_type={{ maintenanceaction.component.type_id }}&next={% url 'bike:maint' maintenanceaction.id %}">
-    New maint. type</a>
+     <a class= "btn btn-warning"
+      href="{% url 'bike:component_replace' maintenanceaction.component.id %}">
+      Replace</a>
+     <a class="btn btn-danger"
+     href="{% url 'bike:maint_delete' maintenanceaction.id %}">
+     Delete</a>
+     <a class="btn btn-secondary"
+     href="{% url 'bike:maint_type_new' %}?component_type={{ maintenanceaction.component.type_id }}&next={% url 'bike:maint' maintenanceaction.id %}">
+     New maint. type</a>
     </p><p>
     {% if completion_msg %}Completed: {{ completion_msg }}</p><p>{% endif %}
     {% if not maintenanceaction.completed %}

@@ -49,12 +49,8 @@ class ComponentForm(forms.ModelForm):
     class Meta:
         model=Component
         fields=['name', 'specification', 'date_acquired', 'supplier', 'notes']
-
-
-class NewComponentForm(ComponentForm):
-    # identical to ComponentForm but a different name, so it can be used in the
-    # same template & POST
-    pass
+        widgets={
+            "notes": forms.Textarea(attrs={"cols": 40, "rows": 2})}
 
 
 class PreferencesForm(forms.ModelForm):

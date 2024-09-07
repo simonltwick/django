@@ -495,7 +495,7 @@ class Component(models.Model):
     subcomponent_of = models.ForeignKey(
         'Component', related_name='components', on_delete=models.PROTECT,
         null=True, blank=True,
-        help_text="leave blank if this is a direct subcomponent of a bike")
+        help_text="Leave blank if this is a direct subcomponent of a bike")
     HIERARCHY_LIMIT = 10  # max chain of cpt -> cpt relationships
     # fk maintenance history
     # fk component history
@@ -841,13 +841,6 @@ class MaintenanceActionHistory(DistanceMixin):
         when = ' '.join(item for item in when
                         if item is not None)
         return f"{self.action} on {when}"
-
-
-class ReplacementActionHistory(MaintenanceActionHistory):
-    """ documents a replacement action and the replaced component """
-    replaced_component = models.ForeignKey(
-        Component, on_delete=models.CASCADE, null=True, blank=True,
-        help_text='you only need to specify one of bike or component.')
 
 
 class ComponentChange(DistanceMixin):

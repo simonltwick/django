@@ -20,9 +20,13 @@ Maint. type:{% if maintenanceaction.maint_type %}
   {% else %}-
   {% endif %}</p>
 
-<p>Component:{% if maintenanceaction.component %}
-  <a href="{% url 'bike:component' maintenanceaction.component_id %}"
-  >{{ maintenanceaction.component }}</a>
+<p>Component:
+  {% if maintenanceaction.component %}
+    <a href="{% url 'bike:component' maintenanceaction.component_id %}"
+    >{{ maintenanceaction.component }}</a>
+    <a class= "btn btn-warning"
+      href="{% url 'bike:component_replace' maintenanceaction.component.id %}">
+      Replace</a>
   {% else %}-
   {% endif %}
 Component Type:{% if maintenanceaction.componenttype %}

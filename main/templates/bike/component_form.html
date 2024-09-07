@@ -7,15 +7,22 @@ Component details: {{ component }}
 {% block content %}
 <h1>Component details:</h1>
 <form method='POST'>
-<table class="table">
+<table class="table table-sm">
 {{ form }}
 {% csrf_token %}
 </table>
+
+{% if component %}
+  <p><strong>Age: </strong>
+  {{ component.current_distance|floatformat }} {{ distance_units }}</p>
+{% endif %}
 
   <p>
   <input type="submit" class="btn btn-primary" value="OK">
 
   {% if component %}
+  <a class="btn btn-warning" href="{% url 'bike:component_replace' component.id %}">
+  Replace</a>
   <a  class="btn btn-danger" href="{% url 'bike:component_delete' component.id %}">
   Delete</a>
   {% else %}
@@ -28,6 +35,7 @@ Component details: {{ component }}
 </form>
 
 {% if component %}
+
 {% url 'bike:component' component.id as success_url %}
 
 <h3>Sub-components

@@ -13,19 +13,23 @@ Replace Component: {{ cpt }}
 <p class="text-danger">WARNING:  all subcomponents will also be recorded as replaced</p>
 {% endif %}
 
-<table>
-<tr><th>Bike:</th><td>{{ cpt.bike|default:"-" }}</td></tr>
-<tr><th>Subcomponent of:</th><td>{{ cpt.subcomponent_of|default:"-" }}</td></tr>
-</table>
+<p>
+{% if cpt.bike %}<bold>Bike:</bold>{{ cpt.bike|default:"-" }}{% endif %}
+{% if cpt.subcomponent_of %}
+  <bold>Subcomponent of:</bold>{{ cpt.subcomponent_of|default:"-" }}
+{% endif %}
+</p>
 
 
 <h3>Old component</h3>
-<table class="table">
+<table class="table table-sm">
 {{ old_cpt_form }}
 </table>
+<p><strong>Age: </strong>
+  {{ cpt.current_distance|floatformat }} {{ distance_units }}<p>
 
 <h3>Replacement component</h3>
-<table class="table">
+<table class="table table-sm">
 {{ new_cpt_form }}
 </table>
   <p>
