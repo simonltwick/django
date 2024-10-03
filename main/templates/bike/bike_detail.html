@@ -1,22 +1,27 @@
 {% extends 'bike/base.html' %}
 
 {% block title %}
-Bike details: {{ bike }}
+Bike: {{ bike }}
 {% endblock %}
 
 {% block content %}
-<h1>Bike details: {{ bike.name }}</h1>
-<dl>
-<dt>Description</dt><dd>{{ bike.description }}</dd>
-<dt>Calculated odometer</dt><dd>{{ bike.current_odo|floatformat }} {{ distance_units }}</dd>
-</dl>
+<h1>Bike: {{ bike.name }}</h1>
+<p>{{ bike.description }}</p>
+<p>Calculated odometer: {{ bike.current_odo|floatformat }} {{ distance_units }}</p>
+
 {% url 'bike:bike' bike.id as success_url %}
+
 {% include 'bike/bike_extra.html' %}
+
 <a href="{% url 'bike:rides' bike_id=bike.id %}" class="btn btn-secondary">
   Ride history</a>
 <a href="{% url 'bike:odometer_readings' bike_id=bike.id %}"
-  class="btn btn-secondary">Odometer history</a>
+  class="btn btn-secondary">
+  Odometer history</a>
 <a class="btn btn-secondary" 
-  href="{% url 'bike:bike_edit' pk=bike.id %}?next={{ next_url }}">Edit</a>
-<a class="btn btn-primary" href="{{ next_url }}">OK</a>
+  href="{% url 'bike:bike_edit' pk=bike.id %}?next={{ success_url }}">
+  Edit</a>
+<a class="btn btn-primary" href="{{ success_url }}">
+  OK</a>
+
 {% endblock %}

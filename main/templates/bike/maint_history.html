@@ -1,7 +1,8 @@
 <!-- included- from other templates.  Expects context=maint_history -->
 
 {% for action in maint_history %}
-  {% if forloop.first %}<h3>Maintenance history</h3><table class="table">
+  {% if forloop.first %}<h3>Maintenance history</h3>
+  <table class="table table-sm table-borderless">
   {% endif %}
   <tr><td>{{ action.completed_date }}</td>
     
