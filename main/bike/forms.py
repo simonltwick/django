@@ -160,3 +160,7 @@ class MaintCompletionDetailsForm(forms.ModelForm):
     class Meta:
         model = MaintenanceActionHistory
         fields = ['completed_date', 'distance']
+        widgets = {
+            "completed_date": forms.DateInput(attrs={"size": 10}),
+            "distance": forms.TextInput(attrs={"size": 8}),
+        }
