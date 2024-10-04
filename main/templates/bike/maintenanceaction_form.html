@@ -1,11 +1,11 @@
 {% extends 'bike/base.html' %}
 
 {% block title %}
-Maintenance Action details: {{ maintenanceaction }} 
+Maintenance Actions: {{ maintenanceaction }} 
 {% endblock %}
 
 {% block content %}
-<h1>Maintenance Action details: {{ maintenanceaction }}</h1>
+<h1>Maintenance Action: {{ maintenanceaction }}</h1>
 <form method='POST'>
 {% csrf_token %}
 
@@ -61,9 +61,11 @@ Maintenance Action details: {{ maintenanceaction }}
   <input type="submit" class="btn btn-primary" value="Save">
 
   {% if maintenanceaction %}
-     <a class= "btn btn-warning"
-      href="{% url 'bike:component_replace' maintenanceaction.component.id %}">
-      Replace</a>
+  	 {% if maintenanceaction.component %}
+       <a class= "btn btn-warning"
+       href="{% url 'bike:component_replace' maintenanceaction.component.id %}">
+       Replace</a>
+     {% endif %}
      <a class="btn btn-danger"
      href="{% url 'bike:maint_delete' maintenanceaction.id %}">
      Delete</a>
