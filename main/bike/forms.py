@@ -47,9 +47,10 @@ ComponentFormSet = modelformset_factory(
 
 class ComponentForm(forms.ModelForm):
     class Meta:
-        model=Component
-        fields=['name', 'specification', 'date_acquired', 'supplier', 'notes']
-        widgets={
+        model = Component
+        fields = ['name', 'specification', 'date_acquired', 'supplier', 'notes']
+        widgets = {
+            "date_acquired": forms.DateInput(attrs={"size": 10}),
             "notes": forms.Textarea(attrs={"cols": 40, "rows": 2})}
 
 
@@ -74,6 +75,9 @@ class OdometerAdjustmentForm(forms.ModelForm):
     class Meta:
         model = Odometer
         fields = ['distance', 'initial_value', 'comment']
+        widgets = {
+            "distance": forms.TextInput(attrs={"size": 8}),
+            } 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -133,6 +137,7 @@ OdometerFormSet = modelformset_factory(
             'bike', 'distance', 'distance_units', 'initial_value',
             'comment', ],
     #       'date'],
+    widgets={"distance": forms.TextInput(attrs={"size": 8})},
     extra=1  # overridden in view
     )
 
@@ -154,6 +159,12 @@ class MaintenanceActionUpdateForm(forms.ModelForm):
                   'recurring', 'maintenance_interval_distance',
                   'maint_interval_days',
                   ]
+        widgets = {
+            "due_date": forms.DateInput(attrs={"size": 10}),
+            "due_distance": forms.TextInput(attrs={"size": 8}),
+            "maintenance_interval_distance": forms.TextInput(attrs={"size": 8}),
+            "maint_interval_days":  DaysDurationInput(attrs={"size": 6}),
+           }
 
 
 class MaintCompletionDetailsForm(forms.ModelForm):
