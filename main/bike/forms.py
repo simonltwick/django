@@ -60,7 +60,7 @@ class PreferencesForm(forms.ModelForm):
         fields = ('distance_units', 'ascent_units',
                   'maint_distance_limit', 'maint_time_limit')
         widgets = {
-            'maint_time_limit': DaysDurationInput()}
+            'maint_time_limit': DaysDurationInput(attrs={"size": 4})}
 
 
 class RideForm(forms.ModelForm):
@@ -68,7 +68,10 @@ class RideForm(forms.ModelForm):
         model = Ride
         fields = ['bike', 'date', 'distance', 'distance_units',
                   'ascent', 'ascent_units', 'description', ]
-        widgets = {'description': forms.Textarea()}
+        widgets = {
+            'distance': forms.TextInput(attrs={"size": 6}),
+            'ascent': forms.TextInput(attrs={"size": 6}),
+            'description': forms.Textarea()}
 
 
 class OdometerAdjustmentForm(forms.ModelForm):
@@ -76,12 +79,8 @@ class OdometerAdjustmentForm(forms.ModelForm):
         model = Odometer
         fields = ['distance', 'initial_value', 'comment']
         widgets = {
-            "distance": forms.TextInput(attrs={"size": 8}),
+            "distance": forms.TextInput(attrs={"class": 'odometer'}),
             } 
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['distance'].widget.attrs['class'] = 'odometer'
 
 
 class OdometerForm(forms.ModelForm):
