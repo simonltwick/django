@@ -91,6 +91,7 @@ class OdometerForm(forms.ModelForm):
         self.user = user
         self.reading_dtime = reading_dtime
         super().__init__(*args, **kwargs)
+        # css class odometer is defined as width 8
         self.fields['distance'].widget.attrs['class'] = 'odometer'
 
     # specialised handling of is_valid and save: forms with no distance data
