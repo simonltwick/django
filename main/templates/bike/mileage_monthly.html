@@ -57,14 +57,21 @@ Mileage{% if bike %} for {{ bike }}{% endif %} in {{ sel_yrs|join:", " }}
 	  </tr>
 	{% endif %}
 </table>
-  
+
 <p>{% if prev_yr %}
 	{% if bike_id %}<a href="{%url 'bike:mileage' year=prev_yr bike_id=bike_id %}">
 	{% else %}<a href="{%url 'bike:mileage' year=prev_yr %}">
 	{% endif %}
 	{{prev_yr}}<</a>
    {% endif %}
-&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;
+
+{% with sel_yrs|last as last_sel_yr %}
+<p><a href="{%url 'bike:mileage_graph' year=last_sel_yr %}"
+	  class='btn btn-secondary'>View as graph</a></p>
+{% endwith %}
+
+&nbsp;&nbsp;
 {% if next_yr %}
 	{% if bike_id %}<a href="{%url 'bike:mileage' year=next_yr bike_id=bike_id %}">
 	{% else %}<a href="{%url 'bike:mileage' year=next_yr %}">

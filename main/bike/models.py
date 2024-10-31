@@ -11,7 +11,7 @@ from collections import defaultdict
 import datetime as dt
 from enum import IntEnum
 import logging
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Union, Self
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -98,6 +98,10 @@ class DistanceUnits(IntEnum):
         # log.info("convert %s from %s to %s", distance, from_units, to_units)
         factor = cls.conversion_factor(from_units, to_units)
         return distance * factor
+
+    @classmethod
+    def display_name(cls, value: int) -> str:
+        return cls(value).name.lower()
 
 
 class DistanceMixin(models.Model):
@@ -313,7 +317,8 @@ class Ride(DistanceMixin):
 
     @classmethod
     def rides_for_years(cls, user, years: Union[int, List[int]],
-                        bike_id: Optional[int]):
+                        bike_id: Optional[int]=None):
+        # return a queryset of rides
         if not isinstance(years, (int, list)):
             raise TypeError(
                 f"years parameter must be list or int, not {type(years)}")
@@ -324,6 +329,33 @@ class Ride(DistanceMixin):
         if bike_id is not None:
                 rides = rides.filter(bike_id=bike_id)
         return rides
+
+
+    @classmethod
+    def cumulative_mileage(cls, user, years: Union[int, List[int]]
+                           ) -> List[Self]:
+        rides = cls.rides_for_years(user, years).order_by("date").all()
+        #  annotate each ride with cum_mileage in ride distance units
+        # if there's more than one distance unit per year, results won't be
+        # converted.
+        prev_year = None
+        cum_total: Dict[int, float]
+        for ride in rides:
+            if ride.date.year != prev_year:
+                if prev_year is not None and len(cum_total) > 1:
+                    log.warning("cumulative mileage for rides with mixed "
+                                "distance units")
+                prev_year = ride.date.year
+                cum_total = {}
+            if ride.distance_units not in cum_total:
+                cum_total[ride.distance_units] = 0.0
+            if ride.distance is not None:
+                cum_total[ride.distance_units] += ride.distance
+            ride.cum_distance = cum_total[ride.distance_units]
+        if len(cum_total) > 1:
+            log.warning("cumulative mileage for rides with mixed distance units")
+        return rides
+
 
     @staticmethod
     def on_post_delete(_sender, instance, **_kwargs):

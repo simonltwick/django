@@ -54,6 +54,9 @@ urlpatterns = [
     path('bike/<int:bike_id>/mileage', views.mileage, name='mileage'),
     path('mileage/<int:year>/bike/<int:bike_id>', views.mileage,
          name='mileage'),
+    path('mileage_graph', views.mileage_graph, name='mileage_graph'),
+    path('mileage_graph/<int:year>', views.mileage_graph, name='mileage_graph'),
+    
 
     path('odometer/readings', views.OdometerList.as_view(),
          name='odometer_readings'),

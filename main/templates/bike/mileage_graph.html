@@ -1,0 +1,25 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Mileage in {{ sel_yrs|join:", " }} 
+{% endblock %}
+
+{% block content %}
+
+<h1>Mileage in {{ sel_yrs|join:", " }}</h1>
+
+{{ cum_mileage }}
+
+
+<p>{% if prev_yr %}
+	<a href="{%url 'bike:mileage_graph' year=prev_yr %}">
+	{{prev_yr}}<</a>
+   {% endif %}
+&nbsp;&nbsp;&nbsp;&nbsp;
+{% if next_yr %}
+	<a href="{%url 'bike:mileage_graph' year=next_yr %}">
+	>{{next_yr}}</a>
+{% endif %}
+</p> 
+
+{% endblock%}

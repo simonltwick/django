@@ -1139,9 +1139,35 @@ class MaintTypeDelete(BikeLoginRequiredMixin, DeleteView):
 def mileage(request, year: Optional[int]=None, bike_id=None):
     """ show a monthly summary of mileage, with detail if requested
     if year provided, show details for that year and the preceding year. """
+    prev_yr, next_yr, sel_yrs = get_mileage_years(year)
+    if bike_id is not None:
+        bike = get_object_or_404(Bike, pk=bike_id, owner=request.user)
+    else:
+        bike = None
+    monthly_mileage = Ride.mileage_by_month(request.user, sel_yrs, bike_id)
+    totals = annual_mileage_totals(monthly_mileage, sel_yrs)
+    mileage_ytd = Ride.mileage_ytd(request.user, sel_yrs, bike_id)
+    sel_yrs_str = [str(yr) for yr in sel_yrs]
+    for month, month_summary in monthly_mileage.items():
+        for yr in sel_yrs_str:
+            if yr not in month_summary:
+                month_summary[yr] = {}
+        monthly_mileage[month] = dict(sorted(month_summary.items()))
+    # log.info("monthly_mileage=%s, sel_yrs=%r, prev_yr=%s, next_yr=%s",
+    #          monthly_mileage, sel_yrs, prev_yr, next_yr)
+    return render(request, 'bike/mileage_monthly.html',
+                  context={'monthly_mileage': monthly_mileage,
+                           'bike': bike, 'bike_id': bike_id,
+                           'sel_yrs': sel_yrs_str, 'totals': totals,
+                           'mileage_ytd': mileage_ytd,
+                           'prev_yr': prev_yr, 'next_yr': next_yr})
+
+
+def get_mileage_years(year: Optional[int]=None
+                      ) -> Tuple[int|None, int|None, List[int]]:
     # retrieve available years with rides recorded, for pagination
-    years_dt = Ride.objects.dates('date', "year")
-    years = [y_dt.year for y_dt in years_dt]
+    years_dt: List[dt.date] = Ride.objects.dates('date', "year")
+    years: List[int] = [y_dt.year for y_dt in years_dt]
     if year is None:
         # or use Queryset.latest() to retrieve latest ride on db
         sel_yrs = years[-2:]
@@ -1153,27 +1179,49 @@ def mileage(request, year: Optional[int]=None, bike_id=None):
         log.warning("mileage requested for a year with no recorded rides.")
     # log.info("years=%s, sel sel_yrs=%s", years, sel_yrs)
     prev_yr, next_yr = get_prev_next_yr(sel_yrs, years)
-    if bike_id is not None:
-        bike = get_object_or_404(Bike, pk=bike_id, owner=request.user)
-    else:
-        bike = None
-    monthly_mileage = Ride.mileage_by_month(request.user, sel_yrs, bike_id)
-    totals = annual_mileage_totals(monthly_mileage, years)
-    mileage_ytd = Ride.mileage_ytd(request.user, sel_yrs, bike_id)
-    sel_yrs = [str(yr) for yr in sel_yrs]
-    for month, month_summary in monthly_mileage.items():
-        for yr in sel_yrs:
-            if yr not in month_summary:
-                month_summary[yr] = {}
-        monthly_mileage[month] = dict(sorted(month_summary.items()))
-    # log.info("monthly_mileage=%s, sel_yrs=%r, prev_yr=%s, next_yr=%s",
-    #          monthly_mileage, sel_yrs, prev_yr, next_yr)
-    return render(request, 'bike/mileage_monthly.html',
-                  context={'monthly_mileage': monthly_mileage,
-                           'bike': bike, 'bike_id': bike_id,
-                           'sel_yrs': sel_yrs, 'totals': totals,
-                           'mileage_ytd': mileage_ytd,
+    return prev_yr, next_yr, sel_yrs
+
+
+@login_required(login_url=LOGIN_URL)
+def mileage_graph(request, year: Optional[str]=None):
+    prev_yr, next_yr, sel_yrs = get_mileage_years(year)
+    rides_cum_total = Ride.cumulative_mileage(request.user, sel_yrs)
+    # create cum mileage dict (this version has int keys, need str for template)
+    # also convert ride.datetime to a dt.date object
+    cumulative_mileage: Dict[int, Dict[int, Dict[dt.date, float]]] = {}
+    for ride in rides_cum_total:
+        year = ride.date.year
+        if year not in cumulative_mileage:
+            cumulative_mileage[year] = {ride.distance_units: {}}
+        if ride.distance_units not in cumulative_mileage[year]:
+            cumulative_mileage[year][ride.distance_units] = {}
+        cumulative_mileage[year][ride.distance_units][ride.date.date()] = (
+            ride.cum_distance)
+    cumulative_mileage_str = convert_cum_mileage_keys_to_strings(
+        cumulative_mileage)
+    sel_yrs_str = [str(yr) for yr in sel_yrs]
+
+    return render(request, 'bike/mileage_graph.html',
+                  context={'cum_mileage': cumulative_mileage_str,
+                           'sel_yrs': sel_yrs_str,
                            'prev_yr': prev_yr, 'next_yr': next_yr})
+
+
+def convert_cum_mileage_keys_to_strings(
+        cumulative_mileage) -> Dict[str, Dict[str, Dict[dt.date, float]]]:
+    # convert year and distance_units to strings, for template formatting
+    cumulative_mileage_str: Dict[str, Dict[str, Dict[dt.date, float]]] = {}
+    years = [y for y in cumulative_mileage]
+    for year in years:
+        distance_units = [du for du in cumulative_mileage[year]]
+        str_yr = str(year)
+        if str_yr not in cumulative_mileage_str:
+            cumulative_mileage_str[str_yr] = {}
+        for distance_unit in distance_units:
+            str_du = str(DistanceUnits(distance_unit).name.lower())
+            cumulative_mileage_str[str_yr][str_du] = (
+                cumulative_mileage[year][distance_unit])
+    return cumulative_mileage_str
 
 
 def annual_mileage_totals(

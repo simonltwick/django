@@ -52,7 +52,7 @@ Rides
 	  <a href="{% url 'bike:ride' ride.id %}">
     {% endif %}
     {{ ride.description|truncatechars:40 }}</a></td>
-  <td>{{ ride.distance|floatformat }} {{ ride.get_distance_units_display }}</td>
+  <td>{{ ride.distance|floatformat|default:"-" }} {{ ride.get_distance_units_display }}</td>
   {% if ride.ascent %}
   <td>{{ ride.ascent }}{{ ride.ascent_units_display }}</td>
   {% endif %}
