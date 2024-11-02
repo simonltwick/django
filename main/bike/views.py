@@ -1246,8 +1246,13 @@ def get_cum_mileage_plot(
 
             ensure_jan1_data(date_series, distance_series)
             plt.plot(date_series, distance_series, label=series_name)
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%-d %b'))
     plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
+    x_labels = plt.gca().get_xticklabels()
+    plt.setp(x_labels, rotation=60)  # , horizontalalignment='right')
+    """fig, ax = plt.subplots()
+    labels = ax.get_xticklabels()
+    plt.setp(labels, rotation=90)  # , horizontalalignment='right') """
     plt.legend()
     return plt
 
