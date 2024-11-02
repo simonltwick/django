@@ -13,7 +13,7 @@ from django.views.generic.detail import DetailView
 import csv
 import datetime as dt
 import logging
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Sequence
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
@@ -1183,7 +1183,10 @@ def get_mileage_years(year: Optional[int]=None
 
 
 @login_required(login_url=LOGIN_URL)
-def mileage_graph(request, year: Optional[str]=None):
+def mileage_graph(request, year: Optional[int]=None):
+    """ plot a cumulative mileage graph for selected year & prev year.  ref: 
+    https://stackoverflow.com/questions/9627686/plotting-dates-on-the-x-axis
+    """
     prev_yr, next_yr, sel_yrs = get_mileage_years(year)
     rides_cum_total = Ride.cumulative_mileage(request.user, sel_yrs)
     # create cum mileage dict (this version has int keys, need str for template)
@@ -1197,14 +1200,103 @@ def mileage_graph(request, year: Optional[str]=None):
             cumulative_mileage[year][ride.distance_units] = {}
         cumulative_mileage[year][ride.distance_units][ride.date.date()] = (
             ride.cum_distance)
-    cumulative_mileage_str = convert_cum_mileage_keys_to_strings(
-        cumulative_mileage)
+
+    #log.info("cum_mileage=%s", convert_cum_mileage_keys_to_strings(
+    #    cumulative_mileage))
+    plot = get_cum_mileage_plot(cumulative_mileage)
+    plot_string = plot_as_base64string(plot)
+
     sel_yrs_str = [str(yr) for yr in sel_yrs]
 
     return render(request, 'bike/mileage_graph.html',
-                  context={'cum_mileage': cumulative_mileage_str,
+                  context={'graphic': plot_string,
                            'sel_yrs': sel_yrs_str,
                            'prev_yr': prev_yr, 'next_yr': next_yr})
+
+
+def get_cum_mileage_plot(
+        cumulative_mileage: Dict[int, Dict[int, Dict[dt.date, float]]]):
+    """return a plot of cumulative mileage.
+    The different years are rebased to a single year: a leap year if there's
+    one in the range
+    Use the "agg" backend for non interactive use, to avoid thread errors
+    agg supports png filetype; use "svg" backend for svg graphics
+    ref: https://matplotlib.org/stable/users/explain/figure/backends.html """
+    import matplotlib
+    from matplotlib import pyplot as plt, dates as mdates
+    matplotlib.use("agg")
+    plt.clf()  # clear previous data in the figure / plot.
+
+    # convert years of cum_mileage into a series
+    base_year = get_plot_base_year(list(cumulative_mileage.keys()))
+    for year, year_data in cumulative_mileage.items():
+        for distance_unit, distance_dict in year_data.items():
+            series_name = (
+                f"{year} ({DistanceUnits(distance_unit).name.lower()})")
+            distance_series = [
+                round(cum_distance, 1)
+                for cum_distance in distance_dict.values()]
+            # rebase dates to base_year
+            date_series = [dt.date(base_year, date.month, date.day)
+                           for  date in distance_dict.keys()]
+            # date_strings = [date.strftime("%d/%m/%y")  # for logging only
+            #                for date in date_series]
+            # log.info("plot series %s: %s",
+            #         series_name, list(zip(date_strings, distance_series)))
+
+            ensure_jan1_data(date_series, distance_series)
+            plt.plot(date_series, distance_series, label=series_name)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
+    plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
+    plt.legend()
+    return plt
+
+
+def ensure_jan1_data(dates: List[dt.date], distances: List[float]):
+    """ if there is no jan 1 distance info, add it at zero distance """
+    if not dates or (dates[0].month == 1 and dates[0].day == 1):
+        return
+    dates.insert(0, dt.date(dates[0].year, 1, 1))
+    distances.insert(0, 0.0)
+
+
+def plot_as_base64string(plt) -> str:
+    """ save a plot to a BytesIO file & return it as Base64 string.  Ref:
+    https://stackoverflow.com/questions/30531990/matplotlib-into-a-django-template
+    Embed in template as <img src="data:image/png;base64,{{ graphic|safe }}">
+    """
+    from io import BytesIO
+    import base64
+    buffer = BytesIO()
+    plt.savefig(buffer, format='png')  # or png
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+
+    graphic = base64.b64encode(image_png)
+    return graphic.decode('utf-8')
+
+
+def get_plot_base_year(years: List[int]):
+    """ return the first leap year if there is one, else the first year """
+    for year in years:
+        if is_leap_year(year):
+            return year
+    return years[0]
+
+
+def is_leap_year(yr: int) -> bool:
+    """ not divisible by 4: False
+        else: not divisible by 100: True
+        else: not divisible by 400: False
+        else: True """
+    if yr % 4:
+        return False
+    if yr % 100:
+        return True
+    if yr % 400:
+        return False
+    return True
 
 
 def convert_cum_mileage_keys_to_strings(

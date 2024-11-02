@@ -67,8 +67,8 @@ Mileage{% if bike %} for {{ bike }}{% endif %} in {{ sel_yrs|join:", " }}
 &nbsp;&nbsp;
 
 {% with sel_yrs|last as last_sel_yr %}
-<p><a href="{%url 'bike:mileage_graph' year=last_sel_yr %}"
-	  class='btn btn-secondary'>View as graph</a></p>
+<a href="{%url 'bike:mileage_graph' year=last_sel_yr %}"
+	  class='btn btn-secondary'>View as graph</a>
 {% endwith %}
 
 &nbsp;&nbsp;

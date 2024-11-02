@@ -1,21 +1,27 @@
 {% extends 'bike/base.html' %}
 
 {% block title %}
-Mileage in {{ sel_yrs|join:", " }} 
+Cumulative Mileage in {{ sel_yrs|join:", " }} 
 {% endblock %}
 
 {% block content %}
 
-<h1>Mileage in {{ sel_yrs|join:", " }}</h1>
+<h1>Cumulative Mileage in {{ sel_yrs|join:", " }}</h1>
 
-{{ cum_mileage }}
-
+<img src="data:image/png;base64,{{ graphic|safe }}">
 
 <p>{% if prev_yr %}
 	<a href="{%url 'bike:mileage_graph' year=prev_yr %}">
-	{{prev_yr}}<</a>
+	{{prev_yr}}&lt.</a>
    {% endif %}
-&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;
+
+{% with sel_yrs|last as last_sel_yr %}
+<a href="{%url 'bike:mileage' year=last_sel_yr %}"
+	  class='btn btn-secondary'>View as table</a>
+{% endwith %}
+
+&nbsp;&nbsp;
 {% if next_yr %}
 	<a href="{%url 'bike:mileage_graph' year=next_yr %}">
 	>{{next_yr}}</a>
