@@ -11,7 +11,7 @@ from collections import defaultdict
 import datetime as dt
 from enum import IntEnum
 import logging
-from typing import Optional, List, Dict, Union, Self
+from typing import Optional, List, Dict, Union
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -333,7 +333,7 @@ class Ride(DistanceMixin):
 
     @classmethod
     def cumulative_mileage(cls, user, years: Union[int, List[int]]
-                           ) -> List[Self]:
+                           ) -> List["Ride"]:
         rides = cls.rides_for_years(user, years).order_by("date").all()
         #  annotate each ride with cum_mileage in ride distance units
         # if there's more than one distance unit per year, results won't be
