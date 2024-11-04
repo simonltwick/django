@@ -1250,9 +1250,7 @@ def get_cum_mileage_plot(
     plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
     x_labels = plt.gca().get_xticklabels()
     plt.setp(x_labels, rotation=60)  # , horizontalalignment='right')
-    """fig, ax = plt.subplots()
-    labels = ax.get_xticklabels()
-    plt.setp(labels, rotation=90)  # , horizontalalignment='right') """
+    plt.grid(which='both')
     plt.legend()
     return plt
 
