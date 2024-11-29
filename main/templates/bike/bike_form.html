@@ -15,7 +15,7 @@ Bike details: {{ bike }}
 {% if bike %}
 <p>
     <input type="submit" class="btn btn-primary" value="OK"
-      {% url 'bike:bike' bike.id as save_url %}
+      {% url 'bike:bike_edit' bike.id as save_url %}
       formaction="{{ save_url }}?next={% url 'bike:bikes' %}">
 	<a href="{% url 'bike:bike_delete' bike.id %}?next={% url 'bike:bikes' %}"
 	  class="btn btn-danger">Delete</a>
