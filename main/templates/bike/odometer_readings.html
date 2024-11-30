@@ -49,7 +49,7 @@ Odometer readings:
     <a href="{% url 'bike:odometer_adjustment' odo_reading_id=reading.id %}">
 	{{ reading.distance|floatformat }}</a></td>
   <td>{{ reading.date }}</td>
-  <td>{% if reading.initial_value %}<b>Initial value</b>{% endif %}</td>
+  <td>{% if reading.initial_value %}<b>Reset</b>{% endif %}</td>
   <td>{{ reading.comment|default_if_none:"" }}</td>
 </tr>
 
