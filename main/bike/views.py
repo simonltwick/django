@@ -1210,6 +1210,7 @@ def mileage_graph(request, year: Optional[int]=None):
 
     return render(request, 'bike/mileage_graph.html',
                   context={'graphic': plot_string,
+                           'graphic_type': 'svg',
                            'sel_yrs': sel_yrs_str,
                            'prev_yr': prev_yr, 'next_yr': next_yr})
 

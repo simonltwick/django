@@ -8,7 +8,11 @@ Cumulative Mileage in {{ sel_yrs|join:", " }}
 
 <h1>Cumulative Mileage in {{ sel_yrs|join:", " }}</h1>
 
+{% if graphic_type == "svg" %}
+{{ graphic|safe }}
+{% else %}
 <img src="data:image/png;base64,{{ graphic|safe }}">
+{% endif %}
 
 <p>{% if prev_yr %}
 	<a href="{%url 'bike:mileage_graph' year=prev_yr %}">
