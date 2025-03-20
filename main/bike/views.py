@@ -1204,7 +1204,7 @@ def mileage_graph(request, year: Optional[int]=None):
     #log.info("cum_mileage=%s", convert_cum_mileage_keys_to_strings(
     #    cumulative_mileage))
     plot = get_cum_mileage_plot(cumulative_mileage)
-    plot_string = plot_as_base64string(plot)
+    plot_string = plot_as_string(plot)
 
     sel_yrs_str = [str(yr) for yr in sel_yrs]
 
@@ -1263,21 +1263,27 @@ def ensure_jan1_data(dates: List[dt.date], distances: List[float]):
     distances.insert(0, 0.0)
 
 
-def plot_as_base64string(plt) -> str:
-    """ save a plot to a BytesIO file & return it as Base64 string.  Ref:
+def plot_as_string(plt) -> str:
+    """ save a plot to a BytesIO file & return it as a string
+    if an svg, this is straightforward, png image is encoded as a Base64 string.
+    Ref:
     https://stackoverflow.com/questions/30531990/matplotlib-into-a-django-template
     Embed in template as <img src="data:image/png;base64,{{ graphic|safe }}">
     """
     from io import BytesIO
-    import base64
     buffer = BytesIO()
-    plt.savefig(buffer, format='png')  # or png
+    plt.savefig(buffer, format='svg', bbox_inches='tight')  # or png
     buffer.seek(0)
-    image_png = buffer.getvalue()
+    image = buffer.getvalue()
     buffer.close()
 
-    graphic = base64.b64encode(image_png)
-    return graphic.decode('utf-8')
+    # png images
+    # import base64
+    # graphic = base64.b64encode(image)
+    # return graphic.decode('utf-8')
+
+    # svg image
+    return image.decode('utf-8')
 
 
 def get_plot_base_year(years: List[int]):
