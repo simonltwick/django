@@ -960,6 +960,9 @@ def maint_action_complete(request, pk: int):
                }
     log.info("maint_action_complete: maint_action=%s, maint_action.id=%s",
              maint_action, maint_action.id)
+    context["next_url"] = (
+        request.POST["next"] if "next" in request.POST
+        else reverse("bike:home"))
     return render(
         request, 'bike/maintenanceaction_detail.html', context=context)
 

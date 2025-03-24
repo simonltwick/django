@@ -59,7 +59,7 @@ Component Type:
   <p>Recurs every 
   {% if maintenanceaction.maintenance_interval_distance %}
     {{ maintenanceaction.maintenance_interval_distance }} {{ distance_units }}
-    {% if maintenanceaction.maintenance_interval_days %}or{% endif %}
+    {% if maintenanceaction.maintenance_interval_days %} or {% endif %}
   {% endif %}
   {% if maintenanceaction.maintenance_interval_days %}
     {{ maintenanceaction.maintenance_interval_days }} days
@@ -75,16 +75,17 @@ Component Type:
 </p>
     {% if completion_msg %}
       <p>Completed: {{ completion_msg }}</p>
-    {% endif %}
-    {% if not maintenanceaction.completed %}
-      <p>
-      <form method="POST">
-      {% csrf_token %}
-      <input type="submit" class="btn btn-primary" value="Mark as Done"
-      name="mark-complete-from-maint-details"
-      formaction="{% url 'bike:maint_complete' maintenanceaction.id %}">
-      {{ completion_form }} {{ distance_units }}
-      </form>
-      </p>
+    {% else %}
+      {% if not maintenanceaction.completed %}
+        <p>
+        <form method="POST">
+        {% csrf_token %}
+        <input type="submit" class="btn btn-primary" value="Mark as Done"
+        name="mark-complete-from-maint-details"
+        formaction="{% url 'bike:maint_complete' maintenanceaction.id %}?next={{ next_url }}">
+        {{ completion_form }} {{ distance_units }}
+        </form>
+        </p>
+      {% endif %}
     {% endif %}
 {% endblock %}
