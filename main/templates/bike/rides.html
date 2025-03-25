@@ -38,7 +38,7 @@ Rides
 {% for ride in entries %}
 
 {% if forloop.first %}
-  <table class="table">
+  <table class="table table-sm">
   <tr><th>date</th><th>bike</th><th>ride</th><th>distance</th><th>ascent</th>
   </tr>
 {% endif %}
@@ -59,6 +59,9 @@ Rides
 </tr>
 
 {% if forloop.last %}
+	{% if totals %}<tr><th>Totals</th><td>{{ totals.count }} rides</td><td></td>
+	<td>{{ totals.total_distance }}</td><td>{{ totals.total_ascent }}</td>
+	</tr>{% endif %}
   </table>
 {% endif %}
 

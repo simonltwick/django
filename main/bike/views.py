@@ -1,6 +1,13 @@
+#! /usr/bin/env python3
+
+import csv
+import datetime as dt
+import logging
+from typing import List, Tuple, Optional, Dict
+
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum, Q, Max
+from django.db.models import Sum, Q, Max, Count
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -10,10 +17,6 @@ from django.views.generic.list import ListView
 from django.views.generic.detail import DetailView
 # from django.views.generic.dates import MonthArchiveView
 
-import csv
-import datetime as dt
-import logging
-from typing import List, Tuple, Optional, Dict, Sequence
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
@@ -638,8 +641,10 @@ class RidesList(BikeLoginRequiredMixin):
                     self.request, 'rides.csv', entries, fields)
         else:
             self.entries = self.entries.order_by('-date').all()[:20]
+        totals = self.get_ride_totals()
         return render(self.request, self.template_name,
-                      context={'form': self.form, 'entries': self.entries})
+                      context={'form': self.form, 'entries': self.entries,
+                               'totals': totals})
 
     def GET(self):
         if self.bike_id is not None:
@@ -658,8 +663,32 @@ class RidesList(BikeLoginRequiredMixin):
         self.form = RideSelectionForm(
             bikes=Bike.objects.filter(owner=self.request.user).all(),
             initial=initial)
+        totals = self.get_ride_totals()
         return render(self.request, self.template_name,
-                      context={'form': self.form, 'entries': self.entries})
+                      context={'form': self.form, 'entries': self.entries,
+                               'totals': totals})
+
+
+    def get_ride_totals(self):
+        """ compute sum & count of entries """
+        total_distance: Dict[str, float] = {}
+        total_ascent: Dict[str, float] = {}
+        for ride in self.entries:
+            if ride.distance is not None:
+                if ride.distance_units_display not in total_distance:
+                    total_distance[ride.distance_units_display] = 0.0
+                total_distance[ride.distance_units_display] += ride.distance
+            if ride.ascent is not None:
+                if ride.ascent_units_display not in total_ascent:
+                    total_ascent[ride.ascent_units_display] = 0.0
+                total_ascent[ride.ascent_units_display] += ride.ascent
+        distance_str = ', '.join(f"{distance:.1f} {units}"
+                                for units, distance in total_distance.items())
+        ascent_str = ', '.join(f"{ascent:.1f} {units}"
+                                for units, ascent in total_ascent.items())
+        return {'total_distance': distance_str,
+                'total_ascent': ascent_str,
+                'count': len(self.entries)}
 
 
 def csv_data_response(request, filename, queryset, fields):
