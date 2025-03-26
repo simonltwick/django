@@ -669,19 +669,23 @@ class RidesList(BikeLoginRequiredMixin):
                                'totals': totals})
 
 
-    def get_ride_totals(self):
-        """ compute sum & count of entries """
+    def get_ride_totals(self) -> Dict[str, str|int]:
+        """ compute sum & count of entries  - only for Rides
+        for Odometer entries, an empty dict is returned. """
         total_distance: Dict[str, float] = {}
         total_ascent: Dict[str, float] = {}
         for ride in self.entries:
-            if ride.distance is not None:
-                if ride.distance_units_display not in total_distance:
-                    total_distance[ride.distance_units_display] = 0.0
-                total_distance[ride.distance_units_display] += ride.distance
-            if ride.ascent is not None:
-                if ride.ascent_units_display not in total_ascent:
-                    total_ascent[ride.ascent_units_display] = 0.0
-                total_ascent[ride.ascent_units_display] += ride.ascent
+            if isinstance(ride, Ride):
+                if ride.distance is not None:
+                    if ride.distance_units_display not in total_distance:
+                        total_distance[ride.distance_units_display] = 0.0
+                    total_distance[ride.distance_units_display] += ride.distance
+                if ride.ascent is not None:
+                    if ride.ascent_units_display not in total_ascent:
+                        total_ascent[ride.ascent_units_display] = 0.0
+                    total_ascent[ride.ascent_units_display] += ride.ascent
+        if not (total_distance or total_ascent):
+            return {}
         distance_str = ', '.join(f"{distance:.1f} {units}"
                                 for units, distance in total_distance.items())
         ascent_str = ', '.join(f"{ascent:.1f} {units}"
