@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -21,7 +22,7 @@
   </head>
   <body>
     <div id="map"></div>
-    {% load static %}
+    {{ markers|json_script:"markers" }}
     <script defer src="{% static 'map.js' %}"></script>
   </body>
 </html>
