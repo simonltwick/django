@@ -22,7 +22,7 @@ class UploadGpxForm(ModelForm):
         model=RawGpx
         fields=["content"]
 
-    def clean_gpx_file(self):
+    def clean_content(self):
         """ ensure valid content type and size.  ref:
         http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
         """
@@ -30,7 +30,8 @@ class UploadGpxForm(ModelForm):
         log.info("uploaded file content_type=%s", uploaded_file.content_type)
 
         content_type = uploaded_file.content_type
-        allowed_content_types = ['text/xml', 'application/octet-stream']
+        allowed_content_types = ['text/xml', 'application/octet-stream',
+                                 'application/gpx+xml']
         if content_type in allowed_content_types:
             if uploaded_file._size > 2621440:
                 raise forms.ValidationError(
@@ -39,5 +40,29 @@ class UploadGpxForm(ModelForm):
 
         else:
             raise forms.ValidationError('Filetype not supported.')
+
+        return uploaded_file
+
+class UploadGpxForm2(forms.Form):
+    """ a form to upload a gpx file.  Not a model form. """
+    gpx_file = forms.FileField()
+
+    def clean_gpx_file(self):
+        """ ensure valid content type and size.  ref:
+        http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
+        """
+        uploaded_file = self.cleaned_data['gpx_file']
+        log.info("uploaded file content_type=%s", uploaded_file.content_type)
+
+        content_type = uploaded_file.content_type
+        allowed_content_types = ['text/xml', 'application/octet-stream',
+                                 'application/gpx+xml']
+        if content_type not in allowed_content_types:
+            raise forms.ValidationError('Filetype not supported.')
+
+        if uploaded_file.size > 2621440:
+            raise forms.ValidationError(
+                'Please keep filesize under 2.5 MB. Current filesize %s'
+                f'{filesizeformat(uploaded_file.size)}')
 
         return uploaded_file

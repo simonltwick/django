@@ -8,9 +8,10 @@
   </head>
   <body>
   <h1>Upload GPX file</h1>
-  <form method="POST">
+  <form method="POST" enctype="multipart/form-data">
   {% csrf_token %} 
   {{ form }}
+  <p class="invalid-feedback">{{ form.non_field_errors }} </p>
   <p><input type="submit" class="btn btn-primary" value="Upload">
   <a class="btn btn-secondary" href="/routes/map">Cancel</a></p>
   </form>
