@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Upload GPX file</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"/>
+  </head>
+  <body>
+  <h1>Upload GPX file</h1>
+  <form method="POST">
+  {% csrf_token %} 
+  {{ form }}
+  <p><input type="submit" class="btn btn-primary" value="Upload">
+  <a class="btn btn-secondary" href="/routes/map">Cancel</a></p>
+  </form>
+  
+  </body>
+</html>
