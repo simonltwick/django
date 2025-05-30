@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
 import json
 import logging
-from typing import TYPE_CHECKING, TextIO
-
-from django.core.serializers import serialize
-from django.http import HttpResponseRedirect
-from django.shortcuts import render
-from django.views.generic import TemplateView
-
-
-from .models import Marker, Track
-from .forms import UploadGpxForm, UploadGpxForm2
-
-# all these imports for copied answer
-from django.http import HttpResponseRedirect
-from django.contrib.gis.geos import Point, LineString, MultiLineString
-
-# from .models import GPXPoint, GPXTrack, gpxFile
+from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.core.serializers import serialize
+from django.db.utils import IntegrityError
+from django.http import HttpResponseRedirect, HttpResponse
+from django.shortcuts import render
+from django.urls import reverse
+from django.views.generic import TemplateView
+# all these imports for copied answer
 
-from gpx import gpxpy
-# from gpx.gpxpy import gpx
+
+from gpx.gpxpy import GPXParser, GPX
+
+from .models import Marker, Track
+from .forms import UploadGpxForm2  #, UploadGpxForm2
 
 
 if TYPE_CHECKING:
@@ -56,57 +51,63 @@ def upload_file(request):
     https://web.archive.org/web/20160425053015/http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
     """
     if request.method == "POST":
-        log.info("upload_file POST=%s, FILES=%s", request.POST, request.FILES)
+        file = request.FILES.get('gpx_file')
+        log.info("uploading file %s, size %d", file.name, file.size)
         form = UploadGpxForm2(request.POST, request.FILES)
         if form.is_valid():
-            log.info("gpx file is valid")
-            save_to_gis(form.cleaned_data['gpx_file'])
+            log.info("gpx file %s is valid", file.name)
+            # decode the file as a text file (not binary)
+            encoding = file.charset or 'utf-8'
+            xml_string = form.cleaned_data['gpx_file'].read().decode(
+                encoding=encoding)
+            gpx = GPXParser(xml_string).parse()
+            if not gpx:
+                return HttpResponse("Failed to parse file", status=400)
+            log.info("gpx file %s parsed ok", gpx)
+
+            try:
+                tracks = Track.new_from_gpx(gpx, form.cleaned_data['gpx_file'].name)
+            except IntegrityError as e:
+                return HttpResponse(status=400, content=e.args)
             # form.save()
             # gpx_id = form.cleaned_data["id"]
-            return HttpResponseRedirect("/success/url/")
+            trackids = ','.join(str(track.id) for track in tracks)
+            return HttpResponseRedirect(
+                reverse("routes:tracks_view", kwargs={"trackids": trackids}))
         log.info("form was not valid")
     else:
         form = UploadGpxForm2()
     return render(request, "gpx_upload.html", {"form": form})
 
 
-def save_to_gis(gpx_file: TextIO):
-    """ save an uploaded gpx file as a track (or possibly, several tracks) """
-    gpx = gpxpy.parse(gpx_file)
-    """
-    if gpx.waypoints:
-        for waypoint in gpx.waypoints:
-            new_waypoint = GPXPoint()
-            if waypoint.name:
-                new_waypoint.name = waypoint.name
-            else:
-                new_waypoint.name = 'unknown'
-            new_waypoint.point = Point(waypoint.longitude, waypoint.latitude)
-            new_waypoint.gpx_file = file_instance
-                new_waypoint.save()  """
+def test_save_gpx(request):
+    """ test saving a specific file from disk to the database """
+    fname = ("/home/simon/Documents/Travel/CoastalAdventure/2025-South/Actual/"
+            "2025-05-25-08-32-09.gpx")
+    with open(fname, 'rt', encoding='utf-8') as infile:
+        xml_string = infile.read()
+    gpx = GPXParser(xml_string).parse()
+    if not gpx:
+        return HttpResponse("Failed to parse file", status=400)
+    log.info("gpx file %s parsed ok", gpx)
+    try:
+        Track.new_from_gpx(gpx, fname)
+    except IntegrityError as e:
+        return HttpResponse(status=400, content=e.args)
+    return HttpResponseRedirect(
+        reverse("routes:tracks_view", kwargs={"trackids": trackids}))
 
-    log.info("gpx file parsed ok")
-    if gpx.tracks:
-        for track in gpx.tracks:
-            log.info("track name: %s", track.name)
-            new_track = Track()
 
-            track_segments = []
-            for segment in track.segments:
-                track_list_of_points = []
-                for point in segment.points:
-
-                    point_in_segment = Point(point.longitude, point.latitude)
-                    track_list_of_points.append(point_in_segment.coords)
-
-                track_segments.append(LineString(track_list_of_points))
-
-            new_track.track = MultiLineString(track_segments)
-            # new_track.gpx_file = file_instance
-            # new_track.save()
+def show_tracks(request, trackids: str=''):
+    """ show a track or tracks, requested by track id or a comma-separated list
+    of track ids """
+    return HttpResponse(status=501)
 
 
 def SaveGPXtoPostGIS(f, file_instance):
+    """ reference implementation from web.  source: 
+    http://web.archive.org/web/20160425053015/http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
+    """
 
     gpx_file = open(settings.MEDIA_ROOT+ '/uploaded_gpx_files'+'/' + f.name)
     gpx = gpxpy.parse(gpx_file)
@@ -128,7 +129,7 @@ def SaveGPXtoPostGIS(f, file_instance):
             new_track = GPXTrack()
             for segment in track.segments:
                 track_list_of_points = []
-                for point in segment.points:
+                for point in segment.track_points:
 
                     point_in_segment = Point(point.longitude, point.latitude)
                     track_list_of_points.append(point_in_segment.coords)

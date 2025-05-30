@@ -1,4 +1,14 @@
+import logging
+from typing import List
+
 from django.contrib.gis.db import models
+from django.contrib.gis.geos import Point, LineString, MultiLineString
+
+from gpx.gpxpy import GPX
+
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 class Marker(models.Model):
@@ -8,7 +18,6 @@ class Marker(models.Model):
 
     def __str__(self):
         return str(self.name)
-
 
 class RawGpx(models.Model):
     """ to store the raw gpx file for a track """
@@ -20,5 +29,53 @@ class Track(models.Model):
     """ a (gpx) track """
     raw_gpx_id = models.ForeignKey(RawGpx, on_delete=models.SET_NULL,
                                    blank=True, null=True)
+    name = models.CharField(unique=True, max_length=40)
     track = models.MultiLineStringField(dim=3)
     # , srid=4326 is the default)
+
+    @classmethod
+    def new_from_gpx(cls, gpx: "GPX", fname: str) -> List["Track"]:
+        """ save a GPX object as a track (or possibly, several tracks) """
+
+        """
+        if gpx.waypoints:
+            for waypoint in gpx.waypoints:
+                new_waypoint = GPXPoint()
+                if waypoint.name:
+                    new_waypoint.name = waypoint.name
+                else:
+                    new_waypoint.name = 'unknown'
+                new_waypoint.point = Point(waypoint.longitude, waypoint.latitude)
+                new_waypoint.gpx_file = file_instance
+                    new_waypoint.save()
+        """
+
+        if not gpx.tracks:
+            log.error("Gpx contains no tracks")
+
+        tracks = []
+        for track_num, track in enumerate(gpx.tracks):
+            log.info("converting track name: %s", track.name)
+            new_track = cls()
+
+            track_segments = []
+            for segment in track.track_segments:
+                track_list_of_points = []
+                for point in segment.track_points:
+
+                    point_in_segment = Point(point.longitude, point.latitude,
+                                             point.elevation)
+                    track_list_of_points.append(point_in_segment.coords)
+
+                track_segments.append(LineString(track_list_of_points))
+
+            new_track.track = MultiLineString(track_segments)
+            # new_track.gpx_file = file_instance
+            new_track.name = track.name or (
+                fname if track_num == 0
+                else f'{fname}.{track_num}')
+            new_track.save()
+            log.info("saved track %s, id=%d", new_track.name, new_track.id)
+            tracks.append(new_track)
+
+        return tracks
