@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+""" views for routes app """
 import json
 import logging
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
 from django.db.utils import IntegrityError
 from django.http import HttpResponseRedirect, HttpResponse
@@ -16,7 +18,7 @@ from django.views.generic import TemplateView
 from gpx.gpxpy import GPXParser, GPX
 
 from .models import Marker, Track
-from .forms import UploadGpxForm2  #, UploadGpxForm2
+from .forms import UploadGpxForm2
 
 
 if TYPE_CHECKING:
@@ -28,26 +30,49 @@ log.setLevel(logging.DEBUG)
 
 
 class MapView(TemplateView):
-    """ (test version) send the default map of the globe, showing markers """
+    """ send the default map, showing all markers and tracks """
     template_name = "map.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["markers"] = json.loads(
-            serialize(
-                "geojson",
-                Marker.objects.all(),
+            serialize("geojson", Marker.objects.all())
             )
-        )
+        ctx["tracks"] = json.loads(
+            serialize("geojson", Track.objects.all())
+            )
+        return ctx
+
+
+class TracksView(TemplateView):
+    """ show a track or tracks, requested by track id or a comma-separated list
+    of track ids """
+    template_name = "map.html"
+
+    def get(self, request, *args, **kwargs):
+        try:
+            context = self.get_context_data(**kwargs)
+        except ValidationError as e:
+            return HttpResponse(e, status=400)
+        return self.render_to_response(context, status=403)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        log.info("TracksView got kwargs=%s", kwargs)
+        try:
+            trackids = [int(trackid) for trackid in kwargs['trackids'].split(',')]
+        except ValueError as e:
+            raise ValidationError(f"Invalid track id: {e.args[0]}")
+        tracks = Track.objects.filter(id__in=trackids)
+        ctx["tracks"] = json.loads(serialize("geojson", tracks))
         return ctx
 
 
 def upload_file(request):
-    """ upload a gpx file (test version) 
+    """ upload a gpx file and convert to a Track.
     
-    This literally stores the file as a blob, no spatialite/geo parsing.
-    Ref: https://docs.djangoproject.com/en/5.1/topics/http/file-uploads/ """
-    """ important post here:
+    Ref: https://docs.djangoproject.com/en/5.1/topics/http/file-uploads/ 
+    important post here:
     https://web.archive.org/web/20160425053015/http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
     """
     if request.method == "POST":
@@ -96,12 +121,6 @@ def test_save_gpx(request):
         return HttpResponse(status=400, content=e.args)
     return HttpResponseRedirect(
         reverse("routes:tracks_view", kwargs={"trackids": trackids}))
-
-
-def show_tracks(request, trackids: str=''):
-    """ show a track or tracks, requested by track id or a comma-separated list
-    of track ids """
-    return HttpResponse(status=501)
 
 
 def SaveGPXtoPostGIS(f, file_instance):

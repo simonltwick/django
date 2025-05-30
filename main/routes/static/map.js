@@ -12,4 +12,10 @@ const feature = L.geoJSON(
   .bindPopup((layer) => layer.feature.properties.name)
   .addTo(map);
 
-map.fitBounds(feature.getBounds());
+const track = L.geoJSON(
+	JSON.parse(document.getElementById("tracks").textContent),
+)
+  .bindPopup((layer) => layer.feature.properties.name)
+  .addTo(map);
+
+map.fitBounds(feature.getBounds().extend(track.getBounds()));

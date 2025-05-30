@@ -1,4 +1,6 @@
+""" models for routes app """
 import logging
+import os.path
 from typing import List
 
 from django.contrib.gis.db import models
@@ -71,9 +73,13 @@ class Track(models.Model):
 
             new_track.track = MultiLineString(track_segments)
             # new_track.gpx_file = file_instance
-            new_track.name = track.name or (
-                fname if track_num == 0
-                else f'{fname}.{track_num}')
+            if track.name:
+                new_track.name = track.name
+            elif track_num == 0:
+                new_track_name = fname
+            else:
+                fname_base, ext = os.path.splitext(fname)
+                new_track.name = f"{fname_base}#{track_num}{ext}"
             new_track.save()
             log.info("saved track %s, id=%d", new_track.name, new_track.id)
             tracks.append(new_track)

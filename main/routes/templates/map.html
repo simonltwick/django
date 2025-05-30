@@ -23,6 +23,7 @@
   <body>
     <div id="map"></div>
     {{ markers|json_script:"markers" }}
+    {{ tracks|json_script:"tracks" }}
     <script defer src="{% static 'map.js' %}"></script>
   </body>
 </html>
