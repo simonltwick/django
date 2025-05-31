@@ -39,27 +39,41 @@ class Track(models.Model):
     def new_from_gpx(cls, gpx: "GPX", fname: str) -> List["Track"]:
         """ save a GPX object as a track (or possibly, several tracks) """
 
-        """
-        if gpx.waypoints:
-            for waypoint in gpx.waypoints:
-                new_waypoint = GPXPoint()
-                if waypoint.name:
-                    new_waypoint.name = waypoint.name
-                else:
-                    new_waypoint.name = 'unknown'
-                new_waypoint.point = Point(waypoint.longitude, waypoint.latitude)
-                new_waypoint.gpx_file = file_instance
-                    new_waypoint.save()
-        """
+        # """
+        # if gpx.waypoints:
+        #     for waypoint in gpx.waypoints:
+        #         new_waypoint = GPXPoint()
+        #         if waypoint.name:
+        #             new_waypoint.name = waypoint.name
+        #         else:
+        #             new_waypoint.name = 'unknown'
+        #         new_waypoint.point = Point(waypoint.longitude, waypoint.latitude)
+        #         new_waypoint.gpx_file = file_instance
+        #             new_waypoint.save()
+        # """
 
         if not gpx.tracks:
             log.error("Gpx contains no tracks")
 
         tracks = []
         for track_num, track in enumerate(gpx.tracks):
-            log.info("converting track name: %s", track.name)
+            log.info("converting track #%d name: %s in file %s",
+                     track_num, track.name, fname)
             new_track = cls()
 
+            # check filename is unique
+            fname = os.path.basename(fname)  # remove dirname if present
+            if track.name:
+                new_track.name = track.name
+            elif track_num == 0:
+                new_track.name = fname
+            else:
+                fname_base, ext = os.path.splitext(fname)
+                new_track.name = f"{fname_base}#{track_num}{ext}"
+            if cls.objects.filter(name=new_track.name).exists():
+                raise FileExistsError(f"duplicate filename: {new_track.name}")
+
+            # add track segments
             track_segments = []
             for segment in track.track_segments:
                 track_list_of_points = []
@@ -73,15 +87,8 @@ class Track(models.Model):
 
             new_track.track = MultiLineString(track_segments)
             # new_track.gpx_file = file_instance
-            if track.name:
-                new_track.name = track.name
-            elif track_num == 0:
-                new_track_name = fname
-            else:
-                fname_base, ext = os.path.splitext(fname)
-                new_track.name = f"{fname_base}#{track_num}{ext}"
             new_track.save()
-            log.info("saved track %s, id=%d", new_track.name, new_track.id)
+            log.info("saved track %s, id=%d", new_track.name, new_track.pk)
             tracks.append(new_track)
 
         return tracks

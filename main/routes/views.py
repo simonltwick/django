@@ -91,10 +91,10 @@ def upload_file(request):
             log.info("gpx file %s parsed ok", gpx)
 
             try:
-                tracks = Track.new_from_gpx(gpx, form.cleaned_data['gpx_file'].name)
-            except IntegrityError as e:
-                return HttpResponse(status=400, content=e.args)
-            # form.save()
+                tracks = Track.new_from_gpx(
+                    gpx, form.cleaned_data['gpx_file'].name)
+            except FileExistsError as e:
+                return HttpResponse(status=400, content=e.args[0])
             # gpx_id = form.cleaned_data["id"]
             trackids = ','.join(str(track.id) for track in tracks)
             return HttpResponseRedirect(
