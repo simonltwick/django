@@ -2,7 +2,7 @@
 """ views for routes app """
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, List
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -68,8 +68,17 @@ class TracksView(TemplateView):
         return ctx
 
 
-def upload_file(request):
-    """ upload a gpx file and convert to a Track.
+def show_tracks(request, tracks: List[Track]):
+    """ show the given tracks on a map """
+    ctx = {}
+    ctx["tracks"] = json.loads(serialize("geojson", tracks))
+    return render(request, "map.html", context=ctx)
+
+
+def upload_file(request, save=True):
+    """ upload a gpx file and convert to a Track (or Tracks).
+    If save=True, save the Track(s) in the DB, otherwise just view without
+    saving
     
     Ref: https://docs.djangoproject.com/en/5.1/topics/http/file-uploads/ 
     important post here:
@@ -80,12 +89,7 @@ def upload_file(request):
         log.info("uploading file %s, size %d", file.name, file.size)
         form = UploadGpxForm2(request.POST, request.FILES)
         if form.is_valid():
-            log.info("gpx file %s is valid", file.name)
-            # decode the file as a text file (not binary)
-            encoding = file.charset or 'utf-8'
-            xml_string = form.cleaned_data['gpx_file'].read().decode(
-                encoding=encoding)
-            gpx = GPXParser(xml_string).parse()
+            gpx = convert_file_to_gpx(form.cleaned_data['gpx_file'])
             if not gpx:
                 return HttpResponse("Failed to parse file", status=400)
             log.info("gpx file %s parsed ok", gpx)
@@ -96,16 +100,30 @@ def upload_file(request):
             except FileExistsError as e:
                 return HttpResponse(status=400, content=e.args[0])
             # gpx_id = form.cleaned_data["id"]
-            trackids = ','.join(str(track.id) for track in tracks)
-            return HttpResponseRedirect(
-                reverse("routes:tracks_view", kwargs={"trackids": trackids}))
+            for track in tracks:
+                track.save()
+                log.debug("saved track %s, id=%d", track.name, track.pk)
+            return show_tracks(request, tracks)
+            # trackids = ','.join(str(track.id) for track in tracks)
+            # return HttpResponseRedirect(
+            #     reverse("routes:tracks_view", kwargs={"trackids": trackids}))
+
         log.info("form was not valid")
     else:
         form = UploadGpxForm2()
-    return render(request, "gpx_upload.html", {"form": form})
+    return render(request, "gpx_upload.html", {"form": form, "save": save})
 
 
-def test_save_gpx(request):
+def convert_file_to_gpx(file: "UploadedFile") -> Optional[GPX]:
+    """ upload a gpx file and convert to a GPX object """
+    log.info("gpx file %s is valid", file.name)
+    # decode the file as a text file (not binary)
+    encoding = file.charset or 'utf-8'
+    xml_string = file.read().decode(encoding=encoding)
+    return GPXParser(xml_string).parse()
+
+
+def test_save_gpx(_request):
     """ test saving a specific file from disk to the database """
     fname = ("/home/simon/Documents/Travel/CoastalAdventure/2025-South/Actual/"
             "2025-05-25-08-32-09.gpx")
@@ -116,9 +134,10 @@ def test_save_gpx(request):
         return HttpResponse("Failed to parse file", status=400)
     log.info("gpx file %s parsed ok", gpx)
     try:
-        Track.new_from_gpx(gpx, fname)
+        tracks = Track.new_from_gpx(gpx, fname)
     except IntegrityError as e:
         return HttpResponse(status=400, content=e.args)
+    trackids = ','.join(str(track.id) for track in tracks)
     return HttpResponseRedirect(
         reverse("routes:tracks_view", kwargs={"trackids": trackids}))
 

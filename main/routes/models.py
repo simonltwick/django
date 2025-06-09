@@ -37,7 +37,8 @@ class Track(models.Model):
 
     @classmethod
     def new_from_gpx(cls, gpx: "GPX", fname: str) -> List["Track"]:
-        """ save a GPX object as a track (or possibly, several tracks) """
+        """ convert a GPX object to a track (or possibly, several tracks)
+        but DO NOT SAVE the tracks """
 
         # """
         # if gpx.waypoints:
@@ -87,8 +88,6 @@ class Track(models.Model):
 
             new_track.track = MultiLineString(track_segments)
             # new_track.gpx_file = file_instance
-            new_track.save()
-            log.info("saved track %s, id=%d", new_track.name, new_track.pk)
             tracks.append(new_track)
 
         return tracks

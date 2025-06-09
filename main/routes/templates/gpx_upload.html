@@ -8,11 +8,13 @@
   </head>
   <body>
   <h1>Upload GPX file</h1>
-  <form method="POST" enctype="multipart/form-data">
+  <form method="POST" enctype="multipart/form-data"
+    action="{% if save %}{% url 'routes:upload_gpx' %}{% else %}{% url 'routes:view_gpx' %}{% endif %}">
   {% csrf_token %} 
   {{ form }}
   <p class="invalid-feedback">{{ form.non_field_errors }} </p>
-  <p><input type="submit" class="btn btn-primary" value="Upload">
+  <p><input type="submit" class="btn btn-primary"
+  	value="{% if save %}Upload{% else %}View{% endif %}">
   <a class="btn btn-secondary" href="/routes/map">Cancel</a></p>
   </form>
   
