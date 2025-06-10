@@ -3,7 +3,7 @@
 import csv
 import datetime as dt
 import logging
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Union
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -669,7 +669,7 @@ class RidesList(BikeLoginRequiredMixin):
                                'totals': totals})
 
 
-    def get_ride_totals(self) -> Dict[str, str|int]:
+    def get_ride_totals(self) -> Dict[str, Union[str,int]]:
         """ compute sum & count of entries  - only for Rides
         for Odometer entries, an empty dict is returned. """
         total_distance: Dict[str, float] = {}
@@ -1200,7 +1200,7 @@ def mileage(request, year: Optional[int]=None, bike_id=None):
 
 
 def get_mileage_years(year: Optional[int]=None
-                      ) -> Tuple[int|None, int|None, List[int]]:
+                      ) -> Tuple[Optional[int], Optional[int], List[int]]:
     # retrieve available years with rides recorded, for pagination
     years_dt: List[dt.date] = Ride.objects.dates('date', "year")
     years: List[int] = [y_dt.year for y_dt in years_dt]
