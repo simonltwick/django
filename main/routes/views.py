@@ -15,7 +15,7 @@ from django.views.generic import TemplateView
 # all these imports for copied answer
 
 
-from gpx.gpxpy import GPXParser, GPX
+from gpxpy import GPXParser, GPX
 
 from .models import Marker, Track
 from .forms import UploadGpxForm2
