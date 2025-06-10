@@ -44,6 +44,7 @@ class MapView(TemplateView):
             ctx["tracks"] = json.loads(
                 serialize("geojson", Track.objects.all())
                 )
+            ctx["ocm_api_key"] = settings.OCM_API_KEY
         except SerializerDoesNotExist as e:
             log.exception(e)
             raise
