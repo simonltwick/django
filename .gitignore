@@ -15,3 +15,4 @@ main/main/settings.py
 /.~lock.Bike design.odt#
 /github-fine-grained-personal-access-token
 /.mypy_cache/
+/.pydevproject
