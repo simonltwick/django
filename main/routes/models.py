@@ -1,12 +1,14 @@
 """ models for routes app """
 import logging
 import os.path
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from django.contrib.gis.db import models
 from django.contrib.gis.geos import Point, LineString, MultiLineString
 
-from gpx.gpxpy import GPX
+
+if TYPE_CHECKING:
+    from gpxpy.gpx import GPX
 
 
 log = logging.getLogger(__name__)
@@ -75,18 +77,18 @@ class Track(models.Model):
                 raise FileExistsError(f"duplicate filename: {new_track.name}")
 
             # add track segments
-            track_segments = []
-            for segment in track.track_segments:
-                track_list_of_points = []
-                for point in segment.track_points:
+            segments = []
+            for segment in track.segments:
+                points = []
+                for point in segment.points:
 
                     point_in_segment = Point(point.longitude, point.latitude,
                                              point.elevation)
-                    track_list_of_points.append(point_in_segment.coords)
+                    points.append(point_in_segment.coords)
 
-                track_segments.append(LineString(track_list_of_points))
+                segments.append(LineString(points))
 
-            new_track.track = MultiLineString(track_segments)
+            new_track.track = MultiLineString(segments)
             # new_track.gpx_file = file_instance
             tracks.append(new_track)
 
