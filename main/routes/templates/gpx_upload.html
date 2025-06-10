@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1.0"/>
   </head>
   <body>
-  <h1>Upload GPX file</h1>
+  <h1>{% if save %}Upload{% else %}View{% endif %} GPX file</h1>
   <form method="POST" enctype="multipart/form-data"
     action="{% if save %}{% url 'routes:upload_gpx' %}{% else %}{% url 'routes:view_gpx' %}{% endif %}">
   {% csrf_token %} 

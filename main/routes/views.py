@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional, List
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
+from django.core.serializers.base import SerializerDoesNotExist
 from django.db.utils import IntegrityError
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render
@@ -36,12 +37,16 @@ class MapView(TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["markers"] = json.loads(
-            serialize("geojson", Marker.objects.all())
-            )
-        ctx["tracks"] = json.loads(
-            serialize("geojson", Track.objects.all())
-            )
+        try:
+            ctx["markers"] = json.loads(
+                serialize("geojson", Marker.objects.all())
+                )
+            ctx["tracks"] = json.loads(
+                serialize("geojson", Track.objects.all())
+                )
+        except SerializerDoesNotExist as e:
+            log.exception(e)
+            raise
         return ctx
 
 
