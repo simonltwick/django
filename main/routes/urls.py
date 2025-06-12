@@ -12,5 +12,7 @@ urlpatterns = [
     path("gpx/upload", views.upload_file, name="upload_gpx"),
     path("gpx/view", views.upload_file, {"save": False}, name="view_gpx"),
     # path("track/test", views.test_save_gpx),
-    path("track/<trackids>", views.TracksView.as_view(), name="tracks_view")
+    path("track/<trackids>", views.TracksView.as_view(), name="tracks_view"),
+    path("place/", views.place),
+    path("place/<int:id>", views.place)
 ]

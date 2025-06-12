@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
-class Marker(models.Model):
+class Place(models.Model):
     """ a named point on the map """
     name = models.CharField(max_length=40)
     location = models.PointField()

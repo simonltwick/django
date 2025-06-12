@@ -11,8 +11,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
 from django.core.serializers.base import SerializerDoesNotExist
+from django.contrib.gis.geos import Point
 from django.db.utils import IntegrityError
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -20,8 +21,8 @@ from django.views.decorators.gzip import gzip_page
 from django.views.generic import TemplateView
 # all these imports for copied answer
 
-from .models import Marker, Track
-from .forms import UploadGpxForm2
+from .models import Place, Track
+from .forms import UploadGpxForm2, PlaceForm
 
 
 if TYPE_CHECKING:
@@ -37,7 +38,7 @@ def get_map_context() -> Dict:
     # geojson serialiser has to be defined in settings.py
     ctx = {}
     ctx["markers"] = json.loads(
-        serialize("geojson", Marker.objects.all())
+        serialize("geojson", Place.objects.all())
         )
     ctx["tracks"] = json.loads(
         serialize("geojson", Track.objects.all())
@@ -152,60 +153,54 @@ def test_save_gpx(_request):
         reverse("routes:tracks_view", kwargs={"trackids": trackids}))
 
 
-def SaveGPXtoPostGIS(f, file_instance):
-    """ reference implementation from web.  source: 
-    http://web.archive.org/web/20160425053015/http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
-    """
-
-    gpx_file = open(settings.MEDIA_ROOT+ '/uploaded_gpx_files'+'/' + f.name)
-    gpx = gpxpy.parse(gpx_file)
-
-    if gpx.waypoints:
-        for waypoint in gpx.waypoints:
-            new_waypoint = GPXPoint()
-            if waypoint.name:
-                new_waypoint.name = waypoint.name
-            else:
-                new_waypoint.name = 'unknown'
-            new_waypoint.point = Point(waypoint.longitude, waypoint.latitude)
-            new_waypoint.gpx_file = file_instance
-            new_waypoint.save()
-
-    if gpx.tracks:
-        for track in gpx.tracks:
-            log.info("track name: %s", track.name)
-            new_track = GPXTrack()
-            for segment in track.segments:
-                track_list_of_points = []
-                for point in segment.track_points:
-
-                    point_in_segment = Point(point.longitude, point.latitude)
-                    track_list_of_points.append(point_in_segment.coords)
-
-                new_track_segment = LineString(track_list_of_points)
-
-            new_track.track = MultiLineString(new_track_segment)
-            new_track.gpx_file = file_instance
-            new_track.save()
-
-
-def upload_gpx(request):
-    """ upload and parse a GPX file.  source: 
-    http://web.archive.org/web/20160425053015/http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
-    """
-    args = {}
-
-    if request.method == 'POST':
-        file_instance = gpxFile()
-        form = UploadGpxForm(request.POST, request.FILES, instance=file_instance)
-        args['form'] = form
-        if form.is_valid():
-            form.save()
-            SaveGPXtoPostGIS(request.FILES['gpx_file'], file_instance)
-
-            return HttpResponseRedirect('success/')
-
+# ------------- place handling ---------------
+def place(request, pk=None):
+    if request.method == 'GET':
+        assert pk is None, "get with pk not yet supported"
+        # expect lat/lon to be specified as query parameters ?lat=555&lon=666
+        lat = request.GET.get('lat')
+        lon = request.GET.get('lon')
+        if lat is None or lon is None:
+            return HttpResponse('lat / lon not specified', status=400)
+        form = PlaceForm()
     else:
-        args['form'] = UploadGpxForm()
+        # handle POST request
+        # ref: https://forum.djangoproject.com/t/django-ajax-form-submission-is-always-invalid/23521/3
+        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+            return HttpResponse("must request using XML", status=400)
+        data = json.load(request)
+        del data["csrfmiddlewaretoken"]
+        data["location"] = Point(float(data["lon"]), float(data["lat"]))
+        if not data["id"]:  # returned as empty string
+            del data["id"]
+        log.info("place request data=%s", data)
+        if pk is None:
+            place_inst = Place()
+        else:
+            assert pk == data["id"], "invalid ID in post response"
+            place_inst = Place.objects.get(pk=pk)
+            form = PlaceForm(initial=data, instance=place)
 
-    return render(request, 'myapp/form.html', args)
+        if data["name"]:   # sole validation for now
+            place_inst.name = data["name"]
+            place_inst.location = data["location"]
+            log.info("Place is valid")
+            place_inst.save()
+            # note: location coords are lon,lat  (x,y)
+            log.info("Saved Place id %d: %s @ %s", place_inst.id,
+                     place_inst.name, place_inst.location.coords)
+            # TODO: add json place ID in json in the response
+            # return JsonResponse({"instance": "saved successfully",
+            #                      "form_isbound" : form.is_bound,
+            #                      "django_backend": test}, status=200)
+            return JsonResponse({"instance": "saved successfully", "type": "",
+                                 "name": place_inst.name, "id": place_inst.pk},
+                                 status=200)
+
+        log.error("PlaceForm is not valid: %s", form.errors)
+        return render(request, 'place.html', context={'form': form})
+
+    return render(request, 'place.html',
+                  context={"form": form, "lat": lat, "lon": lon})
+
+

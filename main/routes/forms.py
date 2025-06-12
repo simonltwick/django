@@ -2,9 +2,9 @@
 import logging
 
 from django import forms
-from django.forms import ModelForm
 from django.template.defaultfilters import filesizeformat
 #from .models import RawGpx
+from .models import Place
 
 
 
@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
-# class UploadGpxForm(ModelForm):
+# class UploadGpxForm(forms.ModelForm):
 #     """ a form to upload a gpx file.
 #
 #     To allow multiple files to be uploaded, see
@@ -45,6 +45,8 @@ log.setLevel(logging.DEBUG)
 
 class UploadGpxForm2(forms.Form):
     """ a form to upload a gpx file.  Not a model form. """
+    error_css_class = "error"
+    required_css_class = "required"
     gpx_file = forms.FileField()
 
     def clean_gpx_file(self):
@@ -66,3 +68,11 @@ class UploadGpxForm2(forms.Form):
                 f'{filesizeformat(uploaded_file.size)}')
 
         return uploaded_file
+
+class PlaceForm(forms.ModelForm):
+    error_css_class = "error"
+    required_css_class = "required"
+    class Meta:
+        model = Place
+        fields=["name"]
+

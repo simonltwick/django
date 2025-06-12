@@ -1,5 +1,5 @@
 
-from routes.models import Marker, Track
+from routes.models import Place, Track
 
 from django.contrib.gis import admin
 
@@ -8,8 +8,8 @@ from django.contrib.gis import admin
 #     # for earlier django release support (GISModelAdmin in 5.2)
 #     admin.GISModelAdmin = admin.GeoModelAdmin
 
-@admin.register(Marker)
-class MarkerAdmin(admin.GISModelAdmin):
+@admin.register(Place)
+class PlaceAdmin(admin.GISModelAdmin):
     list_display = ("name", "location")
 
 @admin.register(Track)
