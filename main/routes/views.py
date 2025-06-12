@@ -2,7 +2,10 @@
 """ views for routes app """
 import json
 import logging
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Dict
+
+from gpxpy.parser import GPXParser
+from gpxpy.gpx import GPX
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -12,12 +15,10 @@ from django.db.utils import IntegrityError
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render
 from django.urls import reverse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.gzip import gzip_page
 from django.views.generic import TemplateView
 # all these imports for copied answer
-
-
-from gpxpy.parser import GPXParser
-from gpxpy.gpx import GPX
 
 from .models import Marker, Track
 from .forms import UploadGpxForm2
@@ -31,24 +32,26 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
-class MapView(TemplateView):
-    """ send the default map, showing all markers and tracks """
-    template_name = "map.html"
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        try:
-            ctx["markers"] = json.loads(
-                serialize("geojson", Marker.objects.all())
-                )
-            ctx["tracks"] = json.loads(
-                serialize("geojson", Track.objects.all())
-                )
-            ctx["ocm_api_key"] = settings.OCM_API_KEY
-        except SerializerDoesNotExist as e:
-            log.exception(e)
-            raise
-        return ctx
+def get_map_context() -> Dict:
+    # geojson serialiser has to be defined in settings.py
+    ctx = {}
+    ctx["markers"] = json.loads(
+        serialize("geojson", Marker.objects.all())
+        )
+    ctx["tracks"] = json.loads(
+        serialize("geojson", Track.objects.all())
+        )
+    ctx["ocm_api_key"] = settings.OCM_API_KEY
+    return ctx
+
+
+@require_http_methods(["GET"])
+@gzip_page
+def map(request):
+    """ return a map showing ALL tracks and markers """
+    context = get_map_context()
+    return render(request, 'map.html', context=context)
 
 
 class TracksView(TemplateView):
