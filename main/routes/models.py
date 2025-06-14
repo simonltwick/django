@@ -23,6 +23,9 @@ class Place(models.Model):
     def __str__(self):
         return str(self.name)
 
+    def __repr__(self):
+        return f"Place(name={self.name},location={self.location})"
+
 class RawGpx(models.Model):
     """ to store the raw gpx file for a track """
     # FIXME: should declare a save_to path for saving files

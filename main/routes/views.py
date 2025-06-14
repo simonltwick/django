@@ -22,7 +22,7 @@ from django.views.generic import TemplateView
 # all these imports for copied answer
 
 from .models import Place, Track
-from .forms import UploadGpxForm2, PlaceForm
+from .forms import UploadGpxForm2, PlaceForm2, PlaceForm
 
 
 if TYPE_CHECKING:
@@ -166,26 +166,36 @@ def place(request, pk=None):
     else:
         # handle POST request
         # ref: https://forum.djangoproject.com/t/django-ajax-form-submission-is-always-invalid/23521/3
+        # form.is_valid() always fails even though form.full_clean()
+        # and form.instance.full_clean() succeed
+        log.info("request.POST=%s, Request-Type=%s", request.POST, request.headers.get("Request-Type"))
         if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
             return HttpResponse("must request using XML", status=400)
+        if "multipart/form-data" in request.headers.get('Content-Type'):
+            return test_place(request, pk)
         data = json.load(request)
         del data["csrfmiddlewaretoken"]
         data["location"] = Point(float(data["lon"]), float(data["lat"]))
+        del data["lat"]
+        del data["lon"]
         if not data["id"]:  # returned as empty string
             del data["id"]
         log.info("place request data=%s", data)
         if pk is None:
-            place_inst = Place()
+            # provide missing location field
+            place_inst = Place(**data)
+            place_inst.name=""
         else:
             assert pk == data["id"], "invalid ID in post response"
             place_inst = Place.objects.get(pk=pk)
-            form = PlaceForm(initial=data, instance=place)
-
-        if data["name"]:   # sole validation for now
-            place_inst.name = data["name"]
-            place_inst.location = data["location"]
+            place_inst.name=data["name"]
+        form = PlaceForm2({"name": place_inst.name})
+        if form.is_valid():
             log.info("Place is valid")
-            place_inst.save()
+            # place_inst.name = data["name"]
+            # place_inst.location = data["location"]
+            # place_inst.save()
+            #form.save()
             # note: location coords are lon,lat  (x,y)
             log.info("Saved Place id %d: %s @ %s", place_inst.id,
                      place_inst.name, place_inst.location.coords)
@@ -197,10 +207,41 @@ def place(request, pk=None):
                                  "name": place_inst.name, "id": place_inst.pk},
                                  status=200)
 
-        log.error("PlaceForm is not valid: %s", form.errors)
+        log.error("PlaceForm is not valid: %s; %s", form.errors, form.non_field_errors())
+        # this should raise a ValidationError with a message
+
+        return HttpResponse(f"errors: {e.message_dict}", status=400)
+
         return render(request, 'place.html', context={'form': form})
 
     return render(request, 'place.html',
                   context={"form": form, "lat": lat, "lon": lon})
 
+
+def test_place(request, pk=None):
+    """ investigate form POST using HTML.  Ref:
+    https://www.geeksforgeeks.org/jquery/how-to-send-formdata-objects-with-ajax-requests-in-jquery/"""
+    log.info("test_place: post=%s", request.POST)
+    if pk is None:
+        form = PlaceForm(request.POST)
+    else:
+        assert str(pk) == request.POST.get("id"), "invalid ID in post response"
+        place_inst = Place.objects.get(pk=pk)
+        form = PlaceForm(request.POST, instance=place_inst)
+    log.info("form.is_valid()=%s, form.errors=%s", form.is_valid(), form.errors)
+    # form.instance.full_clean() raises errors at this point
+    lat, lon = request.POST.get('lat'), request.POST.get("lon")
+    location = Point(float(lon), float(lat))
+    form.instance.location=location
+    log.info("instance.full_clean() #2=%s", form.instance.full_clean())
+    if form.is_valid():
+        form.save()
+        log.info("form is valid, id=%s", form.instance.id)
+        return JsonResponse({"instance": "saved successfully", "type": "",
+                             "name": form.instance.name, "id": form.instance.pk},
+                             status=200)
+
+    # handle form errors
+    return render(request, 'place.html',
+                  context={"form": form, "lat": lat, "lon": lon})
 

@@ -193,6 +193,27 @@ function showPlaceForm(data) {
 
 function onPlaceFormSubmit(event) {
 	event.preventDefault();
+	            
+    var form = document.getElementById('placeForm');
+    var formData = new FormData(form);
+ 	//console.info("onPlaceFormSubmit: formData=", formData.toString())
+	
+    $.ajax({
+        url: "/routes/place/",
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: formData["id"] ? placeUpdateOK: placeInsertOK,                 
+        error: function (xhr, status, error) {                       
+            alert('Your reqiest was not sent successfully.');
+            console.error(error);
+        }
+    });
+}
+	
+function OLDonPlaceFormSubmit(event) {
+	event.preventDefault();
 	let data = $("#placeForm").serializeArray();
 	let jsonData = formArrayToJSON(data);
 	let jsonStringData = JSON.stringify( jsonData );
@@ -200,6 +221,7 @@ function onPlaceFormSubmit(event) {
 	if (jsonData['id']) {
 		requestUrl += jsonData['id'];
 	}
+	
 	$.ajax({
 		method: "POST",
 		url: requestUrl,
@@ -217,9 +239,12 @@ function onPlaceFormSubmit(event) {
 
 function placeUpdateOK(data) {
 	/*  update the existing marker's name & close the popup */
-	console.info("placeUpdateOK(", data, ")");
+	responseType = data.getResponseHeader("Content-Type")
+	
+	console.info("placeUpdateOK(", data, "), responseType=", responseType);
 	popup.remove();  // popup isn't attached to a marker, just to the map
 	popMarker.options.placeName = data["name"];
+	popMarker.options.placeID = data["id"]
 }
 
 function placeInsertOK(data) {
@@ -227,10 +252,10 @@ function placeInsertOK(data) {
 	   data = name, id, type */
 	const fakeFeature = {properties: data};
 	const placeLatLon = L.latLng(data.lat, data.lon);
-	let placeMarker = getPlaceMarker(fakeFeature, placeLatLon)
+	let placeMarker = getPlaceMarker(fakeFeature, popLocation)
 		.on("click", onPlaceClick);
-	console.info("placeInsertOK(data=", data, "): feature=", fakeFeature,
-				 ", latlon=", placeLatLon, " -> marker=", placeMarker);
+	//console.info("placeInsertOK(data=", data, "): feature=", fakeFeature,
+	//			 ", latlon=", popLocation, " -> marker=", placeMarker);
     oldPlacesLayer = placesLayer;
 	if (!placesLayer) {
 		placesLayer = L.layerGroup([]);

@@ -76,3 +76,10 @@ class PlaceForm(forms.ModelForm):
         model = Place
         fields=["name"]
 
+
+class PlaceForm2(forms.Form):
+    error_css_class = "error"
+    required_css_class = "required"
+    name=forms.CharField(max_length=40)
+    
+
