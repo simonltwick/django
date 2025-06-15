@@ -43,7 +43,9 @@ const terrainUrl = 'http://tile.stamen.com/terrain/{z}/{x}/{y}.jpg';
 const layerTerrain = L.tileLayer(terrainUrl, attr='terrain-bcg');
 
 
-const map = L.map("map", { layers: [layerOsm] });
+const map = L.map("map", { layers: [layerOsm] })
+	// allow user to click anywhere & show popup with lat/lon
+	.on('click', onMapClick);
 
 // map.fitWorld();
 
@@ -67,16 +69,28 @@ layerControl = L.control.layers(
 ).addTo(map);
 
 
-// allow user to click anywhere & show popup with lat/lon
-	map.on('click', onMapClick);
-		
-		
+// place icons
+const beerIcon = L.icon({
+	iconUrl: '/static/icons/cup-straw-pink.svg',
+	iconSize: [16, 16]});
+const coffeeIcon = L.icon({
+	iconUrl: '/static/icons/cup-orange.svg',
+	iconSize: [16, 16]});
+const teaIcon = L.icon({
+	iconUrl: '/static/icons/teapot.svg',
+	iconSize: [16, 16]});
+const placeIcon = L.icon({
+	iconUrl: '/static/icons/geo-green.svg',
+	iconSize: [16, 16]});
+const cameraIcon = L.icon({
+	iconUrl: '/static/icons/camera-yellow.svg',
+	iconSize: [16,16]});
+const bullseyeIcon = L.icon({ // unused
+	iconUrl: '/static/icons/bullseye-blue.svg',
+	iconSize:[16,16]});		
+
+
 // add tracks & markers sent with map
-const feature = L.geoJSON(
-  JSON.parse(document.getElementById("markers").textContent),
-)
-  .bindPopup((layer) => layer.feature.properties.name)
-  .addTo(map);
 
 const track = L.geoJSON(
 	JSON.parse(document.getElementById("tracks").textContent),
@@ -84,7 +98,50 @@ const track = L.geoJSON(
   .bindPopup((layer) => layer.feature.properties.name)
   .addTo(map);
 
-map.fitBounds(feature.getBounds().extend(track.getBounds()));
+//const feature = L.geoJSON(
+//  JSON.parse(document.getElementById("markers").textContent),
+//)
+//  .bindPopup((layer) => layer.feature.properties.name)
+//  .addTo(map);
+
+makePlaceLayer(JSON.parse(document.getElementById("markers").textContent),)
+
+
+function makePlaceLayer(data) {
+  var newPlacesLayer = L.geoJSON(data, {
+  	pointToLayer: getPlaceMarker,
+  	onEachFeature: onPlaceShow
+  });
+  // showSidebarSection(true, 'place');
+  placesLayer = replaceMapOverlay(placesLayer, newPlacesLayer, "Places");
+  placesBounds = placesLayer.getBounds();
+  setMapBounds();
+}
+ 
+function setMapBounds(){
+	// resize the map to fit placesBounds and tracksBounds
+	map.fitBounds(placesLayer.getBounds().extend(track.getBounds()));
+	return;	
+	var combinedBounds;
+	if (placesBounds) {
+		if (tracksBounds) {
+			// combine both
+			var combinedBounds = L.latLngBounds(tracksBounds.getNorthEast(),
+												tracksBounds.getSouthWest());
+			combinedBounds.extend(tracksBounds);
+		}
+		else {
+			combinedBounds = placesBounds;
+		}
+	}
+	else if (tracksBounds) {
+		combinedBounds = tracksBounds
+	}
+	else {  // neither tracksBounds or placesBounds are specified
+		return;  // do nothing
+	}
+	map.fitBounds(combinedBounds);
+}
 
 
 // create popup when user clicks on map
@@ -155,26 +212,6 @@ function ajaxFail(jqXHR, textStatus, errorThrown) {
 }
 
 // ------ place handling ------
-// icons for place display
-const beerIcon = L.icon({
-	iconUrl: '/routes/static/icons/cup-straw-pink.svg',
-	iconSize: [16, 16]});
-const coffeeIcon = L.icon({
-	iconUrl: '/routes/static/icons/cup-orange.svg',
-	iconSize: [16, 16]});
-const teaIcon = L.icon({
-	iconUrl: '/routes/static/icons/teapot.svg',
-	iconSize: [16, 16]});
-const placeIcon = L.icon({
-	iconUrl: '/routes/static/icons/geo-green.svg',
-	iconSize: [16, 16]});
-const cameraIcon = L.icon({
-	iconUrl: '/routes/static/icons/camera-yellow.svg',
-	iconSize: [16,16]});
-const bullseyeIcon = L.icon({ // unused
-	iconUrl: '/routes/static/icons/bullseye-blue.svg',
-	iconSize:[16,16]});
-
 
 // handle 'new place' 
 
@@ -192,6 +229,10 @@ function showPlaceForm(data) {
 }
 
 function onPlaceFormSubmit(event) {
+	// submit the place form using html/post
+	// expects a json response if all ok
+	// if form errors, an html response is received, and this triggers error
+	// handling
 	event.preventDefault();
 	            
     var form = document.getElementById('placeForm');
@@ -204,39 +245,18 @@ function onPlaceFormSubmit(event) {
         data: formData,
         processData: false,
         contentType: false,
+		dataType: "json",  // if not json, error will be called
+		/* 		success: function(data, textStatus, jqXHR) { /YAY },
+		    error: function(jqXHR, textStatus, errorThrown) { //AWWW... JSON parse error }
+			*/
         success: formData["id"] ? placeUpdateOK: placeInsertOK,                 
-        error: function (xhr, status, error) {                       
-            alert('Your reqiest was not sent successfully.');
-            console.error(error);
+        error: function (jqXHR, textStatus, errorThrown) {                       
+            alert('Your request was not sent successfully.');
+            console.error(errorThrown);
         }
     });
 }
 	
-function OLDonPlaceFormSubmit(event) {
-	event.preventDefault();
-	let data = $("#placeForm").serializeArray();
-	let jsonData = formArrayToJSON(data);
-	let jsonStringData = JSON.stringify( jsonData );
-	requestUrl = "/routes/place/";
-	if (jsonData['id']) {
-		requestUrl += jsonData['id'];
-	}
-	
-	$.ajax({
-		method: "POST",
-		url: requestUrl,
-		data: jsonStringData,
-		contentType: "application/json; charset=utf-8",
-	  	dataType: "json",
-			headers: {"X-CSRFToken": jsonData["csrfmiddlewaretoken"],
-				'X-Requested-With': 'XMLHttpRequest',  // Important for Django to recognize the AJAX request
-		                },
-		success: jsonData["id"] ? placeUpdateOK: placeInsertOK,
-		error: ajaxFail
-	});
-	return false;  // prevent propagation
-}
-
 function placeUpdateOK(data) {
 	/*  update the existing marker's name & close the popup */
 	responseType = data.getResponseHeader("Content-Type")
@@ -269,7 +289,7 @@ function getPlaceMarker(feature, latlng){
 	/* return a marker depending on the type of the feature */
 
 	var sel_icon, marker;
-	switch(feature.properties.type.toUpperCase()){
+	switch(feature.properties.type){
 		case 'P':
 		    sel_icon = beerIcon;
 			break;
@@ -323,9 +343,142 @@ function updatePlaceLocation(data) {
 	alert("Not yet implemented: updatePlaceLocation" + data.toString());
 }
 
-function onPlaceClick(data) {
-	console.info("Not yet implemented: onPlaceClick", data.toString());
+function onPlaceShow(feature, layer) {
+	layer.on({
+		click: onPlaceClick,
+		mouseover: onPlaceMouseOver,
+		mouseout: onPlaceMouseLeave
+	});
+	// addToPlaceSidebar(feature, layer);
 }
+
+const placePopupContent =`<p>{{name}}</p>
+<button class="btn btn-light" type="button"
+onClick="placeDetails()">Details</button>
+<button class="btn btn-outline-danger" type="button"
+onClick="placeDelete({{loc_id}})">Delete</button>`
+
+function onPlaceClick(event) {
+	// open a popup menu about the place
+	popMarker = event.target;
+	popLocation = popMarker.getLatLng();  // for showPlaceForm
+	var content = placePopupContent
+		.replace('\{\{name\}\}', popMarker.options.placeName)
+		.replace('\{\{loc_id\}\}', popMarker.options.placeID);
+	popup = popMarker.getPopup();
+	if (popup) {
+		popMarker.unbindPopup();  // it can't be reopened (?)
+	}
+	popup = L.popup().setContent(content);
+	popMarker.bindPopup(popup)
+		.openPopup();
+}
+
+function onPlaceMouseOver(ev){
+	layerChangeState(ev.target, 'place', true, null);
+	const placeID = ev.target.feature.properties.id;
+	$("#place-sidebar-item-" + placeID).addClass("highlight");
+}
+
+function onPlaceMouseLeave(ev){
+	const placeID = ev.target.feature.properties.id;
+	$("#place-sidebar-item-" + placeID).removeClass("highlight");
+	layerChangeState(ev.target, 'place', false, null);
+}
+
+// ----- control highlighting of places & tracks ------
+
+/* layer highlighting has 4 states, like 4 corners of a square:
+   No highlight:   mouse enter -> hovering; select -> selected
+   Selected and hovering: mouse leave -> selected; deselect -> hovering
+   Selected:  mouse enter -> sel & hovering; deselect -> none
+   Hovering:  mouse leave -> none; select -> sel & hovering
+
+   Visually, hovering has precedence, so hover + select looks like hover
+*/
+
+function layerChangeState(layer, itemType, hovering, selected) {
+	if (!layer.feature) {
+		console.error("layerChangeState(", layer, ")");
+		throw Error("layerChangeState invalid without layer.feature");
+	}
+	if (!layer.feature.properties.state) {
+		layer.feature.properties.state = {};
+	}
+	if (hovering !== null) {
+		layer.feature.properties.state.hovering = hovering;
+	}
+	if (selected !== null) {
+		layer.feature.properties.state.selected = selected;
+	}
+	let style = getLayerStyle(itemType, layer.feature.properties.state);
+	// console.info("layerStateChange(..",hovering, selected,"): style=", style);
+	layerUpdateHilight(layer, itemType, style);
+}
+
+const trackHoverStyle = {
+	color: 'Indigo',
+	opacity: 1.0
+	};
+
+const trackSelectedStyle = {
+	color: 'DeepPink',
+	opacity: 1.0
+	};
+
+const placeHoverStyle = {
+		radius: 10,
+		stroke: false,
+		fill: true,
+		fillColor: '#ffff00',  // yellow
+		fillOpacity: 0.5,
+		interactive: false,   // don't emit mouse events, pass to map
+	};
+
+const placeSelectedStyle = {
+		radius: 10,
+		stroke: true,
+		weight: 2,  // px
+		color: 'DeepPink',   // '#cc00cc',  // grey
+		opacity: 1.0,
+		fill: false,
+		interactive: false,   // don't emit mouse events, pass to map
+	};
+
+function getLayerStyle(itemType, state) {
+	/* return the hilight style, or null if not highlighted */
+	// console.info("getLayerStyle(", itemType, state, ")");
+	if (state.hovering) {
+		return itemType == 'track' ? trackHoverStyle : placeHoverStyle;
+	} else if (state.selected) {
+		return itemType == 'track' ? trackSelectedStyle : placeSelectedStyle;
+	} else {
+		return null;
+	}
+}
+
+function layerUpdateHilight(layer, itemType, style) {
+	if (itemType == 'track') {
+		if (style) {
+			layer.setStyle(style);
+			layer.bringToFront();
+		} else {
+			tracksGeoLayer.resetStyle(layer);
+		}
+	} else if (itemType == 'place') {
+		if (layer.feature.properties.prevHilight) {
+			layer.feature.properties.prevHilight.removeFrom(placesLayer);
+		}
+		if (style) {
+			let hilight = L.circleMarker(layer.getLatLng(), style);
+			hilight.addTo(placesLayer);
+			layer.feature.properties.prevHilight = hilight;
+		} else {
+			layer.feature.properties.prevHilight = null;
+		}
+	}
+}
+
 
 // ---- utilities ----
 

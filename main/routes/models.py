@@ -15,10 +15,17 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
+class PlaceType(models.Model):
+    """ a type of place, eg. Pub, Cafe """
+    name = models.CharField(max_length=40)
+
+
 class Place(models.Model):
     """ a named point on the map """
     name = models.CharField(max_length=40)
     location = models.PointField()
+    type = models.ForeignKey(PlaceType, on_delete=models.PROTECT,
+                             blank=True, null=True)
 
     def __str__(self):
         return str(self.name)
