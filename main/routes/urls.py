@@ -14,5 +14,7 @@ urlpatterns = [
     # path("track/test", views.test_save_gpx),
     path("track/<trackids>", views.TracksView.as_view(), name="tracks_view"),
     path("place/", views.place),
-    path("place/<int:id>", views.place)
+    path("place/<int:pk>", views.place),
+    path("place/<int:pk>/delete", views.place_delete),
+    path("place/<int:pk>/delete_form", views.place_deletion_form),
 ]

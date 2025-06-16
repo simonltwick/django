@@ -2,7 +2,7 @@
 
 <p>Place details</p>
 <form id="placeForm" onsubmit="onPlaceFormSubmit(event)">
-<input type="hidden" name="id" value="{{id}}">
+<input type="hidden" name="pk" value="{{pk}}">
 <input type="hidden" name="lat" value="{{lat}}">
 <input type="hidden" name="lon" value="{{lon}}">
 {% csrf_token %}
