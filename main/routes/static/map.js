@@ -348,8 +348,18 @@ function placeDragEnd(event) {
 	};
 }
 
-function updatePlaceLocation(data) {
-	alert("Not yet implemented: updatePlaceLocation" + data.toString());
+function updatePlaceLocation(values) {
+	// send a json request with new lat/lon
+	requestUrl = '/place/' + values["id"];
+	$.ajax({
+		url: requestUrl,
+		method: 'POST',
+		data: JSON.stringify(values),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        success: null,
+        failure: requestFailMsg
+	});
 }
 
 function onPlaceShow(feature, layer) {
