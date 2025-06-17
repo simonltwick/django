@@ -15,14 +15,13 @@ from django.contrib.gis.geos import Point
 from django.db.utils import IntegrityError
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.gzip import gzip_page
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, ListView, CreateView, UpdateView
 # all these imports for copied answer
-
-from .models import Place, Track
-from .forms import UploadGpxForm2, PlaceForm2, PlaceForm
+from .models import Place, Track, PlaceType
+from .forms import UploadGpxForm2, PlaceForm, PlaceTypeForm
 
 
 if TYPE_CHECKING:
@@ -169,15 +168,10 @@ def place(request, pk=None):
         return render(request, 'place.html', context={"form": form, "pk": pk})
 
     # handle POST request
-    if "multipart/form-data" in request.headers.get('Content-Type'):
-        return place_handle_http_form_post(request, pk)
-    return place_handle_json_post(request, pk)  # UNTESTED/NOT WORKING
-
-
-def place_handle_http_form_post(request, pk=None):
-    """ investigate form POST using HTML.  Ref:
-    https://www.geeksforgeeks.org/jquery/how-to-send-formdata-objects-with-ajax-requests-in-jquery/"""
-    # log.info("place_handle_http_form_post: pk=%s,post=%s", pk, request.POST)
+    if "multipart/form-data" not in request.headers.get('Content-Type'):
+        raise ValueError("expecting html form data (did you send json??)")
+    # """ investigate form POST using HTML.  Ref:
+    # https://www.geeksforgeeks.org/jquery/how-to-send-formdata-objects-with-ajax-requests-in-jquery/"""
     if pk is None:
         form = PlaceForm(request.POST)
         lat, lon = request.POST.get('lat'), request.POST.get("lon")
@@ -197,30 +191,6 @@ def place_handle_http_form_post(request, pk=None):
 
     # handle form errors
     return render(request, 'place.html', context={"form": form, 'pk': pk})
-
-def place_handle_json_post(request, pk):
-    """ don't think this is being used """
-    raise NotImplementedError("untested/invalid code")
-    log.info("place: Handling json post: %s", request.POST)
-    data = json.load(request)
-    log.info("place: Json data=%s", data)
-    del data["csrfmiddlewaretoken"]
-    assert data["pk"] == str(pk), "url pk doesn't match data passed"
-    if data["action"] != "move":
-        return HttpResponse("Unrecognised action in json request", status=400)
-    lat, lon = data["lat"], data["lon"]
-    place = get_object_or_404(Place, pk=pk)
-    place.location = Point(float(lon), float(lat))
-    place.save()
-
-    log.info("Saved Place pk %d: %s @ %s", place.pk,
-             place.name, place.location.coords)
-    # TODO: add json place ID in json in the response
-    # return JsonResponse({"instance": "saved successfully",
-    #                      "form_isbound" : form.is_bound,
-    #                      "django_backend": test}, status=200)
-    return JsonResponse({"instance": "moved successfully", "pk": place.pk},
-                         status=200)
 
 
 def place_delete(request, pk: int):
@@ -252,3 +222,34 @@ def place_move(request, pk: int):
     place.location = Point(float(lon), float(lat))
     place.save()
     return HttpResponse(status=200)
+
+
+# ---- place types ----
+class PlaceTypeListView(ListView):
+    model = PlaceType
+    context_object_name = "place_types"
+    template_name = "placetype_list.html"
+
+
+# class PlaceTypeFormView(FormView):
+#     model = PlaceType
+#     form_class = PlaceTypeForm
+#     success_url = reverse_lazy("routes:map")
+#     template_name = "placetype_form.html"
+#
+#     def form_valid(self, form):
+#         log.info("PlaceType form is valid: %s", form)
+#         form.save()
+#         return super().form_valid(form)
+
+class PlaceTypeCreateView(CreateView):
+    model = PlaceType
+    fields = ["name", "icon"]
+    success_url = reverse_lazy("routes:map")
+    template_name = "placetype_form.html"
+
+class PlaceTypeUpdateView(UpdateView):
+    model = PlaceType
+    fields = ["name", "icon"]
+    success_url = reverse_lazy("routes:map")
+    template_name = "placetype_form.html"

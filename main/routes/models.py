@@ -15,9 +15,27 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
+""" choices for place type icons.  icon name refers to an image in the
+static folder.  Does not have to be svg but recommended.
+In future, it may be possible to choose colour dynamically through css """
+ICON_CHOICES= {
+    "Beer": "cup-straw-pink.svg",
+    "Coffee": "cup-orange.svg",
+    "Tea": "teapot.svg",
+    "Place": "geo-green.svg",
+    "Camera": "camera-yellow.svg",
+    "Bullseye": "bullseye-blue.svg"
+    }
+
+
 class PlaceType(models.Model):
     """ a type of place, eg. Pub, Cafe """
     name = models.CharField(max_length=40)
+    icon = models.CharField(max_length=30, choices=ICON_CHOICES,
+                            default="geo-green.svg")
+
+    def __str__(self):
+        return self.name
 
 
 class Place(models.Model):
