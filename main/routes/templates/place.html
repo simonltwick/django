@@ -1,10 +1,10 @@
 <!-- popup form for place details -->
 
-<p>Place details</p>
+<h4>Place details</h4>
 <form id="placeForm" onsubmit="onPlaceFormSubmit(event)">
-<input type="hidden" name="pk" value="{{ pk|default_if_none:"" }}">
-<input type="hidden" name="lat" value="{{ lat }}">
-<input type="hidden" name="lon" value="{{ lon }}">
+<input type="hidden" name="pk" value="{{ pk|default_if_none:'' }}">
+<input id="place-lat" type="hidden" name="lat" value="">
+<input id="place-lon" type="hidden" name="lon" value="">
 {% csrf_token %}
 <table>
 {{ form.as_table }}

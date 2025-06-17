@@ -1,0 +1,17 @@
+<!-- popup form for confirming place deletion
+	Submitted back to the originating url -->
+
+<h4>Confirm Move Place</h4>
+<form id="placeMoveForm" onsubmit="onPlaceMoveConfirm(event)">
+{% csrf_token %}
+<input type="hidden" name="pk" value="{{ place.pk }}">
+<input id="place-move-lat" type="hidden" name="lat" value="">
+<input id="place-move-lon" type="hidden" name="lon" value="">
+<p>Name: {{ place.name }}</p>
+<p>Type: {{ place.type.name }}</p>
+<p>
+<button type="submit" class="btn btn-outline-primary">Move</button>
+<button type="button" class="bth btn-outline-secondary"
+	onclick="onPlaceMoveUndo()">Undo</button>
+</p>
+</form>

@@ -1,9 +1,9 @@
 <!-- popup form for confirming place deletion -->
 
-<p>Confirm Place delete</p>
+<h4>Confirm Place delete</h4>
 <form id="placeDeleteForm" onsubmit="onPlaceDoDelete(event)">
 {% csrf_token %}
-<input type="hidden" name="pk" value="{{place.pk}}">
+<input type="hidden" name="pk" value="{{ place.pk }}">
 <p>Name: {{ place.name }}</p>
 <p>Type: {{ place.type.name }}</p>
 <button type="submit" class="btn btn-outline-danger">Delete</button>

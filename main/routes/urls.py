@@ -16,5 +16,5 @@ urlpatterns = [
     path("place/", views.place),
     path("place/<int:pk>", views.place),
     path("place/<int:pk>/delete", views.place_delete),
-    path("place/<int:pk>/delete_form", views.place_deletion_form),
+    path("place/<int:pk>/move", views.place_move),
 ]

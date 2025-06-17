@@ -219,13 +219,13 @@ function ajaxFail(jqXHR, textStatus, errorThrown) {
 	// translate to a requestFailMsg call
 	requestFailMsg({ "status": textStatus, "statusText": errorThrown });
 }
-
+/*
 // ------ place handling ------
-
+*/
 // handle 'new place' 
 
 function createPlace() {
-	requestUrl = "/routes/place?lat=" + popLocation.lat + '&lon=' + popLocation.lng;
+	requestUrl = "/routes/place";
 	$.get(requestUrl, null, showPlaceForm, 'html')
 		.fail(requestFailMsg);
 }
@@ -240,11 +240,13 @@ function showPlaceForm(data) {
 function onPlaceFormSubmit(event) {
 	// submit the place form using html/post
 	// expects a json response if all ok
-	// if form errors, an html response is received, and this triggers error
+	// if form errors, an html response is received, which triggers error
 	// handling
 	event.preventDefault();
 
-	// event.target === document.getElementById("formData")
+	// fill in hidden values in form for position
+	document.getElementById("place-lat").value = popLocation.lat;
+	document.getElementById("place-lon").value = popLocation.lng;
 	var formData = new FormData(event.target);
 	var pk = formData.get("pk")
 	
@@ -255,9 +257,6 @@ function onPlaceFormSubmit(event) {
 		processData: false,
 		contentType: false,
 		dataType: "json",  // if not json, error will be called
-		/* 		success: function(data, textStatus, jqXHR) { /YAY },
-			error: function(jqXHR, textStatus, errorThrown) { //AWWW... JSON parse error }
-			*/
 		success: formData["pk"] ? placeUpdateOK : placeInsertOK,
 		error: function(jqXHR, textStatus, errorThrown) {
 			alert('Your request was not sent successfully.');
@@ -268,9 +267,6 @@ function onPlaceFormSubmit(event) {
 
 function placeUpdateOK(data) {
 	/*  update the existing marker's name & close the popup */
-	responseType = data.getResponseHeader("Content-Type")
-
-	console.info("placeUpdateOK(", data, "), responseType=", responseType);
 	popup.remove();  // popup isn't attached to a marker, just to the map
 	popMarker.options.placeName= data["name"];
 	popMarker.options.placeID = data["pk"]
@@ -332,34 +328,52 @@ function placeDragStart(event) {
 }
 
 function placeDragEnd(event) {
-	var marker = event.target;
-	var pos = marker.getLatLng();
-	var name = marker.options.placeName;
-	if (confirm("Move " + name + " to " + pos + "?")) {
-		updatePlaceLocation({
-			id: marker.options.placeID,
-			lat: pos.lat,
-			lon: pos.lng
-		});
-	} else {
-		// move back to original place
-		console.info("cancelled.  Event info=", event)
-		marker.setLatLng(dragStartLatLng);
-	};
+	popMarker = event.target;
+	var newPos = popMarker.getLatLng();
+	requestUrl = "/routes/place/" + popMarker.options.placeID + "/move"
+	$.ajax({
+		url: requestUrl,
+		method: "GET",
+		dataType: "html",
+		success: function(content){
+			// open a popup to confirm the move
+			popup = L.popup().setContent(content);
+				popMarker.bindPopup(popup)
+					.openPopup();
+		},
+		error: function() {
+			onPlaceMoveUndo();
+			requestFailMsg();
+		}
+	});
 }
 
-function updatePlaceLocation(values) {
-	// send a json request with new lat/lon
-	requestUrl = '/place/' + values["id"];
+function onPlaceMoveConfirm(event) {
+	event.preventDefault();
+	newPos = popMarker.getLatLng();
+	document.getElementById("place-move-lat").value = newPos.lat;
+	document.getElementById("place-move-lon").value = newPos.lng;
+	var formData = new FormData(event.target);
+	var pk = formData.get("pk")
+	requestUrl = "/routes/place/" + pk + "/move"
+		
 	$.ajax({
 		url: requestUrl,
 		method: 'POST',
-		data: JSON.stringify(values),
-        contentType: "application/json; charset=utf-8",
-        dataType: "json",
-        success: null,
-        failure: requestFailMsg
+		data: formData,
+		processData: false,
+		contentType: false,
+		success: null,
+		error: requestFailMsg
 	});
+	if (popup) {popup.remove();}
+}
+
+function onPlaceMoveUndo() {
+	// move back to original place (also called from place_move form)
+	console.info("move cancelled.");
+	if (popup) {popup.remove();}
+	popMarker.setLatLng(dragStartLatLng);
 }
 
 function onPlaceShow(feature, layer) {
@@ -406,7 +420,7 @@ function placeDelete(pk) {
 		alert("placeDelete: place id doesn't match:" + pk + " vs. "
 			  + popMarker.options.placeID);
 	}
-	$.get("/routes/place/" + pk.toString() + "/delete_form", "",
+	$.get("/routes/place/" + pk.toString() + "/delete", "",
 		  placeConfirmDelete, "html", {error: requestFailMsg})
 }
 
@@ -432,9 +446,8 @@ function onPlaceDoDelete(event) {
 	    contentType: false,
 		dataType: "json",
 		success: function(data) {
-			popMarker.remove();  // this also removes the popup
-			// alert("onPlaceDoDelete success("+data.toString()+")");
-			// placesLayer.removeLayer(popMarker);
+			// popMarker.remove();  // this also removes the popup
+			placesLayer.removeLayer(popMarker);
 		},
 		error: requestFailMsg
 	}

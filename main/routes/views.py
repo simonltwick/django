@@ -154,41 +154,24 @@ def test_save_gpx(_request):
 
 
 # ------------- place handling ---------------
-@require_http_methods(["GET", "POST", "DELETE"])
+@require_http_methods(["GET", "POST"])
 def place(request, pk=None):
+    """ insert or update place details """
     # log.info("place.%s(pk=%r, request.GET=%s, request.POST=%s)",
-    # request.method, pk, request.GET, request.POST)
-    # TODO: lat/lon should only be necessary for inserting new points
+    #          request.method, pk, request.GET, request.POST)
     if request.method == 'GET':
         if pk is not None:
             place_inst = get_object_or_404(Place, pk=pk)
             form = PlaceForm(instance=place_inst)
-            location = place_inst.location
-            lon, lat = location.x, location.y
         else:
-            # expect lat/lon to be specified as query params ?lat=555&lon=666
-            lat = request.GET.get('lat')
-            lon = request.GET.get('lon')
-            if lat is None or lon is None:
-                return HttpResponse('lat / lon not specified', status=400)
             form = PlaceForm()
 
-        return render(request, 'place.html',
-                      context={"form": form, "lat": lat, "lon": lon, "pk": pk})
-    elif request.method == 'POST':
-        # handle POST request
-        # ref: https://forum.djangoproject.com/t/django-ajax-form-submission-is-always-invalid/23521/3
-        # form.is_valid() always fails even though form.full_clean()
-        # and form.instance.full_clean() succeed
-        # log.info("request.POST=%s, request.POST)
-        # if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
-        #     return HttpResponse("must request using XML", status=400)
-        assert "multipart/form-data" in request.headers.get('Content-Type'), (
-            "Expecting an html form to be submitted")
-        return place_handle_http_form_post(request, pk)
+        return render(request, 'place.html', context={"form": form, "pk": pk})
 
-        # used for processing json encoded form request (but not tested)
-        # return place_handle_json_post(request, pk)
+    # handle POST request
+    if "multipart/form-data" in request.headers.get('Content-Type'):
+        return place_handle_http_form_post(request, pk)
+    return place_handle_json_post(request, pk)  # UNTESTED/NOT WORKING
 
 
 def place_handle_http_form_post(request, pk=None):
@@ -204,77 +187,68 @@ def place_handle_http_form_post(request, pk=None):
         assert str(pk) == request.POST.get("pk"), "invalid ID in post response"
         place_inst = get_object_or_404(Place, pk=pk)
         form = PlaceForm(request.POST, instance=place_inst)
-        location = place_inst.location
-        lon, lat = location.x, location.y
     if form.is_valid():
         form.save()
-        # log.info("form is valid, id=%s", form.instance.id)
-        return JsonResponse({"instance": "saved successfully", "type": "",
-                             "name": form.instance.name, "pk": form.instance.pk},
-                             status=200)
+        type_name = form.instance.type.name if form.instance.type else ''
+        return JsonResponse(
+            {"instance": "saved successfully", "type": type_name,
+             "name": form.instance.name, "pk": form.instance.pk},
+            status=200)
 
     # handle form errors
-    log.info("form is not valid: %s", form.errors)
-    return render(request, 'place.html',
-                  context={"form": form, "lat": lat, "lon": lon,'pk': pk})
+    return render(request, 'place.html', context={"form": form, 'pk': pk})
 
 def place_handle_json_post(request, pk):
     """ don't think this is being used """
-    raise NotImplementedError("this code untested - should not be used")
+    raise NotImplementedError("untested/invalid code")
     log.info("place: Handling json post: %s", request.POST)
     data = json.load(request)
+    log.info("place: Json data=%s", data)
     del data["csrfmiddlewaretoken"]
+    assert data["pk"] == str(pk), "url pk doesn't match data passed"
+    if data["action"] != "move":
+        return HttpResponse("Unrecognised action in json request", status=400)
     lat, lon = data["lat"], data["lon"]
-    data["location"] = Point(float(lon), float(lat))
-    del data["lat"]
-    del data["lon"]
-    if not data["pk"]:  # returned as empty string
-        del data["pk"]
-    log.info("place request data=%s", data)
-    if pk is None:
-        # provide missing location field
-        place_inst = Place(**data)
-        place_inst.name = ""  #  ** HACK ** force error
-    else:
-        assert pk == data["pk"], "invalid ID in post response"
-        place_inst = Place.objects.get(pk=pk)
-        place_inst.name=data["name"]
-    form = PlaceForm2({"name": place_inst.name})
-    if form.is_valid():
-        log.info("Place is valid")
-        # place_inst.name = data["name"]
-        # place_inst.location = data["location"]
-        # place_inst.save()
-        #form.save()
-        # note: location coords are lon,lat  (x,y)
-        log.info("Saved Place id %d: %s @ %s", place_inst.id,
-                 place_inst.name, place_inst.location.coords)
-        # TODO: add json place ID in json in the response
-        # return JsonResponse({"instance": "saved successfully",
-        #                      "form_isbound" : form.is_bound,
-        #                      "django_backend": test}, status=200)
-        return JsonResponse({"instance": "saved successfully", "type": "",
-                             "name": place_inst.name, "pk": place_inst.pk},
-                             status=200)
-
-    log.error("PlaceForm is not valid: %s; %s", form.errors, form.non_field_errors())
-    # and return the form again
-    return render(request, 'place.html',
-              context={"form": form, "lat": lat, "lon": lon, "pk": pk})
-
-
-@require_http_methods(["GET"])
-def place_deletion_form(request, pk: int):
-    """ send the delete confirmation form, (with CSRF token) """
     place = get_object_or_404(Place, pk=pk)
-    return render(request, 'place_delete.html', context={"place": place})
+    place.location = Point(float(lon), float(lat))
+    place.save()
+
+    log.info("Saved Place pk %d: %s @ %s", place.pk,
+             place.name, place.location.coords)
+    # TODO: add json place ID in json in the response
+    # return JsonResponse({"instance": "saved successfully",
+    #                      "form_isbound" : form.is_bound,
+    #                      "django_backend": test}, status=200)
+    return JsonResponse({"instance": "moved successfully", "pk": place.pk},
+                         status=200)
 
 
-@require_http_methods(["POST"])
 def place_delete(request, pk: int):
-    """ actually do the delete after confirmation """
+    """ handle a delete request """
+    if request.method == "GET":
+        # send the delete confirmation form, (with CSRF token)
+        place = get_object_or_404(Place, pk=pk)
+        return render(request, 'place_delete.html', context={"place": place})
+
+    # else (POST): actually do the delete after confirmation
     form_pk = request.POST.get("pk")
     assert form_pk == str(pk), "pk in url doesn't match pk in form"
     get_object_or_404(Place, pk=pk).delete()
     return JsonResponse({"instance": "deleted successfully", "pk": pk},
                          status=200)
+
+
+def place_move(request, pk: int):
+    """ handle a move request """
+    place = get_object_or_404(Place, pk=pk)
+    #log.info("place_move: request.GET=%s, request.POSt=%s", request.GET,
+    #         request.POST)
+    if request.method == "GET":
+        return render(request, 'place_move.html', context={'place': place})
+
+    # else (POST)
+    lat, lon = request.POST.get('lat'), request.POST.get("lon")
+    assert request.POST.get("pk") == str(pk), "url mismatch to form data for pk"
+    place.location = Point(float(lon), float(lat))
+    place.save()
+    return HttpResponse(status=200)
