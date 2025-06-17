@@ -248,6 +248,7 @@ function onPlaceFormSubmit(event) {
 	document.getElementById("place-lat").value = popLocation.lat;
 	document.getElementById("place-lon").value = popLocation.lng;
 	var formData = new FormData(event.target);
+	console.info("updated formData:", formData.get("lat"), formData.get("lon"));
 	var pk = formData.get("pk")
 	
 	$.ajax({
