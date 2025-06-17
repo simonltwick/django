@@ -247,12 +247,16 @@ function onPlaceFormSubmit(event) {
 	// fill in hidden values in form for position
 	document.getElementById("place-lat").value = popLocation.lat;
 	document.getElementById("place-lon").value = popLocation.lng;
-	var formData = new FormData(event.target);
-	console.info("updated formData:", formData.get("lat"), formData.get("lon"));
-	var pk = formData.get("pk")
+	let formData = new FormData(event.target);
+	if (!formData.get("lat")) {
+	  alert("updated formData: lat=" + formData.get("lat") + ", lon=" + formData.get("lon"));
+	  throw "lat/lon not set properly";
+	}
+	let pk = formData.get("pk")
+	let requestUrl = "/routes/place/" + (pk ? pk: "")
 	
 	$.ajax({
-		url: "/routes/place/" + (pk ? pk: ""),
+		url: requestUrl,
 		method: 'POST',
 		data: formData,
 		processData: false,
