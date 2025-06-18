@@ -18,10 +18,11 @@ from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.gzip import gzip_page
-from django.views.generic import TemplateView, ListView, CreateView, UpdateView
+from django.views.generic import (
+    TemplateView, ListView, CreateView, UpdateView, DeleteView)
 # all these imports for copied answer
 from .models import Place, Track, PlaceType
-from .forms import UploadGpxForm2, PlaceForm, PlaceTypeForm
+from .forms import UploadGpxForm2, PlaceForm
 
 
 if TYPE_CHECKING:
@@ -245,11 +246,16 @@ class PlaceTypeListView(ListView):
 class PlaceTypeCreateView(CreateView):
     model = PlaceType
     fields = ["name", "icon"]
-    success_url = reverse_lazy("routes:map")
+    success_url = reverse_lazy("routes:place_types")
     template_name = "placetype_form.html"
 
 class PlaceTypeUpdateView(UpdateView):
     model = PlaceType
     fields = ["name", "icon"]
-    success_url = reverse_lazy("routes:map")
+    success_url = reverse_lazy("routes:place_types")
     template_name = "placetype_form.html"
+
+class PlaceTypeDeleteView(DeleteView):
+    model = PlaceType
+    success_url = reverse_lazy("routes:place_types")
+    template_name = "placetype_delete_form.html"
