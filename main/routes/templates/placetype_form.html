@@ -1,34 +1,24 @@
+{% extends 'bike/base.html' %}
+
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport"
-	  content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Routes - Place Type {{ object }}</title>
-    <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
 
+{% block title %}
+Routes - Place Type {{ object }}
+{% endblock %}
 
-    <style>
-      body {margin: 0; padding: 0;}
-      html, body, #map {height: 100%; width: 100vw;}
-    </style>
-  </head>
-  <body>
-    <h1>Routes - Place Type {{ object }}</h1>
-    {% if object %}
-    <form method='post' action="{% url 'routes:place_type' object.pk %}">
-    {% else %}
-    <form method='post' action="{% url 'routes:place_type' %}">
-    {% endif %}
-    {% csrf_token %}
-    <table>
-    {{ form.as_table }}
-    </table>
-    <p>
-    <button type="submit">Save</button>
-    <a href="{% url 'routes:map' %}">Quit</a></p>
-    </form>
-  </body>
-</html>
+{% block content %}
+<h1>Routes - Place Type {{ object }}</h1>
+{% if object %}<form method='post' action="{% url 'routes:place_type' object.pk %}">
+{% else %}<form method='post' action="{% url 'routes:place_type' %}">
+{% endif %}
+	{% csrf_token %}
+	<table>
+	{{ form.as_table }}
+	</table>
+	<p>
+	<button class="btn btn-primary" type="submit">Save</button>
+	<a class="btn btn-secondary" href="{% url 'routes:place_types' %}">Quit</a>
+	<a class="btn btn-danger" href="{% url 'routes:place_type_delete' object.pk %}">Delete</a>
+	</p>
+</form>
+{% endblock %}
