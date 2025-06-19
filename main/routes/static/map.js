@@ -22,7 +22,7 @@ const attrOcm = '&copy; ' + linkOsm + ' Contributors & ' + hrefOcm;
 const tilesOcm = 'http://{s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey='
 	+ ocmApiKey;
 const layerOcm = L.tileLayer(tilesOcm, { attribution: attrOcm, maxZoom: 18 });
-
+ 
 // Google Maps / Google Satellite maps
 const googleMapsUrl = 'http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
 const googleSatMapUrl = 'http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
