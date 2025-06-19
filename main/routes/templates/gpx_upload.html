@@ -1,12 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <title>{% if save %}Upload{% else %}View{% endif %} GPX file</title>
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"/>
-  </head>
-  <body>
+{% extends 'bike/base.html' %}
+{% block title %}
+{% if save %}Upload{% else %}View{% endif %} GPX file
+{% endblock %}
+
+{% block content %}
   <h1>{% if save %}Upload{% else %}View{% endif %} GPX file</h1>
   <form method="POST" enctype="multipart/form-data"
     action="{% if save %}{% url 'routes:gpx_upload' %}{% else %}{% url 'routes:gpx_view' %}{% endif %}">
@@ -17,6 +14,4 @@
   	value="{% if save %}Upload{% else %}View{% endif %}">
   <a class="btn btn-secondary" href="/routes/map">Cancel</a></p>
   </form>
-  
-  </body>
-</html>
+{% endblock %}

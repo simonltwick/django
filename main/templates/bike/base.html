@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -5,13 +6,14 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap Latest compiled and minified CSS -->
-	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
-	
 	<!-- jQuery library -->
 	<script src="https://code.jquery.com/jquery-3.6.0.min.js"
       integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
       crossorigin="anonymous"></script>
+
+    <!-- Bootstrap Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+	
 	
 	<!-- Popper JS : already included in bootstrap bundle 
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
@@ -27,13 +29,14 @@
     integrity="sha384-lZN37f5QGtY3VHgisS14W3ExzMWZxybE1SJSEsQp9S+oqd12jhcu+A56Ebc1zFSJ"
     crossorigin="anonymous">  -->
 
-<script>  /* initialise tooltips */
-  $(document).ready(function(){
-    $('[data-toggle="tooltip"]').tooltip();
-  });
-</script>
+	{% block head %} {% endblock %}
 
-	{% load static %}
+	<script>  /* initialise tooltips */
+	  $(document).ready(function(){
+	    $('[data-toggle="tooltip"]').tooltip();
+	  });
+	</script>
+
     <link rel="stylesheet" href="{% static 'bike.css' %}" type="text/css">
     <script src="{% static 'bike.js' %}"></script>
 
@@ -46,6 +49,7 @@
     	{% endblock %}
     	- Bike
     	</title>
+
 </head>
 <body>
 <header class="container-fluid masthead">
@@ -183,11 +187,13 @@
   </div>
 </header>
 
-
-<main class="container">
-
+<body>
+{% block map %}{% endblock %}  <!-- can't be in a responsive container or in <main> -->
+<main>
+<div class="container">
 {% block content %}
 {% endblock %}
+</div>
 
 </main>
 <footer class="container">

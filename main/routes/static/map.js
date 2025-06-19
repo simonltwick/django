@@ -16,10 +16,11 @@ const layerOsm = L.tileLayer(tilesOsm, { attribution: attrOsm });
 const linkOsm = '<a href="http://openstreetmap.org">OpenStreetMap</a>';
 
 // OpenCycleMap layer - requires an API key from thunderforest.com
+const ocmApiKey = JSON.parse(document.getElementById('ocm-api-key').textContent);
 const hrefOcm = '<a href="http://thunderforest.com/">Thunderforest</a>';
 const attrOcm = '&copy; ' + linkOsm + ' Contributors & ' + hrefOcm;
 const tilesOcm = 'http://{s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey='
-	+ ocm_api_key;
+	+ ocmApiKey;
 const layerOcm = L.tileLayer(tilesOcm, { attribution: attrOcm, maxZoom: 18 });
 
 // Google Maps / Google Satellite maps
