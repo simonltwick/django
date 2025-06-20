@@ -22,7 +22,7 @@ const attrOcm = '&copy; ' + linkOsm + ' Contributors & ' + hrefOcm;
 const tilesOcm = 'http://{s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey='
 	+ ocmApiKey;
 const layerOcm = L.tileLayer(tilesOcm, { attribution: attrOcm, maxZoom: 18 });
- 
+
 // Google Maps / Google Satellite maps
 const googleMapsUrl = 'http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
 const googleSatMapUrl = 'http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
@@ -454,6 +454,57 @@ function onPlaceDoDelete(event) {
 		error: requestFailMsg
 	}
 	);
+}
+
+function onPlaceTypeEdit(pk) {
+	if (!pk) {pk="";}
+	getMapDialogData("/routes/place/type/" + pk);
+}
+
+function onPlaceTypeSubmit(event) {
+	event.preventDefault();
+	let formData = new FormData(event.target);
+	var pk = formData.get("pk")
+	requestUrl = "/routes/place/type/" + (pk ? pk : "");
+	postMapDialogData(formData);
+}
+
+function onPlaceTypeDoDelete(event) {
+	event.preventDefault();
+		let formData = new FormData(event.target);
+		var pk = formData.get("pk")
+		if (!pk) {throw "pk is null";}
+		requestUrl = "/routes/place/type/" + (pk ? pk : "") + "/delete";
+		postMapDialogData(formData);
+}
+
+function postMapDialogData(formData) {
+	$.ajax({
+						url: requestUrl,
+						method: "POST",
+						data: formData,
+						processData: false,
+					    contentType: false,
+						dataType: "html",
+						success: showMapDialog,
+						error: requestFailMsg
+					});
+}
+
+function getMapDialogData(url) {
+	requestUrl = url;
+	$.get(requestUrl, null, showMapDialog, "html");
+	return false;  // prevent default action
+}
+
+function showMapDialog(data) {
+	let dialog = document.getElementById("map-dialog");
+	dialog.innerHTML = data;
+	dialog.showModal();
+}
+
+function onCloseMapDialog() {
+	document.getElementById("map-dialog").close();
 }
 
 function onPlaceMouseOver(ev) {

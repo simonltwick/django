@@ -1,0 +1,13 @@
+<!-- popup form for confirming place deletion -->
+
+<h4>Confirm Place delete: {{ object }}</h4>
+<form id="placeTypeDeleteForm" onsubmit="onPlaceTypeDoDelete(event)">
+{% csrf_token %}
+<input type="hidden" name="pk" value="{{ object.pk }}">
+<p>Place Type: {{ object }}</p>
+<button type="submit" class="btn btn-danger">Delete</button>
+{% url 'routes:place_types' as place_types_url %}
+<button class="btn btn-outline-secondary"
+	onclick="getMapDialogData('{{ place_types_url }}')"
+	>Cancel</button>
+</form>

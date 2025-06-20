@@ -1,24 +1,22 @@
-{% extends 'bike/base.html' %}
-
 {% load static %}
-
-{% block title %}
-Routes - Place Type {{ object }}
-{% endblock %}
-
-{% block content %}
-<h1>Routes - Place Type {{ object }}</h1>
-{% if object %}<form method='post' action="{% url 'routes:place_type' object.pk %}">
-{% else %}<form method='post' action="{% url 'routes:place_type' %}">
-{% endif %}
+<a class="nav-link x-icon" href="#" onClick="onCloseMapDialog()"
+	data-bs-toggle="tooltip" title="Close dialog">
+	&times;
+	</a>
+<h4>Place Type {{ object }}</h4>
+<form onsubmit="onPlaceTypeSubmit(event)" method="post">
 	{% csrf_token %}
+	<input type="hidden" name="pk" value="{{ object.pk|default_if_none:'' }}">
 	<table>
 	{{ form.as_table }}
 	</table>
 	<p>
 	<button class="btn btn-primary" type="submit">Save</button>
-	<a class="btn btn-secondary" href="{% url 'routes:place_types' %}">Quit</a>
-	<a class="btn btn-danger" href="{% url 'routes:place_type_delete' object.pk %}">Delete</a>
+	{% if object %}
+	{% url 'routes:place_type_delete' object.pk as place_type_delete_url %}
+	<button type="button" class="btn btn-danger"
+	  onclick="getMapDialogData('{{ place_type_delete_url }}')"
+	  >Delete</button>
+	{% endif %}
 	</p>
 </form>
-{% endblock %}

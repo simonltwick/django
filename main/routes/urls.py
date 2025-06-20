@@ -19,7 +19,7 @@ urlpatterns = [
     path("place/<int:pk>/move", views.place_move),
     path("place/types", views.PlaceTypeListView.as_view(),
          name="place_types"),
-    path("place/type", views.PlaceTypeCreateView.as_view(),
+    path("place/type/", views.PlaceTypeCreateView.as_view(),
          name="place_type"),
     path("place/type/<int:pk>", views.PlaceTypeUpdateView.as_view(),
          name="place_type"),

@@ -21,6 +21,11 @@
 <style>
   body {margin: 0; padding: 0;}
   html, body, #map {height: 100%; width: 100vw;}
+  #map-dialog {border-radius: 15px; border-style: none;}
+  #map-dialog::backdrop {filter: blur(5px) contrast(50%);}
+  .x-icon {position: absolute; top: 0; right: 0px; float: right;
+  			color: black; font-size: 1em; padding-top: 0;}
+  .plus-icon {color: green; font-size: 1em;}
 </style>
 <script defer src="{% static 'map.js' %}"></script>
 {{ markers|json_script:"markers" }}
@@ -31,4 +36,8 @@
 
 {% block map %}
 <div id="map"></div>
+
+<dialog id="map-dialog" closedby="any">
+<!-- dialog for showing larger forms etc. Content provided by js -->
+</dialog>
 {% endblock %}

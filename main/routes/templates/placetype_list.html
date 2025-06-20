@@ -1,25 +1,21 @@
-{% extends 'bike/base.html' %}
 {% load static %}
-
-{% block title %}
-Routes - Place Types
-{% endblock %}
-    
-{% block content %}
-<h1>Routes - Place Types</h1>
+{% get_static_prefix as STATIC_PREFIX %}
+<a class="nav-link x-icon" href="#" onClick="onCloseMapDialog()"
+	data-bs-toggle="tooltip" title="Close dialog">
+	&times;
+	</a>
+<h4>Place Types</h4>
 <table>
 {% for place_type in object_list %}
 <tr><td>{{ place_type }}</td>
-    <td><img src="/static/icons/{{ place_type.get_icon_display }}"
+    <td><img src="{{ STATIC_PREFIX }}/icons/{{ place_type.get_icon_display }}"
     width=16px height=16px>
-	<td><a href="{% url 'routes:place_type' place_type.pk %}">edit</a></td>
+	<td><a onclick="onPlaceTypeEdit({{ place_type.pk }})">edit</a></td>
 </tr>
 {% empty %}
 <p>(No place types found.)</p>
 {% endfor %}
 </table>
-<p>
-<a class="btn btn-secondary" href="{% url 'routes:place_type' %}">New place type</a>
-<a class="btn btn-primary" href="{% url 'routes:map' %}">Close</a>
-</p>
-{% endblock %}
+<a class="plus-icon" onclick="onPlaceTypeEdit()"
+  data-bs-toggle="tooltip" title="New place type">
+  &plus;...</a>

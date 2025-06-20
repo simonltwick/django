@@ -6,5 +6,7 @@
 <input type="hidden" name="pk" value="{{ place.pk }}">
 <p>Name: {{ place.name }}</p>
 <p>Type: {{ place.type.name }}</p>
-<button type="submit" class="btn btn-outline-danger">Delete</button>
+<button type="submit" class="btn btn-danger">Delete</button>
+<button type="button" class="btn btn-secondary"
+	onclick="popup.close()">Cancel</button>
 </form>

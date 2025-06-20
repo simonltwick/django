@@ -10,4 +10,8 @@
 {{ form.as_table }}
 </table>
 <button type="submit" class="btn btn-outline-primary">Save</button>
+{% url 'routes:place_types' as place_types_url %}
+<button class="btn btn-outline-secondary"
+	onclick="getMapDialogData('{{ place_types_url }}')"
+	>Edit place types</button>
 </form>
