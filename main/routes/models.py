@@ -38,12 +38,15 @@ class PlaceType(models.Model):
         return self.name
 
 
+def get_default_place_type():
+    return PlaceType.objects.get_or_create(name='Place')[0].id
+
 class Place(models.Model):
     """ a named point on the map """
     name = models.CharField(max_length=40)
     location = models.PointField()
-    type = models.ForeignKey(PlaceType, on_delete=models.PROTECT,
-                             blank=True, null=True)
+    type = models.ForeignKey(PlaceType, on_delete=models.SET_DEFAULT,
+                             default=get_default_place_type)
 
     def __str__(self):
         return str(self.name)

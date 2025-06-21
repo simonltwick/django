@@ -43,7 +43,11 @@ class PlaceForm(forms.ModelForm):
     required_css_class = "required"
     class Meta:
         model = Place
-        fields=["name"]
+        fields=["name", "type"]
+
+
+class CustomSelectWidget(forms.widgets.Select):
+    option_template_class = "routes/place_type_icon_option.html"
 
 
 class PlaceTypeForm(forms.ModelForm):
@@ -53,3 +57,4 @@ class PlaceTypeForm(forms.ModelForm):
     class Meta:
         model = PlaceType
         fields = ["name", "icon"]
+        widgets = {"icon": CustomSelectWidget}

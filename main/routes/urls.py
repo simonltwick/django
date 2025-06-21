@@ -25,4 +25,5 @@ urlpatterns = [
          name="place_type"),
     path("place/type/<int:pk>/delete", views.PlaceTypeDeleteView.as_view(),
          name="place_type_delete"),
+    path("api/place/types/icons", views.place_type_list_json),
 ]

@@ -1,0 +1,6 @@
+<!-- template for icon in select option 
+<select><option value="{{ instance.pk }}">{{ instance.name }}
+<a href={% static 'icons/{{ instance.get_icon_display }} %}"</select>-->
+
+<option value="{{ widget.value|stringformat:'s' }}"
+{% include "django/forms/widgets/attrs.html" %}>**{{ widget.label }}</option>

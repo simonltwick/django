@@ -21,7 +21,7 @@ from django.views.decorators.gzip import gzip_page
 from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView)
 # all these imports for copied answer
-from .models import Place, Track, PlaceType
+from .models import Place, Track, PlaceType, ICON_CHOICES
 from .forms import UploadGpxForm2, PlaceForm
 
 
@@ -242,6 +242,17 @@ class PlaceTypeListView(ListView):
 #         log.info("PlaceType form is valid: %s", form)
 #         form.save()
 #         return super().form_valid(form)
+
+def place_type_list_json(request):
+    """ return a json list of icons & names for all defined place types """
+    data = {place_type.pk:
+            {"icon": f"{settings.STATIC_URL}icons/{place_type.get_icon_display()}",
+             "name": place_type.name}
+            for place_type in PlaceType.objects.all()}
+    # log.info("PlaceTypeListJson returning %s", data)
+    # must set safe=False in order to send lists, otherwise only dict allowed
+    return JsonResponse(data, status=200)
+
 
 class PlaceTypeCreateView(CreateView):
     model = PlaceType

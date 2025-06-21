@@ -73,33 +73,6 @@ layerControl = L.control.layers(
 ).addTo(map);
 
 
-// place icons
-const beerIcon = L.icon({
-	iconUrl: '/static/icons/cup-straw-pink.svg',
-	iconSize: [16, 16]
-});
-const coffeeIcon = L.icon({
-	iconUrl: '/static/icons/cup-orange.svg',
-	iconSize: [16, 16]
-});
-const teaIcon = L.icon({
-	iconUrl: '/static/icons/teapot.svg',
-	iconSize: [16, 16]
-});
-const placeIcon = L.icon({
-	iconUrl: '/static/icons/geo-green.svg',
-	iconSize: [16, 16]
-});
-const cameraIcon = L.icon({
-	iconUrl: '/static/icons/camera-yellow.svg',
-	iconSize: [16, 16]
-});
-const bullseyeIcon = L.icon({ // unused
-	iconUrl: '/static/icons/bullseye-blue.svg',
-	iconSize: [16, 16]
-});
-
-
 // add tracks & markers sent with map
 
 const track = L.geoJSON(
@@ -114,8 +87,10 @@ const track = L.geoJSON(
 //  .bindPopup((layer) => layer.feature.properties.name)
 //  .addTo(map);
 
-makePlaceLayer(JSON.parse(document.getElementById("markers").textContent),)
 
+const placeIconSize = [16, 16];  // should match css .place-icon
+let placeIcons;
+loadPlaceIcons();  // this calls makePlaceLayer
 
 function makePlaceLayer(data) {
 	var newPlacesLayer = L.geoJSON(data, {
@@ -130,27 +105,16 @@ function makePlaceLayer(data) {
 
 function setMapBounds() {
 	// resize the map to fit placesBounds and tracksBounds
-	map.fitBounds(placesLayer.getBounds().extend(track.getBounds()));
-	return;
-	var combinedBounds;
-	if (placesBounds) {
-		if (tracksBounds) {
-			// combine both
-			var combinedBounds = L.latLngBounds(tracksBounds.getNorthEast(),
-				tracksBounds.getSouthWest());
-			combinedBounds.extend(tracksBounds);
-		}
-		else {
-			combinedBounds = placesBounds;
-		}
+	let trackBounds = track ? track.getBounds(): null;
+	let placesBounds = placesLayer ? placesLayer.getBounds(): null;
+	let combinedBounds = (trackBounds? (
+		placesBounds? placesBounds.extend(trackBounds) : trackBounds
+		) : placesBounds); 
+	if (combinedBounds) {
+		map.fitBounds(combinedBounds);
+	} else {
+		console.error("map bounds not defined:", trackBounds, placesBounds);
 	}
-	else if (tracksBounds) {
-		combinedBounds = tracksBounds
-	}
-	else {  // neither tracksBounds or placesBounds are specified
-		return;  // do nothing
-	}
-	map.fitBounds(combinedBounds);
 }
 
 
@@ -291,37 +255,41 @@ function placeInsertOK(data) {
 	popup.remove();
 }
 
+
+function loadPlaceIcons() {
+	$.get('/routes/api/place/types/icons', null, buildPlaceIconDict, 'json');
+	// nb. placeIcons is not initialised until response received
+}
+
+function buildPlaceIconDict(data) {
+	placeIcons = {};
+	for (const [key, value] of Object.entries(data)) {
+		placeIcons[key] = L.icon({
+			iconUrl: value.icon,
+			iconSize: placeIconSize,
+			placeTypeName: value.name
+		});
+	}
+	// console.info("buildPlaceIconDict:", data, placeIcons);
+	makePlaceLayer(JSON.parse(document.getElementById("markers").textContent),);
+}
+
 function getPlaceMarker(feature, latlng) {
 	/* return a marker depending on the type of the feature */
-
-	var sel_icon, marker;
-	switch (feature.properties.type) {
-		case 'P':
-			sel_icon = beerIcon;
-			break;
-		case '11':
-			sel_icon = coffeeIcon;
-			break;
-		case 'T':
-			sel_icon = teaIcon;
-			break;
-		case 'L':
-			sel_icon = placeIcon;
-			break;
-		case 'C':
-			sel_icon = cameraIcon;
-			break;
-		default:
-			sel_icon = placeIcon;
-	}
-	marker = L.marker(latlng, {
+	if (!feature.properties){ throw "undefined feature.properties";}
+	let placeType = feature.properties.type;
+	let sel_icon = placeIcons[placeType];
+	if (!sel_icon) throw "undefined sel_icon for placeType="+placeType;
+	let marker = L.marker(latlng, {
 		icon: sel_icon,
 		draggable: true,
 		placeID: feature.properties.pk,
-		placeName: feature.properties.name
+		placeName: feature.properties.name,
+		placeType: placeType  // pk of placeType
 	})
 		.on('dragstart', placeDragStart)
 		.on('dragend', placeDragEnd);
+	// console.info("getPlaceMarker", feature.properties, sel_icon, marker.options);
 	return marker;
 }
 
@@ -331,7 +299,6 @@ function placeDragStart(event) {
 
 function placeDragEnd(event) {
 	popMarker = event.target;
-	var newPos = popMarker.getLatLng();
 	requestUrl = "/routes/place/" + popMarker.options.placeID + "/move"
 	$.ajax({
 		url: requestUrl,
@@ -387,7 +354,7 @@ function onPlaceShow(feature, layer) {
 	// addToPlaceSidebar(feature, layer);
 }
 
-const placePopupContent = `<p>{{name}}</p>
+const placePopupContent = `<p>{{name}}</p><p>{{type}}</p>
 <button class="btn btn-light" type="button"
 onClick="placeDetails()">Details</button>
 <button class="btn btn-outline-danger" type="button"
@@ -399,7 +366,9 @@ function onPlaceClick(event) {
 	popLocation = popMarker.getLatLng();  // for showPlaceForm
 	let content = placePopupContent
 		.replace('\{\{name\}\}', popMarker.options.placeName)
-		.replace('\{\{id\}\}', popMarker.options.placeID);
+		.replace('\{\{id\}\}', popMarker.options.placeID)
+		.replace('\{\{type\}\}',
+			placeIcons[popMarker.options.placeType].options.placeTypeName);
 	popup = popMarker.getPopup();
 	if (popup) {
 		popMarker.unbindPopup();  // it can't be reopened (?)
