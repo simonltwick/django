@@ -256,16 +256,16 @@ def place_type_list_json(request):
 class PlaceTypeCreateView(CreateView):
     model = PlaceType
     fields = ["name", "icon"]
-    success_url = reverse_lazy("routes:place_types")
+    success_url = reverse_lazy("routes:api_place_types")
     template_name = "placetype_form.html"
 
 class PlaceTypeUpdateView(UpdateView):
     model = PlaceType
     fields = ["name", "icon"]
-    success_url = reverse_lazy("routes:place_types")
+    success_url = reverse_lazy("routes:api_place_types")
     template_name = "placetype_form.html"
 
 class PlaceTypeDeleteView(DeleteView):
     model = PlaceType
-    success_url = reverse_lazy("routes:place_types")
+    success_url = reverse_lazy("routes:api_place_types")
     template_name = "placetype_delete_form.html"

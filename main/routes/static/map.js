@@ -262,6 +262,12 @@ function loadPlaceIcons() {
 }
 
 function buildPlaceIconDict(data) {
+	refreshPlaceIconDict(data);
+	// console.info("buildPlaceIconDict:", data, placeIcons);
+	makePlaceLayer(JSON.parse(document.getElementById("markers").textContent),);
+}
+
+function refreshPlaceIconDict(data) {
 	placeIcons = {};
 	for (const [key, value] of Object.entries(data)) {
 		placeIcons[key] = L.icon({
@@ -270,8 +276,6 @@ function buildPlaceIconDict(data) {
 			placeTypeName: value.name
 		});
 	}
-	// console.info("buildPlaceIconDict:", data, placeIcons);
-	makePlaceLayer(JSON.parse(document.getElementById("markers").textContent),);
 }
 
 function getPlaceMarker(feature, latlng) {
@@ -409,21 +413,16 @@ function onPlaceDoDelete(event) {
 	var pk = formData.get("pk")
 	requestUrl = "/routes/place/" + pk.toString() + "/delete"
 	// alert("onPlaceDoDelete: requestUrl=(" + requestUrl);
-	$.ajax({
-		url: requestUrl,
-		method: "POST",
-		data: formData,
-		processData: false,
-	    contentType: false,
-		dataType: "json",
-		success: function(data) {
-			// popMarker.remove();  // this also removes the popup
-			placesLayer.removeLayer(popMarker);
-		},
-		error: requestFailMsg
-	}
-	);
+	postMapDialogData(formData, 'json', function(data) {
+		// popMarker.remove();  // this also removes the popup
+		placesLayer.removeLayer(popMarker);
+	});
 }
+
+
+/* --- place type handling ---
+ Any updates to PlaceType refresh the placetype-icon dictionary placeIcon
+ and then show the PlaceType list dialog */
 
 function onPlaceTypeEdit(pk) {
 	if (!pk) {pk="";}
@@ -435,7 +434,7 @@ function onPlaceTypeSubmit(event) {
 	let formData = new FormData(event.target);
 	var pk = formData.get("pk")
 	requestUrl = "/routes/place/type/" + (pk ? pk : "");
-	postMapDialogData(formData);
+	postMapDialogData(formData, 'json', afterPlaceTypesUpdate);
 }
 
 function onPlaceTypeDoDelete(event) {
@@ -444,18 +443,26 @@ function onPlaceTypeDoDelete(event) {
 		var pk = formData.get("pk")
 		if (!pk) {throw "pk is null";}
 		requestUrl = "/routes/place/type/" + (pk ? pk : "") + "/delete";
-		postMapDialogData(formData);
+		postMapDialogData(formData, 'json', afterPlaceTypesUpdate);
 }
 
-function postMapDialogData(formData) {
+function afterPlaceTypesUpdate(data) {
+	// update placeTypes
+	refreshPlaceIconDict(data);
+	// TODO: refresh the icons & place type names in place layer
+	getMapDialogData("/routes/place/types")
+}
+
+
+function postMapDialogData(formData, dataType, successRoutine) {
 	$.ajax({
 						url: requestUrl,
 						method: "POST",
 						data: formData,
 						processData: false,
 					    contentType: false,
-						dataType: "html",
-						success: showMapDialog,
+						dataType: dataType,
+						success: successRoutine,
 						error: requestFailMsg
 					});
 }
