@@ -184,9 +184,8 @@ def place(request, pk=None):
         form = PlaceForm(request.POST, instance=place_inst)
     if form.is_valid():
         form.save()
-        type_name = form.instance.type.name if form.instance.type else ''
         return JsonResponse(
-            {"instance": "saved successfully", "type": type_name,
+            {"instance": "saved successfully", "type": form.instance.type.pk,
              "name": form.instance.name, "pk": form.instance.pk},
             status=200)
 

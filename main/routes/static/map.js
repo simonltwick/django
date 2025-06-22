@@ -223,7 +223,7 @@ function onPlaceFormSubmit(event) {
 		processData: false,
 		contentType: false,
 		dataType: "json",  // if not json, error will be called
-		success: formData["pk"] ? placeUpdateOK : placeInsertOK,
+		success: formData.get("pk") ? placeUpdateOK : placeInsertOK,
 		error: function(jqXHR, textStatus, errorThrown) {
 			alert('Your request was not sent successfully.');
 			console.error(errorThrown);
@@ -232,10 +232,10 @@ function onPlaceFormSubmit(event) {
 }
 
 function placeUpdateOK(data) {
-	/*  update the existing marker's name & close the popup */
-	popup.remove();  // popup isn't attached to a marker, just to the map
-	popMarker.options.placeName= data["name"];
-	popMarker.options.placeID = data["pk"]
+	/* replace the existing marker & close the popup. */
+	popMarker.removeFrom(placesLayer);
+	placeInsertOK(data);
+	return;
 }
 
 function placeInsertOK(data) {
