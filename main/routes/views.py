@@ -24,7 +24,7 @@ from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView)
 
 from .models import Place, Track, PlaceType, get_default_place_type
-from .forms import UploadGpxForm2, PlaceForm, PlaceTypeDeleteForm
+from .forms import UploadGpxForm2, PlaceForm
 
 
 if TYPE_CHECKING:
@@ -41,14 +41,14 @@ class BikeLoginRequiredMixin(LoginRequiredMixin):
     login_url = LOGIN_URL
 
 
-def get_map_context() -> Dict:
+def get_map_context(request) -> Dict:
     # geojson serialiser has to be defined in settings.py
     ctx = {}
     ctx["markers"] = json.loads(
-        serialize("geojson", Place.objects.all())
+        serialize("geojson", Place.objects.filter(user=request.user).all())
         )
     ctx["tracks"] = json.loads(
-        serialize("geojson", Track.objects.all())
+        serialize("geojson", Track.objects.filter(user=request.user).all())
         )
     ctx["ocm_api_key"] = settings.OCM_API_KEY
     return ctx
@@ -59,7 +59,7 @@ def get_map_context() -> Dict:
 @gzip_page
 def map(request):
     """ return a map showing ALL tracks and markers """
-    context = get_map_context()
+    context = get_map_context(request)
     return render(request, 'map.html', context=context)
 
 
@@ -82,14 +82,14 @@ class TracksView(BikeLoginRequiredMixin, TemplateView):
             trackids = [int(trackid) for trackid in kwargs['trackids'].split(',')]
         except ValueError as e:
             raise ValidationError(f"Invalid track id: {e.args[0]}")
-        tracks = Track.objects.filter(id__in=trackids)
+        tracks = Track.objects.filter(id__in=trackids, user=request.user)
         ctx["tracks"] = json.loads(serialize("geojson", tracks))
         return ctx
 
 
-@login_required(login_url=LOGIN_URL)
-def show_tracks(request, tracks: List[Track]):
-    """ show the given tracks on a map """
+def _show_tracks(request, tracks: List[Track]):
+    """ INTERNAL METHOD: no url.  show the given tracks on a map.
+    Used by upload_file. """
     ctx = {}
     ctx["tracks"] = json.loads(serialize("geojson", tracks))
     return render(request, "map.html", context=ctx)
@@ -117,17 +117,14 @@ def upload_file(request, save=True):
 
             try:
                 tracks = Track.new_from_gpx(
-                    gpx, form.cleaned_data['gpx_file'].name)
+                    gpx, form.cleaned_data['gpx_file'].name, user=request.user)
             except FileExistsError as e:
                 return HttpResponse(status=400, content=e.args[0])
             # gpx_id = form.cleaned_data["id"]
             for track in tracks:
                 track.save()
                 log.debug("saved track %s, id=%d", track.name, track.pk)
-            return show_tracks(request, tracks)
-            # trackids = ','.join(str(track.id) for track in tracks)
-            # return HttpResponseRedirect(
-            #     reverse("routes:tracks_view", kwargs={"trackids": trackids}))
+            return _show_tracks(request, tracks)
 
         log.info("form was not valid")
     else:
@@ -146,6 +143,7 @@ def convert_file_to_gpx(file: "UploadedFile") -> Optional[GPX]:
 
 def test_save_gpx(_request):
     """ test saving a specific file from disk to the database """
+    raise NotImplementedError("Track now requires a User field")
     fname = ("/home/simon/Documents/Travel/CoastalAdventure/2025-South/Actual/"
             "2025-05-25-08-32-09.gpx")
     with open(fname, 'rt', encoding='utf-8') as infile:
@@ -155,7 +153,7 @@ def test_save_gpx(_request):
         return HttpResponse("Failed to parse file", status=400)
     log.info("gpx file %s parsed ok", gpx)
     try:
-        tracks = Track.new_from_gpx(gpx, fname)
+        tracks = Track.new_from_gpx(gpx, fname)# , user=1 for simon
     except IntegrityError as e:
         return HttpResponse(status=400, content=e.args)
     trackids = ','.join(str(track.id) for track in tracks)
@@ -172,7 +170,7 @@ def place(request, pk=None):
     #          request.method, pk, request.GET, request.POST)
     if request.method == 'GET':
         if pk is not None:
-            place_inst = get_object_or_404(Place, pk=pk)
+            place_inst = get_object_or_404(Place, pk=pk, user=request.user)
             form = PlaceForm(instance=place_inst)
         else:
             form = PlaceForm()
@@ -189,9 +187,10 @@ def place(request, pk=None):
         lat, lon = request.POST.get('lat'), request.POST.get("lon")
         location = Point(float(lon), float(lat))
         form.instance.location=location
+        form.instance.user=request.user
     else:
         assert str(pk) == request.POST.get("pk"), "invalid ID in post response"
-        place_inst = get_object_or_404(Place, pk=pk)
+        place_inst = get_object_or_404(Place, pk=pk, user=request.user)
         form = PlaceForm(request.POST, instance=place_inst)
     if form.is_valid():
         form.save()
@@ -209,13 +208,13 @@ def place_delete(request, pk: int):
     """ handle a delete request """
     if request.method == "GET":
         # send the delete confirmation form, (with CSRF token)
-        place_inst = get_object_or_404(Place, pk=pk)
+        place_inst = get_object_or_404(Place, pk=pk, user=request.user)
         return render(request, 'place_delete.html', context={"place": place_inst})
 
     # else (POST): actually do the delete after confirmation
     form_pk = request.POST.get("pk")
     assert form_pk == str(pk), "pk in url doesn't match pk in form"
-    get_object_or_404(Place, pk=pk).delete()
+    get_object_or_404(Place, pk=pk, user=request.user).delete()
     return JsonResponse({"instance": "deleted successfully", "pk": pk},
                          status=200)
 
@@ -223,7 +222,7 @@ def place_delete(request, pk: int):
 @login_required(login_url=LOGIN_URL)
 def place_move(request, pk: int):
     """ handle a move request """
-    place_inst = get_object_or_404(Place, pk=pk)
+    place_inst = get_object_or_404(Place, pk=pk, user=request.user)
     #log.info("place_move: request.GET=%s, request.POSt=%s", request.GET,
     #         request.POST)
     if request.method == "GET":
@@ -243,14 +242,18 @@ class PlaceTypeListView(BikeLoginRequiredMixin, ListView):
     context_object_name = "place_types"
     template_name = "placetype_list.html"
 
+    def get_queryset(self):
+        return PlaceType.objects.filter(user=self.request.user).all()
+
 
 @login_required(login_url=LOGIN_URL)
-def place_type_list_json(_request):
+def place_type_list_json(request):
     """ return a json list of icons & names for all defined place types """
     data = {place_type.pk:
             {"icon": f"{settings.STATIC_URL}icons/{place_type.get_icon_display()}",
              "name": place_type.name}
-            for place_type in PlaceType.objects.all()}
+            for place_type in PlaceType.objects.filter(user=request.user).all()
+            }
     # default entry gives the default pk
     data["default"] = get_default_place_type()
     # log.info("PlaceTypeListJson returning %s", data)
@@ -264,14 +267,43 @@ class PlaceTypeCreateView(BikeLoginRequiredMixin, CreateView):
     success_url = reverse_lazy("routes:api_place_types")
     template_name = "placetype_form.html"
 
+    def form_valid(self, form):
+        obj = form.save(commit=False)
+        obj.user = self.request.user
+        return super(PlaceTypeCreateView, self).form_valid(form)
+
+
 class PlaceTypeUpdateView(BikeLoginRequiredMixin, UpdateView):
     model = PlaceType
     fields = ["name", "icon"]
     success_url = reverse_lazy("routes:api_place_types")
     template_name = "placetype_form.html"
 
+    def form_valid(self, form):
+        obj = form.save(commit=False)
+        obj.user = self.request.user
+        return super(PlaceTypeUpdateView, self).form_valid(form)
+
+    def dispatch(self, request, *args, **kwargs):
+        if not PlaceType.objects.filter(pk=self.kwargs['pk'],
+                                        user=request.user).exists():
+            return HttpResponse("Unauthorised place type", status=401)
+        return super(PlaceTypeUpdateView, self).dispatch(
+            request, *args, **kwargs)
+
+
 class PlaceTypeDeleteView(BikeLoginRequiredMixin, DeleteView):
     model = PlaceType
     success_url = reverse_lazy("routes:api_place_types")
-    # FIXME: prevent deletion of default instance form_class = PlaceTypeDeleteForm
     template_name = "placetype_delete_form.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self.kwargs['pk'] == get_default_place_type():
+            return HttpResponse(
+                "Cannot delete the default place type", status=403)
+        if not PlaceType.objects.filter(pk=self.kwargs['pk'],
+                                        user=request.user).exists():
+            return HttpResponse("Unauthorised place type", status=401)
+        return super(PlaceTypeDeleteView, self).dispatch(
+            request, *args, **kwargs)
+

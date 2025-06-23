@@ -3,6 +3,7 @@ import logging
 import os.path
 from typing import List, TYPE_CHECKING
 
+from django.contrib.auth.models import User
 from django.contrib.gis.db import models
 from django.contrib.gis.geos import Point, LineString, MultiLineString
 
@@ -13,7 +14,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
-
 
 """ choices for place type icons.  icon name refers to an image in the
 static folder.  Does not have to be svg but recommended.
@@ -30,6 +30,7 @@ ICON_CHOICES= {
 
 class PlaceType(models.Model):
     """ a type of place, eg. Pub, Cafe """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=40)
     icon = models.CharField(max_length=30, choices=ICON_CHOICES,
                             default="geo-green.svg")
@@ -43,9 +44,10 @@ def get_default_place_type():
 
 class Place(models.Model):
     """ a named point on the map """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=40)
     location = models.PointField()
-    type = models.ForeignKey(PlaceType, on_delete=models.SET_DEFAULT,
+    type = models.ForeignKey(PlaceType, on_delete=models.PROTECT,
                              default=get_default_place_type)
 
     def __str__(self):
@@ -57,11 +59,13 @@ class Place(models.Model):
 class RawGpx(models.Model):
     """ to store the raw gpx file for a track """
     # FIXME: should declare a save_to path for saving files
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.FileField(editable=True)
 
 
 class Track(models.Model):
     """ a (gpx) track """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     raw_gpx_id = models.ForeignKey(RawGpx, on_delete=models.SET_NULL,
                                    blank=True, null=True)
     name = models.CharField(unique=True, max_length=40)
@@ -69,7 +73,7 @@ class Track(models.Model):
     # , srid=4326 is the default)
 
     @classmethod
-    def new_from_gpx(cls, gpx: "GPX", fname: str) -> List["Track"]:
+    def new_from_gpx(cls, gpx: "GPX", fname: str, user: User) -> List["Track"]:
         """ convert a GPX object to a track (or possibly, several tracks)
         but DO NOT SAVE the tracks """
 
@@ -93,7 +97,7 @@ class Track(models.Model):
         for track_num, track in enumerate(gpx.tracks):
             log.info("converting track #%d name: %s in file %s",
                      track_num, track.name, fname)
-            new_track = cls()
+            new_track = cls(user=user)
 
             # check filename is unique
             fname = os.path.basename(fname)  # remove dirname if present
@@ -104,7 +108,7 @@ class Track(models.Model):
             else:
                 fname_base, ext = os.path.splitext(fname)
                 new_track.name = f"{fname_base}#{track_num}{ext}"
-            if cls.objects.filter(name=new_track.name).exists():
+            if cls.objects.filter(name=new_track.name, user=user).exists():
                 raise FileExistsError(f"duplicate filename: {new_track.name}")
 
             # add track segments

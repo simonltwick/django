@@ -150,6 +150,10 @@ function onMapClick(event) {
 		.setLatLng(popLocation)
 		.setContent(
 			'<p>You clicked at ' + popLocation.toString() + `</p>
+			<a class="btn" onClick="onSearch()">
+				<span class="oi oi-magnifying-glass"
+				  data-toggle="tooltip" title="Search">
+			</a>
 			<button type="button" class="btn" onClick="createPlace()">
 			New Place</button>` +
 			buttonsHtml)
@@ -449,10 +453,18 @@ function onPlaceTypeDoDelete(event) {
 function afterPlaceTypesUpdate(data) {
 	// update placeTypes
 	refreshPlaceIconDict(data);
-	// TODO: refresh the icons & place type names in place layer
+	// refresh the icons & place type names in place layer
+	placesLayer.eachLayer(function(feature) {
+		let placeTypePK = feature.options.placeType;
+		if (!placeTypePK in placeIcons) {
+			// placeType has been deleted - set to default placeType
+			placeTypePK = placeIcons["default"];  // default pk
+			feature.options.placeType = placeTypePK;
+		} 
+		feature.setIcon(placeIcons[placeTypePK]);
+	});
 	getMapDialogData("/routes/place/types")
 }
-
 
 function postMapDialogData(formData, dataType, successRoutine) {
 	$.ajax({

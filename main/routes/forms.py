@@ -4,7 +4,7 @@ import logging
 from django import forms
 from django.template.defaultfilters import filesizeformat
 #from .models import RawGpx
-from .models import Place, PlaceType
+from .models import Place, PlaceType, get_default_place_type
 
 
 log = logging.getLogger(__name__)
