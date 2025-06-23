@@ -11,6 +11,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
 from django.core.serializers.base import SerializerDoesNotExist
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
 from django.db.utils import IntegrityError
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse
@@ -20,9 +22,9 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.gzip import gzip_page
 from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView)
-# all these imports for copied answer
-from .models import Place, Track, PlaceType, ICON_CHOICES
-from .forms import UploadGpxForm2, PlaceForm
+
+from .models import Place, Track, PlaceType, get_default_place_type
+from .forms import UploadGpxForm2, PlaceForm, PlaceTypeDeleteForm
 
 
 if TYPE_CHECKING:
@@ -32,6 +34,11 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
+
+LOGIN_URL = '/bike/login?next=/bike'
+
+class BikeLoginRequiredMixin(LoginRequiredMixin):
+    login_url = LOGIN_URL
 
 
 def get_map_context() -> Dict:
@@ -47,6 +54,7 @@ def get_map_context() -> Dict:
     return ctx
 
 
+@login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET"])
 @gzip_page
 def map(request):
@@ -55,12 +63,12 @@ def map(request):
     return render(request, 'map.html', context=context)
 
 
-class TracksView(TemplateView):
+class TracksView(BikeLoginRequiredMixin, TemplateView):
     """ show a track or tracks, requested by track id or a comma-separated list
     of track ids """
     template_name = "map.html"
 
-    def get(self, request, *args, **kwargs):
+    def get(self, _request, *_args, **kwargs):
         try:
             context = self.get_context_data(**kwargs)
         except ValidationError as e:
@@ -79,6 +87,7 @@ class TracksView(TemplateView):
         return ctx
 
 
+@login_required(login_url=LOGIN_URL)
 def show_tracks(request, tracks: List[Track]):
     """ show the given tracks on a map """
     ctx = {}
@@ -86,6 +95,7 @@ def show_tracks(request, tracks: List[Track]):
     return render(request, "map.html", context=ctx)
 
 
+@login_required(login_url=LOGIN_URL)
 def upload_file(request, save=True):
     """ upload a gpx file and convert to a Track (or Tracks).
     If save=True, save the Track(s) in the DB, otherwise just view without
@@ -154,6 +164,7 @@ def test_save_gpx(_request):
 
 
 # ------------- place handling ---------------
+@login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET", "POST"])
 def place(request, pk=None):
     """ insert or update place details """
@@ -193,12 +204,13 @@ def place(request, pk=None):
     return render(request, 'place.html', context={"form": form, 'pk': pk})
 
 
+@login_required(login_url=LOGIN_URL)
 def place_delete(request, pk: int):
     """ handle a delete request """
     if request.method == "GET":
         # send the delete confirmation form, (with CSRF token)
-        place = get_object_or_404(Place, pk=pk)
-        return render(request, 'place_delete.html', context={"place": place})
+        place_inst = get_object_or_404(Place, pk=pk)
+        return render(request, 'place_delete.html', context={"place": place_inst})
 
     # else (POST): actually do the delete after confirmation
     form_pk = request.POST.get("pk")
@@ -208,64 +220,58 @@ def place_delete(request, pk: int):
                          status=200)
 
 
+@login_required(login_url=LOGIN_URL)
 def place_move(request, pk: int):
     """ handle a move request """
-    place = get_object_or_404(Place, pk=pk)
+    place_inst = get_object_or_404(Place, pk=pk)
     #log.info("place_move: request.GET=%s, request.POSt=%s", request.GET,
     #         request.POST)
     if request.method == "GET":
-        return render(request, 'place_move.html', context={'place': place})
+        return render(request, 'place_move.html', context={'place': place_inst})
 
     # else (POST)
     lat, lon = request.POST.get('lat'), request.POST.get("lon")
     assert request.POST.get("pk") == str(pk), "url mismatch to form data for pk"
-    place.location = Point(float(lon), float(lat))
-    place.save()
+    place_inst.location = Point(float(lon), float(lat))
+    place_inst.save()
     return HttpResponse(status=200)
 
 
 # ---- place types ----
-class PlaceTypeListView(ListView):
+class PlaceTypeListView(BikeLoginRequiredMixin, ListView):
     model = PlaceType
     context_object_name = "place_types"
     template_name = "placetype_list.html"
 
 
-# class PlaceTypeFormView(FormView):
-#     model = PlaceType
-#     form_class = PlaceTypeForm
-#     success_url = reverse_lazy("routes:map")
-#     template_name = "placetype_form.html"
-#
-#     def form_valid(self, form):
-#         log.info("PlaceType form is valid: %s", form)
-#         form.save()
-#         return super().form_valid(form)
-
-def place_type_list_json(request):
+@login_required(login_url=LOGIN_URL)
+def place_type_list_json(_request):
     """ return a json list of icons & names for all defined place types """
     data = {place_type.pk:
             {"icon": f"{settings.STATIC_URL}icons/{place_type.get_icon_display()}",
              "name": place_type.name}
             for place_type in PlaceType.objects.all()}
+    # default entry gives the default pk
+    data["default"] = get_default_place_type()
     # log.info("PlaceTypeListJson returning %s", data)
     # must set safe=False in order to send lists, otherwise only dict allowed
     return JsonResponse(data, status=200)
 
 
-class PlaceTypeCreateView(CreateView):
+class PlaceTypeCreateView(BikeLoginRequiredMixin, CreateView):
     model = PlaceType
     fields = ["name", "icon"]
     success_url = reverse_lazy("routes:api_place_types")
     template_name = "placetype_form.html"
 
-class PlaceTypeUpdateView(UpdateView):
+class PlaceTypeUpdateView(BikeLoginRequiredMixin, UpdateView):
     model = PlaceType
     fields = ["name", "icon"]
     success_url = reverse_lazy("routes:api_place_types")
     template_name = "placetype_form.html"
 
-class PlaceTypeDeleteView(DeleteView):
+class PlaceTypeDeleteView(BikeLoginRequiredMixin, DeleteView):
     model = PlaceType
     success_url = reverse_lazy("routes:api_place_types")
+    # FIXME: prevent deletion of default instance form_class = PlaceTypeDeleteForm
     template_name = "placetype_delete_form.html"
