@@ -370,7 +370,7 @@ def component_replace(request, pk: int):
         old_cpt_form = ComponentForm(request.POST, instance=old_cpt,
                                      prefix='old')
         new_cpt_form = ComponentForm(request.POST, prefix='new')
-        
+
         if old_cpt_form.is_valid() and new_cpt_form.is_valid():
             new_cpt = new_cpt_form.save(commit=False)
             old_cpt_form.save(commit=False)  # update instance
