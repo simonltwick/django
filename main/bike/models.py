@@ -58,12 +58,12 @@ class Bike(models.Model):
         bikes.update(current_odo=F('current_odo') * factor)
 
 
-class DistanceUnits(IntEnum):
+class DistanceUnits(models.IntegerChoices):
     MILES = 10
     KILOMETRES = 20
 
     @classmethod
-    def choices(cls):
+    def Xchoices(cls):
         return [(key.value, key.name.lower()) for key in cls]
 
     @classmethod
@@ -107,7 +107,7 @@ class DistanceUnits(IntEnum):
 class DistanceMixin(models.Model):
     distance = models.FloatField(null=True, blank=True)
     distance_units = models.PositiveSmallIntegerField(
-        choices=DistanceUnits.choices(), default=DistanceUnits.MILES)
+        choices=DistanceUnits, default=DistanceUnits.MILES)
 
     class Meta:
         abstract = True
@@ -135,7 +135,7 @@ class Preferences(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE,
                                 primary_key=True, related_name='preferences')
     distance_units = models.PositiveSmallIntegerField(
-        choices=DistanceUnits.choices(), default=DistanceUnits.MILES)
+        choices=DistanceUnits, default=DistanceUnits.MILES)
     ascent_units = models.PositiveSmallIntegerField(
         choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
     maint_distance_limit = models.PositiveSmallIntegerField(

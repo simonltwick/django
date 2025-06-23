@@ -10,21 +10,20 @@ from gpxpy.gpx import GPX
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
-from django.core.serializers.base import SerializerDoesNotExist
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
-from django.db.utils import IntegrityError
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.gzip import gzip_page
 from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView)
 
-from .models import Place, Track, PlaceType, get_default_place_type
-from .forms import UploadGpxForm2, PlaceForm
+from .models import (
+    Place, Track, PlaceType, get_default_place_type, Preferences, DistanceUnits)
+from .forms import UploadGpxForm2, PlaceForm, PreferencesForm
 
 
 if TYPE_CHECKING:
@@ -81,7 +80,7 @@ class TracksView(BikeLoginRequiredMixin, TemplateView):
         try:
             trackids = [int(trackid) for trackid in kwargs['trackids'].split(',')]
         except ValueError as e:
-            raise ValidationError(f"Invalid track id: {e.args[0]}")
+            raise ValidationError(f"Invalid track id: {e.args[0]}") from e
         tracks = Track.objects.filter(id__in=trackids, user=request.user)
         ctx["tracks"] = json.loads(serialize("geojson", tracks))
         return ctx
@@ -144,21 +143,21 @@ def convert_file_to_gpx(file: "UploadedFile") -> Optional[GPX]:
 def test_save_gpx(_request):
     """ test saving a specific file from disk to the database """
     raise NotImplementedError("Track now requires a User field")
-    fname = ("/home/simon/Documents/Travel/CoastalAdventure/2025-South/Actual/"
-            "2025-05-25-08-32-09.gpx")
-    with open(fname, 'rt', encoding='utf-8') as infile:
-        xml_string = infile.read()
-    gpx = GPXParser(xml_string).parse()
-    if not gpx:
-        return HttpResponse("Failed to parse file", status=400)
-    log.info("gpx file %s parsed ok", gpx)
-    try:
-        tracks = Track.new_from_gpx(gpx, fname)# , user=1 for simon
-    except IntegrityError as e:
-        return HttpResponse(status=400, content=e.args)
-    trackids = ','.join(str(track.id) for track in tracks)
-    return HttpResponseRedirect(
-        reverse("routes:tracks_view", kwargs={"trackids": trackids}))
+    # fname = ("/home/simon/Documents/Travel/CoastalAdventure/2025-South/Actual/"
+    #         "2025-05-25-08-32-09.gpx")
+    # with open(fname, 'rt', encoding='utf-8') as infile:
+    #     xml_string = infile.read()
+    # gpx = GPXParser(xml_string).parse()
+    # if not gpx:
+    #     return HttpResponse("Failed to parse file", status=400)
+    # log.info("gpx file %s parsed ok", gpx)
+    # try:
+    #     tracks = Track.new_from_gpx(gpx, fname)# , user=1 for simon
+    # except IntegrityError as e:
+    #     return HttpResponse(status=400, content=e.args)
+    # trackids = ','.join(str(track.id) for track in tracks)
+    # return HttpResponseRedirect(
+    #     reverse("routes:tracks_view", kwargs={"trackids": trackids}))
 
 
 # ------------- place handling ---------------
@@ -307,3 +306,32 @@ class PlaceTypeDeleteView(BikeLoginRequiredMixin, DeleteView):
         return super(PlaceTypeDeleteView, self).dispatch(
             request, *args, **kwargs)
 
+
+@login_required(login_url=LOGIN_URL)
+def preferences(request):
+    """ Preferences is a 1:1 object for each user.  Create it or get it """
+    preferences = Preferences.objects.get_or_create(user=request.user)[0]
+    if request.method == "GET":
+        form = PreferencesForm(instance=preferences)
+    else:
+        form = PreferencesForm(request.POST, instance=preferences)
+        if form.is_valid():
+            form.save()
+            return HttpResponseRedirect(reverse_lazy("routes:api_preferences"))
+
+    return render(request, 'preferences_form.html', context={"form": form})
+
+
+@login_required(login_url=LOGIN_URL)
+def preferences_as_json(request):
+    """ this returns a list of a single preferences object """
+    preferences = Preferences.objects.get_or_create(user=request.user)[0]
+    # have to get it again as a queryset in order to serialise it
+    data = serialize("json", [preferences])
+    distance_units_choices = {k:v for k,v in DistanceUnits.choices}
+    # bolt the distanceUnits.choices onto the end of the list
+    data_as_json = json.loads(data)
+    data_as_json.append({"DistanceUnits.choices": distance_units_choices})
+    data=json.dumps(data_as_json)
+    log.info("preferences_as_json: data=%s", data)
+    return JsonResponse(data, safe=False, status=200)

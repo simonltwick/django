@@ -1,12 +1,15 @@
 """ models for routes app """
+from dataclasses import dataclass, field
+from enum import IntEnum
 import logging
 import os.path
-from typing import List, TYPE_CHECKING
+from typing import List, Dict, TYPE_CHECKING
 
 from django.contrib.auth.models import User
 from django.contrib.gis.db import models
 from django.contrib.gis.geos import Point, LineString, MultiLineString
 
+from bike.models import DistanceUnits
 
 if TYPE_CHECKING:
     from gpxpy.gpx import GPX
@@ -128,3 +131,17 @@ class Track(models.Model):
             tracks.append(new_track)
 
         return tracks
+
+
+# ------ Settings handling ------
+class Preferences(models.Model):
+    """ store user preferences for distance units, and for search """
+    user = models.OneToOneField(User, on_delete=models.CASCADE,
+                                primary_key=True, related_name='routes_preferences')
+    distance_units = models.IntegerField(default=DistanceUnits.KILOMETRES,
+                                         choices=DistanceUnits)
+    # units for the settings below are yards or metres (dep. on distance_units)
+    track_nearby_search_distance = models.FloatField(default=5)
+    track_search_result_limit = models.IntegerField(default=100)
+    place_nearby_search_distance = models.FloatField(default=20)
+    place_search_result_limit = models.IntegerField(default=1000)

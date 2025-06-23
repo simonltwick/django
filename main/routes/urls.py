@@ -27,4 +27,6 @@ urlpatterns = [
          name="place_type_delete"),
     path("api/place/types/icons", views.place_type_list_json,
          name="api_place_types"),
+    path("preferences", views.preferences),
+    path("api/preferences", views.preferences_as_json, name="api_preferences"),
 ]

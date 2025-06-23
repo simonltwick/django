@@ -4,7 +4,7 @@ import logging
 from django import forms
 from django.template.defaultfilters import filesizeformat
 #from .models import RawGpx
-from .models import Place, PlaceType, get_default_place_type
+from .models import Place, PlaceType, Preferences
 
 
 log = logging.getLogger(__name__)
@@ -48,6 +48,15 @@ class PlaceForm(forms.ModelForm):
 
 class CustomSelectWidget(forms.widgets.Select):
     option_template_class = "routes/place_type_icon_option.html"
+
+
+class PreferencesForm(forms.ModelForm):
+    error_css_class = "error"
+    required_css_class = "required"
+    class Meta:
+        model = Preferences
+        exclude = ["pk", "user"]
+
 
 
 class PlaceTypeForm(forms.ModelForm):

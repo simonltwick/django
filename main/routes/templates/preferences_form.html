@@ -1,0 +1,16 @@
+{% load static %}
+<a class="nav-link x-icon" href="#" onClick="onCloseMapDialog()"
+	data-bs-toggle="tooltip" title="Close dialog">
+	&times;
+	</a>
+<h4>Preferences for {{ object.user }}</h4>
+<form onsubmit="onPreferencesSubmit(event)" method="post">
+	{% csrf_token %}
+	<input type="hidden" name="pk" value="{{ object.pk|default_if_none:'' }}">
+	<table>
+	{{ form.as_table }}
+	</table>
+	<p>
+	<button class="btn btn-primary" type="submit">Save</button>
+	</p>
+</form>
