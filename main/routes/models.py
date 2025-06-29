@@ -8,15 +8,22 @@ from typing import List, Dict, TYPE_CHECKING
 from django.contrib.auth.models import User
 from django.contrib.gis.db import models
 from django.contrib.gis.geos import Point, LineString, MultiLineString
+from django.contrib.gis.measure import D  # synonym for Distance
 
 from bike.models import DistanceUnits
 
 if TYPE_CHECKING:
-    from gpxpy.gpx import GPX
+    from gpxpy.gpx import GPX, GPXTrack
 
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
+
+
+class QueryStringError(ValueError):
+    """ signifies invalid query string in a web request """
+    pass
+
 
 """ choices for place type icons.  icon name refers to an image in the
 static folder.  Does not have to be svg but recommended.
@@ -59,6 +66,7 @@ class Place(models.Model):
     def __repr__(self):
         return f"Place(name={self.name},location={self.location})"
 
+
 class RawGpx(models.Model):
     """ to store the raw gpx file for a track """
     # FIXME: should declare a save_to path for saving files
@@ -74,6 +82,14 @@ class Track(models.Model):
     name = models.CharField(unique=True, max_length=40)
     track = models.MultiLineStringField(dim=3)
     # , srid=4326 is the default)
+    start_time = models.DateTimeField(blank=True, null=True)
+    end_time = models.DateTimeField(blank=True, null=True)
+    moving_time = models.FloatField(blank=True, null=True,
+                                      help_text="Moving time in seconds")
+    moving_distance = models.FloatField(blank=True, null=True,
+                                          help_text="Moving distance in metres")
+    ascent = models.FloatField(blank=True, null=True,
+                                 help_text="Ascent in metres")
 
     @classmethod
     def new_from_gpx(cls, gpx: "GPX", fname: str, user: User) -> List["Track"]:
@@ -128,16 +144,57 @@ class Track(models.Model):
 
             new_track.track = MultiLineString(segments)
             # new_track.gpx_file = file_instance
+            new_track.add_gpx_stats(track)
             tracks.append(new_track)
 
         return tracks
 
+    def __str__(self):
+        s = self.name or self.start_time or "unnamed Track"
+        if s.moving_distance:
+            preferred_distance_units = self.user.routes_preference.distance_units
+            distance = DistanceUnits.convert(
+                s.moving_distance/1000.0,
+                DistanceUnits.KM, preferred_distance_units)
+            s += f" ({distance:d} {preferred_distance_units.display_name()})"
+        return s
+
+    @classmethod
+    def nearby(cls, limits: Dict, prefs: "Preference"):
+        """ return a queryset of tracks according to limits such as
+        latlon: latlon (less than preferences.track_search_distance from latlon)
+        """
+        query = Track.objects.filter(user=prefs.user)
+        for key, value in limits.items():
+            # log.debug("Track.nearby: key=%s, value=%s", key, value)
+            if value is None:
+                continue # value can be stored as a list, terminated by None
+            if key in {"latlon", "andlatlon"}:
+                lat, lon = parse_floats(value, 2, f'{key} must be y,x')
+                query = query.filter(track__distance_lte=(Point(lon, lat), D(
+                    m=prefs.track_nearby_search_distance_metres)))
+            else:
+                raise QueryStringError(f"unrecognised query keyword {key!r}")
+        # limit the number of results returned
+        query = query[:prefs.track_search_result_limit]
+        return query
+
+    def add_gpx_stats(self, gpx_track: "GPXTrack"):
+        """ add stats calculated from the gpx file """
+        time_bounds = gpx_track.get_time_bounds()
+        self.start_time = time_bounds.start_time
+        self.end_time = time_bounds.end_time
+        moving_data = gpx_track.get_moving_data()
+        self.moving_time = moving_data.moving_time
+        self.moving_distance =  moving_data.moving_distance
+        self.ascent = gpx_track.get_uphill_downhill().uphill
+
 
 # ------ Settings handling ------
-class Preferences(models.Model):
-    """ store user preferences for distance units, and for search """
+class Preference(models.Model):
+    """ store user preference for distance units, and for search """
     user = models.OneToOneField(User, on_delete=models.CASCADE,
-                                primary_key=True, related_name='routes_preferences')
+                                primary_key=True, related_name='routes_preference')
     distance_units = models.IntegerField(default=DistanceUnits.KILOMETRES,
                                          choices=DistanceUnits)
     # units for the settings below are yards or metres (dep. on distance_units)
@@ -145,3 +202,28 @@ class Preferences(models.Model):
     track_search_result_limit = models.IntegerField(default=100)
     place_nearby_search_distance = models.FloatField(default=20)
     place_search_result_limit = models.IntegerField(default=1000)
+
+    @property
+    def track_nearby_search_distance_metres(self):
+        """ for use in Leaflet - distances are in metres """
+        return DistanceUnits.convert(
+            self.track_nearby_search_distance,
+            self.distance_units, DistanceUnits.KILOMETRES) * 1000.0
+
+    @property
+    def place_nearby_search_distance_metres(self):
+        return DistanceUnits.convert(
+            self.place_nearby_search_distance,
+            self.distance_units, DistanceUnits.KILOMETRES) * 1000.0
+
+
+def parse_floats(arg_string, n_floats, error_msg):
+    # log.debug("parse_floats(%s, ...)", arg_string)
+    args = arg_string.split(',')
+    if len(args) != n_floats:
+        raise QueryStringError(error_msg)
+    try:
+        return [float(a) for a in args]
+    except ValueError as e:
+        raise QueryStringError(f'{error_msg}: {e.args[0]}')
+

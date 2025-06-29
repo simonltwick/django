@@ -51,7 +51,7 @@
     	</title>
 
 </head>
-<body>
+<body></body>
 <header class="container-fluid masthead">
 
   <nav class="navbar navbar-expand-sm navbar-dark bg-primary">
@@ -124,11 +124,16 @@
         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
     	  <a class="dropdown-item" href="{% url 'routes:map' %}">
     	  Map</a>
+    	  <a class="dropdown-item" onclick="onRoutesSearch()">
+    	  <span class="oi oi-magnifying-glass"
+    	  data-toggle="tooltip" title="Search places or tracks. To search
+    	  by location, click the map"></span></a>
     	  <a class="dropdown-item" href="{% url 'routes:gpx_upload' %}">
     	  GPX Upload</a>
     	  <a class="dropdown-item" href="{% url 'routes:gpx_view' %}">
     	  GPX View</a>
-    	  <a class="dropdown-item" href="{% url 'routes:place_types' %}">
+    	  <a class="dropdown-item"
+    	    onclick="getMapDialogData('{{ place_types_url }}')">
     	  Place Types</a>
         </div>
 	  </li>

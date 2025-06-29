@@ -7,6 +7,13 @@ let oldplacesLayer; // saved placesLayer (to be replaced)
 
 let dragStartLatLng;  // start of drag action for place
 
+let nearbyTracksUrl;  // url for searching tracks
+
+let preference;  // nearby search preference
+
+
+/* ------ initialisation ------ */
+
 // make the osm layer
 const hrefOsm = "https://www.openstreetmap.org/copyright";
 const attrOsm = `© <a href='${hrefOsm}'>OpenStreetMap</a>`;
@@ -66,34 +73,47 @@ const baseLayers = {
 	NatGeographic: layerNatGeo,
 };
 
-const overlays = {
-};
-layerControl = L.control.layers(
+const overlays = {};
+const layerControl = L.control.layers(
 	baseLayers, overlays, { position: "bottomleft" }
 ).addTo(map);
 
 
+const trackStyle = {color: '#ff00ff',
+    weight: 2,
+    opacity: 0.5
+};
+
 // add tracks & markers sent with map
 
-const track = L.geoJSON(
-	JSON.parse(document.getElementById("tracks").textContent),
-)
-	.bindPopup((layer) => layer.feature.properties.name)
-	.addTo(map);
 
-//const feature = L.geoJSON(
-//  JSON.parse(document.getElementById("markers").textContent),
-//)
-//  .bindPopup((layer) => layer.feature.properties.name)
-//  .addTo(map);
+let tracksLayer; 
+showTracks(JSON.parse(document.getElementById("tracks").textContent));
 
-
-const placeIconSize = [16, 16];  // should match css .place-icon
 let placeIcons;
-loadPlaceIcons();  // this calls makePlaceLayer
+
+// get preference & buildPlaceIcons cannot be run in parallel
+$.get("/routes/api/preference", "json", function(data){
+	json_data = JSON.parse(data);
+	updatePreference(json_data);
+	buildPlaceIcons();  // this calls makePlaceLayer when icons built
+});
+
+function buildPlaceIcons() {
+	$.get('/routes/api/place/types/icons', null, buildPlaceIconDict, 'json');
+	// nb. placeIcons is not initialised until response received
+}
+
+function buildPlaceIconDict(data) {
+	refreshPlaceIconDict(data);
+	// console.info("buildPlaceIconDict:", data, placeIcons);
+	makePlaceLayer(JSON.parse(document.getElementById("markers").textContent),);
+}
+
+/* ----- end of initialisation ------ */
 
 function makePlaceLayer(data) {
-	var newPlacesLayer = L.geoJSON(data, {
+	let newPlacesLayer = L.geoJSON(data, {
 		pointToLayer: getPlaceMarker,
 		onEachFeature: onPlaceShow
 	});
@@ -105,7 +125,7 @@ function makePlaceLayer(data) {
 
 function setMapBounds() {
 	// resize the map to fit placesBounds and tracksBounds
-	let trackBounds = track ? track.getBounds(): null;
+	let trackBounds = tracksLayer ? tracksLayer.getBounds(): null;
 	let placesBounds = placesLayer ? placesLayer.getBounds(): null;
 	let combinedBounds = (trackBounds? (
 		placesBounds? placesBounds.extend(trackBounds) : trackBounds
@@ -150,12 +170,16 @@ function onMapClick(event) {
 		.setLatLng(popLocation)
 		.setContent(
 			'<p>You clicked at ' + popLocation.toString() + `</p>
-			<a class="btn" onClick="onSearch()">
+			<a class="btn" onClick="onRoutesSearch()">
 				<span class="oi oi-magnifying-glass"
 				  data-toggle="tooltip" title="Search">
 			</a>
 			<button type="button" class="btn" onClick="createPlace()">
-			New Place</button>` +
+			New Place</button>
+			<a class="btn" onClick="onPreference()">
+							<span class="oi oi-cog"
+							  data-toggle="tooltip" title="Preference">
+						</a>` +
 			buttonsHtml)
 		.openOn(map);
 	// TODO: if tracks layer is not shown, don't show additional track options      
@@ -172,15 +196,52 @@ function replaceMapOverlay(oldOverlay, newOverlay, overlayName) {
 }
 
 
+function onRoutesSearch() {
+	// search tracks or places from a form.
+	getMapDialogData("/routes/api/search/");
+}
+
+function onSearchFormSubmit(event) {
+	event.preventDefault();
+	searchType = document.getElementById("tracks-search"
+		).classList.contains("active") ? 'track': 'place'
+	requestUrl = '/routes/api/search/?search_type=' + searchType;
+	$.post(requestUrl, $('#searchForm').serialize(), searchResults, null
+		).fail(requestFailMsg); 
+	/* this automatically parses result data to json or html/text */
+}
+
+function searchResults(data) {
+	// handle search results, which could be html if form errors, or json
+	try{
+	console.info("searchResults status:", data.status);
+	} catch (err) { // ParseError: html was returned
+		console.info("searchresults caught", err, "handling", data)
+		showMapDialog(data);
+		return;
+	}
+	// json data was returned, so display it
+	onCloseMapDialog();
+	if ("tracks" in data)  {
+		showTracks(data["tracks"]);
+	} else if ("places" in data) {
+		showPlaces(data["places"]);
+	} else {
+		console.info("Unrecognised search results:", data);
+		alert("Unrecognised response to search request");
+	}
+}
+
 // error handling
-function requestFailMsg(errMsg) {
-	var msg = errMsg;
-	if (errMsg.status) {
-		msg = "Status code " + errMsg.status + ": " + errMsg.statusText;
+function requestFailMsg(jqXHR, textStatus, errorThrown) {
+	console.error("Request failed:",
+		{jqHXR: jqXHR, textStatus: textStatus, errorThrown: errorThrown});
+	var msg = jqXHR;
+	if (jqXHR.status) {
+		msg = "Status code " + jqXHR.status + ": " + jqXHR.statusText;
 	}
 	msg = "Server request " + requestUrl + " returned " + msg;
-	console.error(msg + ': ' + errMsg)
-	window.alert(msg + ': ' + errMsg);
+	window.alert(msg + ': ' + textStatus);
 	// log_error(msg, errMsg);
 }
 
@@ -188,6 +249,122 @@ function ajaxFail(jqXHR, textStatus, errorThrown) {
 	// translate to a requestFailMsg call
 	requestFailMsg({ "status": textStatus, "statusText": errorThrown });
 }
+
+function log_error(msg) {
+	alert(msg);
+}
+
+/*
+ ------ Track handling ------
+ */
+function nearbyTracks(searchType) {
+	/* get tracks nearby popLocation.   depending on the value of searchType,
+	add to tracks already shown, replace tracks already shown, or limit the
+	search to those already shown.  This is done by resubmitting the 
+	query with the combined search term */
+	switch (searchType){
+		case undefined:
+			nearbyTracksUrl = (
+				'/routes/api/track?latlon=' + popLocation.lat + ',' + popLocation.lng);
+		    break;
+		case "add":
+			nearbyTracksUrl += (
+				"&orlatlon=" + popLocation.lat + ',' + popLocation.lng);
+			break;
+		case "reduce":
+			nearbyTracksUrl += (
+				"&andlatlon=" + popLocation.lat + ',' + popLocation.lng);
+			break;
+		default:
+			log_error("nearbyTracks: unexpected value for searchType: "
+					  + searchType);
+		};
+	// console.info("nearbyTracks: settings=", settings, ", nearbyTracksUrl=", nearbyTracksUrl);
+	$.get(nearbyTracksUrl, null, showTracks, 'json').fail(
+		function(_, status, jqXHR){
+			log_error("nearbyTracks request status=" + status +
+				', response=' + jqXHR);
+			console.error('jqXHR=', jqXHR);
+		});
+	map.closePopup();
+	// add search area to map
+	tracksLayer.clearLayers();
+	// console.info("nearbyTracks: preference=", preference);
+	L.circle(popLocation, {
+			radius: preference.track_nearby_search_distance_metres,
+			color: "blue",
+			weight: 1,
+			opacity: 0.5,
+			fill: false}).addTo(tracksLayer);
+}
+
+function showTracks(track_list) {
+	// add tracks to the map
+	if (track_list.length < 1) {
+		alert("No matching tracks found");
+		return
+	}
+	// console.info('showTracks(): track_list=', track_list)
+	tracksLayer = L.geoJSON(track_list, {
+		style: trackStyle,
+		onEachFeature: onTrackShow
+	});
+	// tracksHidden = [];
+	// showSidebarSection(true, 'track');
+	tracksLayer = replaceMapOverlay(tracksLayer, tracksLayer, "Tracks");
+	tracksBounds = tracksLayer.getBounds();
+	setMapBounds();
+}
+
+function onTrackShow(feature, layer) {
+	/*if (feature.geometry && feature.geometry.type
+			&& feature.geometry.type == "MultiLineString") {
+		addTrackStartStopMarkers(feature, layer);
+	} */
+	
+	layer.on({
+		click: onTrackClick,
+		mouseover: onTrackMouseOver,
+		mouseout: onTrackMouseLeave,
+		});
+	// addToTrackSidebar(feature, layer);
+}
+
+function onTrackMouseOver(ev) {
+	layerChangeState(ev.target, 'track', true, null);
+	const trackID = ev.target.feature.properties.id;
+	$("#track-sidebar-item-"+trackID).addClass("highlight");
+}
+
+function onTrackMouseLeave(ev) {
+	const trackID = ev.target.feature.properties.id;
+	$("#track-sidebar-item-" + trackID).removeClass("highlight");
+	layerChangeState(ev.target, 'track', false, null);
+}
+
+function onTrackClick(event) {
+	const layer = event.target;
+	const latLng = event.latlng;
+	popMarker = layer;
+	const trackID = layer.feature.properties.id;
+	requestUrl = '/tags/track/' + trackID; 
+	$.get(requestUrl, null, addTrackTags, 'json')
+		.fail(requestFailMsg);
+	const popupContent = getTrackPopupContent(
+		trackID, layer.feature.properties.name, trackPopupSpinner);
+	popup = layer.getPopup();
+	if (!popup) {
+		popup = L.popup();
+		layer.bindPopup(popup);
+	}
+	popup.setContent(popupContent);
+	layer.openPopup();
+	popup.setLatLng(latLng);	// do this AFTER opening popup
+	L.DomEvent.stopPropagation(event);
+	// return false;  // stop propagation - doesn't work
+}
+
+
 /*
 // ------ place handling ------
 */
@@ -260,18 +437,8 @@ function placeInsertOK(data) {
 }
 
 
-function loadPlaceIcons() {
-	$.get('/routes/api/place/types/icons', null, buildPlaceIconDict, 'json');
-	// nb. placeIcons is not initialised until response received
-}
-
-function buildPlaceIconDict(data) {
-	refreshPlaceIconDict(data);
-	// console.info("buildPlaceIconDict:", data, placeIcons);
-	makePlaceLayer(JSON.parse(document.getElementById("markers").textContent),);
-}
-
 function refreshPlaceIconDict(data) {
+	const placeIconSize = [16, 16];  // should match css .place-icon
 	placeIcons = {};
 	for (const [key, value] of Object.entries(data)) {
 		placeIcons[key] = L.icon({
@@ -438,7 +605,7 @@ function onPlaceTypeSubmit(event) {
 	let formData = new FormData(event.target);
 	var pk = formData.get("pk")
 	requestUrl = "/routes/place/type/" + (pk ? pk : "");
-	postMapDialogData(formData, 'json', afterPlaceTypesUpdate);
+	postMapDialogData(formData, "text", afterPlaceTypesUpdate);
 }
 
 function onPlaceTypeDoDelete(event) {
@@ -447,11 +614,20 @@ function onPlaceTypeDoDelete(event) {
 		var pk = formData.get("pk")
 		if (!pk) {throw "pk is null";}
 		requestUrl = "/routes/place/type/" + (pk ? pk : "") + "/delete";
-		postMapDialogData(formData, 'json', afterPlaceTypesUpdate);
+		postMapDialogData(formData, 'text', afterPlaceTypesUpdate);
 }
 
 function afterPlaceTypesUpdate(data) {
-	// update placeTypes
+	// update placeTypes if JSON sent, else show html response in the dialog
+	console.info("afterPlaceTypesUpdate:", data);
+	try {
+		data = JSON.parse(data);  // is it json?
+		}
+	catch(exc) {
+		// Should be a SyntaxError.  treat it as html
+		showMapDialog(data);
+		return;
+	}
 	refreshPlaceIconDict(data);
 	// refresh the icons & place type names in place layer
 	placesLayer.eachLayer(function(feature) {
@@ -464,6 +640,42 @@ function afterPlaceTypesUpdate(data) {
 		feature.setIcon(placeIcons[placeTypePK]);
 	});
 	getMapDialogData("/routes/place/types")
+}
+
+function onPreference() {
+	getMapDialogData("/routes/preference");
+	
+}
+
+function onPreferenceSubmit(event) {
+	event.preventDefault();
+	let formData = new FormData(event.target);
+	requestUrl = "/routes/preference";
+	postMapDialogData(formData, 'text', afterPreferenceSubmit);
+}
+
+function afterPreferenceSubmit(data) {
+	// handle either json or html
+	try {
+		data = JSON.parse(data);
+	}
+	catch(exc) {
+		// it was html (SyntaxError)
+		showMapDialog(data);
+		return;
+	}
+	// it was json - update settings and close the preference dialog
+	updatePreference(data);
+	document.getElementById("map-dialog").close();
+}
+
+function updatePreference(data) {
+	if (data[0].model != "routes.preference") {
+		console.error("Invalid preference data:", data);
+		throw "invalid preference data";
+	}
+	// init preference (a list of 1 item is sent)
+	preference = data[0].fields;
 }
 
 function postMapDialogData(formData, dataType, successRoutine) {
@@ -584,7 +796,7 @@ function layerUpdateHilight(layer, itemType, style) {
 			layer.setStyle(style);
 			layer.bringToFront();
 		} else {
-			tracksGeoLayer.resetStyle(layer);
+			tracksLayer.resetStyle(layer);
 		}
 	} else if (itemType == 'place') {
 		if (layer.feature.properties.prevHilight) {

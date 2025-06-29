@@ -2,7 +2,7 @@
 """ views for routes app """
 import json
 import logging
-from typing import TYPE_CHECKING, Optional, List, Dict
+from typing import TYPE_CHECKING, Optional, List, Dict, Tuple
 
 from gpxpy.parser import GPXParser
 from gpxpy.gpx import GPX
@@ -13,7 +13,8 @@ from django.core.serializers import serialize
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
-from django.http import HttpResponseRedirect, HttpResponse, JsonResponse
+from django.http import (
+    HttpResponseRedirect, HttpResponse, JsonResponse, HttpResponseForbidden)
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_http_methods
@@ -22,8 +23,10 @@ from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView)
 
 from .models import (
-    Place, Track, PlaceType, get_default_place_type, Preferences, DistanceUnits)
-from .forms import UploadGpxForm2, PlaceForm, PreferencesForm
+    Place, Track, PlaceType, get_default_place_type, Preference)
+from .forms import (
+    UploadGpxForm2, PlaceForm, PreferenceForm, TrackSearchForm, PlaceSearchForm,
+    TestCSRFForm)
 
 
 if TYPE_CHECKING:
@@ -62,6 +65,63 @@ def map(request):
     return render(request, 'map.html', context=context)
 
 
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["POST", "GET"])
+@gzip_page
+def search(request, search_type: Optional[str]):
+    log.info("search(search_type=%s), method=%s", search_type, request.method)
+
+    if request.method == "GET":
+        track_form = TrackSearchForm()
+        place_form = PlaceSearchForm()
+        return render(request, "search2.html", context={
+            "track_form": track_form, "place_form": place_form})
+
+    search_type = request.GET.get("search_type")
+    if search_type == "track":
+        form = TrackSearchForm(request.POST)
+        if not form.is_valid():
+            place_form = PlaceSearchForm()
+            return render(request, "search2.html", context={
+                "track_form": form, "place_form": place_form})
+
+        tracks = Track.objects.filter(user=request.user)
+        start_date = form.cleaned_data.get("start_date")
+        if start_date is not None:
+            tracks = tracks.filter(start_time__gte=start_date)
+        end_date = form.cleaned_data["end_date"]
+        if end_date is not None:
+            tracks = tracks.filter(start_time__lte=end_date)
+        tracks=tracks[:request.user.routes_preference.track_search_result_limit]
+        tracks_json = json.loads(serialize("geojson",tracks))
+        return JsonResponse({"status": "success", "tracks": tracks_json},
+                            status=200)
+    if search_type != 'place':
+        log.error("search_type not recognised: POST=%s", request.POST)
+        return HttpResponse("Search_type not defined", status=400)
+
+    # search_type == 'place'
+    form = PlaceSearchForm(request.POST)
+    if not form.is_valid():
+        track_form = TrackSearchForm()
+        return render(request, "search2.html", context={
+            "track_form": track_form, "place_form": form})
+
+    log.info("place_search: form.cleaned_data=%s", form.cleaned_data)
+    return HttpResponse("Not implemented", status=501)
+
+
+def test_csrf(request):
+    if request.method == 'GET':
+        form = TestCSRFForm()
+        return render(request, 'test_csrf.html', context={'form': form})
+
+    log.info("test_csrf: POST=%s", request.POST)
+    form = TestCSRFForm(request.POST)
+    log.info("form received successfully.  is_valid=%s", form.is_valid())
+    return HttpResponse("OK", status=200)
+
+
 class TracksView(BikeLoginRequiredMixin, TemplateView):
     """ show a track or tracks, requested by track id or a comma-separated list
     of track ids """
@@ -84,6 +144,36 @@ class TracksView(BikeLoginRequiredMixin, TemplateView):
         tracks = Track.objects.filter(id__in=trackids, user=request.user)
         ctx["tracks"] = json.loads(serialize("geojson", tracks))
         return ctx
+
+
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET"])
+@gzip_page
+def track_json(request):
+    """ return a selection of tracks based on search parameters including
+    &latlon=  &andlatlon=,  &orlatlon=, (name, date - not yet defined) """
+    # query = Track.objects
+    log.info("track_json: GET=%s", request.GET)
+    params = request.GET
+    defaults = {'latlon': None,  # float, float,
+                'andlatlon': None,  # float, float
+                }
+    limits = {key: params.get(key, default_value)
+              for key, default_value in defaults.items()}
+    prefs = Preference.objects.get_or_create(user=request.user)[0]
+    nearby_tracks: dict = Track.nearby(limits, prefs)
+    log.info("track_json returned %d tracks", len(nearby_tracks))
+    msg = json.loads(serialize("geojson", nearby_tracks))
+    return JsonResponse(msg, status=200)
+
+
+def parse_latlon(value: str) -> Tuple[float, float]:
+    """ parse a string containing two floats """
+    values = value.split(',')
+    if len(values) > 2:
+        raise ValueError(f"Too many values for latlon: {value!r}")
+    float_values = tuple(float(v) for v in values)
+    return float_values
 
 
 def _show_tracks(request, tracks: List[Track]):
@@ -308,30 +398,40 @@ class PlaceTypeDeleteView(BikeLoginRequiredMixin, DeleteView):
 
 
 @login_required(login_url=LOGIN_URL)
-def preferences(request):
+def preference(request):
     """ Preferences is a 1:1 object for each user.  Create it or get it """
-    preferences = Preferences.objects.get_or_create(user=request.user)[0]
+    preference = Preference.objects.get_or_create(user=request.user)[0]
     if request.method == "GET":
-        form = PreferencesForm(instance=preferences)
+        form = PreferenceForm(instance=preference)
     else:
-        form = PreferencesForm(request.POST, instance=preferences)
+        form = PreferenceForm(request.POST, instance=preference)
         if form.is_valid():
             form.save()
-            return HttpResponseRedirect(reverse_lazy("routes:api_preferences"))
+            return HttpResponseRedirect(reverse_lazy("routes:api_preference"))
 
-    return render(request, 'preferences_form.html', context={"form": form})
+    return render(request, 'preference_form.html', context={"form": form})
 
 
 @login_required(login_url=LOGIN_URL)
-def preferences_as_json(request):
-    """ this returns a list of a single preferences object """
-    preferences = Preferences.objects.get_or_create(user=request.user)[0]
-    # have to get it again as a queryset in order to serialise it
-    data = serialize("json", [preferences])
-    distance_units_choices = {k:v for k,v in DistanceUnits.choices}
-    # bolt the distanceUnits.choices onto the end of the list
-    data_as_json = json.loads(data)
-    data_as_json.append({"DistanceUnits.choices": distance_units_choices})
-    data=json.dumps(data_as_json)
-    log.info("preferences_as_json: data=%s", data)
+def preference_as_json(request):
+    """ this returns a list of a single preferences object,
+    with search distances converted to metres """
+    preference = Preference.objects.get_or_create(user=request.user)[0]
+    # it has to be a list or queryset in order to serialise it
+    # add search distances in metres
+    data = serialize("json", [preference])
+    json_data = json.loads(data)
+    fields = json_data[0]["fields"]
+    fields["track_nearby_search_distance_metres"] = (
+        preference.track_nearby_search_distance_metres)
+    fields["place_nearby_search_distance_metres"] = (
+        preference.place_nearby_search_distance_metres)
+    data = json.dumps(json_data)
+    # log.info("preference_as_json: data=%s", data)
     return JsonResponse(data, safe=False, status=200)
+
+
+def csrf_failure(request, reason=""):
+    log.error("CSRF failure for request %s, \nheaders=%s, \nreason=%s",
+              request, request.headers, reason)
+    return HttpResponseForbidden('CSRF failure')

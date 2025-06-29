@@ -4,7 +4,7 @@ import logging
 from django import forms
 from django.template.defaultfilters import filesizeformat
 #from .models import RawGpx
-from .models import Place, PlaceType, Preferences
+from .models import Place, PlaceType, Preference, Track
 
 
 log = logging.getLogger(__name__)
@@ -50,11 +50,11 @@ class CustomSelectWidget(forms.widgets.Select):
     option_template_class = "routes/place_type_icon_option.html"
 
 
-class PreferencesForm(forms.ModelForm):
+class PreferenceForm(forms.ModelForm):
     error_css_class = "error"
     required_css_class = "required"
     class Meta:
-        model = Preferences
+        model = Preference
         exclude = ["pk", "user"]
 
 
@@ -67,3 +67,34 @@ class PlaceTypeForm(forms.ModelForm):
         model = PlaceType
         fields = ["name", "icon"]
         widgets = {"icon": CustomSelectWidget}
+
+
+track_years = [
+    dt.year for dt in Track.objects.dates('start_time', 'year', order='DESC')]
+
+
+class TrackSearchForm(forms.Form):
+    start_date = forms.DateField(
+        required=False, widget=forms.SelectDateWidget(years=track_years))
+    end_date = forms.DateField(
+        required=False, widget=forms.SelectDateWidget(years=track_years))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        try:
+            if not (cleaned_data["start_date"] or cleaned_data["end_date"]):
+                raise forms.ValidationError(
+                    "At least one of start_date or end_date must be specified.")
+        except KeyError:
+            return
+
+
+class TestCSRFForm(forms.Form):
+    yesno = forms.BooleanField(required=False)
+
+
+class PlaceSearchForm(forms.Form):
+    name = forms.CharField(max_length=40, required=False)
+    type = forms.ModelMultipleChoiceField(
+        queryset=PlaceType.objects,
+        widget=forms.CheckboxSelectMultiple)
