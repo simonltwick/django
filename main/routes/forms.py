@@ -68,6 +68,15 @@ class PlaceTypeForm(forms.ModelForm):
         fields = ["name", "icon"]
         widgets = {"icon": CustomSelectWidget}
 
+    def clean(self):
+        """ check at least one search criteria is specified """
+        cleaned_data = super().clean()
+        for value in cleaned_data.values():
+            if value:
+                return cleaned_data
+        raise forms.ValidationError(
+            "At least one search criteria must be specified.")
+
 
 track_years = [
     dt.year for dt in Track.objects.dates('start_time', 'year', order='DESC')]
@@ -85,8 +94,7 @@ class TrackSearchForm(forms.Form):
             if not (cleaned_data["start_date"] or cleaned_data["end_date"]):
                 raise forms.ValidationError(
                     "At least one of start_date or end_date must be specified.")
-        except KeyError:
-            return
+        return cleaned_data
 
 
 class TestCSRFForm(forms.Form):

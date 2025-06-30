@@ -74,22 +74,22 @@ def search(request, search_type: Optional[str]):
     if request.method == "GET":
         track_form = TrackSearchForm()
         place_form = PlaceSearchForm()
-        return render(request, "search2.html", context={
+        return render(request, "search.html", context={
             "track_form": track_form, "place_form": place_form})
 
     search_type = request.GET.get("search_type")
+    track_form = TrackSearchForm(request.POST)
+    place_form = PlaceSearchForm(request.POST)
     if search_type == "track":
-        form = TrackSearchForm(request.POST)
-        if not form.is_valid():
-            place_form = PlaceSearchForm()
-            return render(request, "search2.html", context={
-                "track_form": form, "place_form": place_form})
+        if not track_form.is_valid():
+            return render(request, "search.html", context={
+                "track_form": track_form, "place_form": place_form})
 
         tracks = Track.objects.filter(user=request.user)
-        start_date = form.cleaned_data.get("start_date")
+        start_date = track_form.cleaned_data.get("start_date")
         if start_date is not None:
             tracks = tracks.filter(start_time__gte=start_date)
-        end_date = form.cleaned_data["end_date"]
+        end_date = track_form.cleaned_data["end_date"]
         if end_date is not None:
             tracks = tracks.filter(start_time__lte=end_date)
         tracks=tracks[:request.user.routes_preference.track_search_result_limit]
@@ -101,13 +101,11 @@ def search(request, search_type: Optional[str]):
         return HttpResponse("Search_type not defined", status=400)
 
     # search_type == 'place'
-    form = PlaceSearchForm(request.POST)
-    if not form.is_valid():
-        track_form = TrackSearchForm()
-        return render(request, "search2.html", context={
-            "track_form": track_form, "place_form": form})
+    if not place_form.is_valid():
+        return render(request, "search.html", context={
+            "track_form": track_form, "place_form": place_form})
 
-    log.info("place_search: form.cleaned_data=%s", form.cleaned_data)
+    log.info("place_search: form.cleaned_data=%s", place_form.cleaned_data)
     return HttpResponse("Not implemented", status=501)
 
 

@@ -1,4 +1,4 @@
-<!-- form fragment for search -->
+<!-- form fragment for search2 -->
 <a class="nav-link x-icon" href="#" onClick="onCloseMapDialog()"
 	data-bs-toggle="tooltip" title="Close dialog">
 	&times;
@@ -21,23 +21,19 @@
 </ul>
 </nav>
 
+    <form id="searchForm" onsubmit="onSearchFormSubmit(event)">
+      {% csrf_token %}
 <div class="tab-content" id="searchTabContent">
   <div class="tab-pane fade show active" id="tracks-search" role="tabpanel"
   	aria-labelledby="tracks-tab">
-    <form id="searchTrackForm" onsubmit="onSearchFormSubmit(event, 'track')">
-      {% csrf_token %}
 	  <table>{{ track_form.as_table }}</table>
-	  <button type="submit" class="btn btn-outline-primary">Search</button>
-	</form>
   </div>
   <div class="tab-pane fade" id="places-search" role="tabpanel"
     aria-labelledby="places-search-tab">
     
-	<form id="searchPlaceForm" onsubmit="onSearchFormSubmit(event, 'place')">
-	   {% csrf_token %}
       <table>{{ place_form.as_table }}</table>
-	  <button type="submit" class="btn btn-outline-primary">Search</button>
-	</form>
   </div>
 </div>
+	  <button type="submit" class="btn btn-outline-primary">Search</button>
+	</form>
 
