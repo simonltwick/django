@@ -96,7 +96,7 @@ let placeIcons;
 $.get("/routes/api/preference", "json", function(data){
 	json_data = JSON.parse(data);
 	updatePreference(json_data);
-	buildPlaceIcons();  // this calls makePlaceLayer when icons built
+	buildPlaceIcons();  // this calls showPlaces when icons built
 });
 
 function buildPlaceIcons() {
@@ -107,18 +107,19 @@ function buildPlaceIcons() {
 function buildPlaceIconDict(data) {
 	refreshPlaceIconDict(data);
 	// console.info("buildPlaceIconDict:", data, placeIcons);
-	makePlaceLayer(JSON.parse(document.getElementById("markers").textContent),);
+	showPlaces(JSON.parse(document.getElementById("markers").textContent),);
 }
 
 /* ----- end of initialisation ------ */
 
-function makePlaceLayer(data) {
-	let newPlacesLayer = L.geoJSON(data, {
+function showPlaces(data) {
+	if (placesLayer) {placesLayer.clearLayers();}
+	placesLayer = L.geoJSON(data, {
 		pointToLayer: getPlaceMarker,
 		onEachFeature: onPlaceShow
 	});
 	// showSidebarSection(true, 'place');
-	placesLayer = replaceMapOverlay(placesLayer, newPlacesLayer, "Places");
+	placesLayer = replaceMapOverlay(placesLayer, placesLayer, "Places");
 	placesBounds = placesLayer.getBounds();
 	setMapBounds();
 }
@@ -166,7 +167,7 @@ const nearbyButtons2Html = `<p>
 function onMapClick(event) {
 	popLocation = event.latlng;
 	var buttonsHtml = map.hasLayer(tracks) ? nearbyButtons2Html : nearbyButtons1Html;
-	L.popup()
+	popup = L.popup()
 		.setLatLng(popLocation)
 		.setContent(
 			'<p>You clicked at ' + popLocation.toString() + `</p>
@@ -199,6 +200,7 @@ function replaceMapOverlay(oldOverlay, newOverlay, overlayName) {
 function onRoutesSearch() {
 	// search tracks or places from a form.
 	getMapDialogData("/routes/api/search/");
+	popup.close();
 }
 
 function onSearchFormSubmit(event) {
@@ -213,18 +215,17 @@ function onSearchFormSubmit(event) {
 
 function searchResults(data) {
 	// handle search results, which could be html if form errors, or json
-	try{
-	console.info("searchResults status:", data.status);
-	} catch (err) { // ParseError: html was returned
-		console.info("searchresults caught", err, "handling", data)
+	if (!data.status) { // ParseError: html was returned
 		showMapDialog(data);
 		return;
 	}
 	// json data was returned, so display it
 	onCloseMapDialog();
-	if ("tracks" in data)  {
+	if (data.hasOwnProperty("tracks"))  {
+		console.info("searchResults: showing", data.tracks.features.length, "tracks");
 		showTracks(data["tracks"]);
-	} else if ("places" in data) {
+	} else if (data.hasOwnProperty("places")) {
+		console.info("searchResults: showing", data.places.features.length, "places");
 		showPlaces(data["places"]);
 	} else {
 		console.info("Unrecognised search results:", data);
@@ -304,6 +305,7 @@ function showTracks(track_list) {
 		alert("No matching tracks found");
 		return
 	}
+	if (tracksLayer) {tracksLayer.clearLayers();}
 	// console.info('showTracks(): track_list=', track_list)
 	tracksLayer = L.geoJSON(track_list, {
 		style: trackStyle,

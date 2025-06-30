@@ -71,6 +71,7 @@ class PlaceTypeForm(forms.ModelForm):
     def clean(self):
         """ check at least one search criteria is specified """
         cleaned_data = super().clean()
+        print("PlaceTypeForm.cleaned_data=", cleaned_data)
         for value in cleaned_data.values():
             if value:
                 return cleaned_data
@@ -90,19 +91,26 @@ class TrackSearchForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        try:
-            if not (cleaned_data["start_date"] or cleaned_data["end_date"]):
-                raise forms.ValidationError(
-                    "At least one of start_date or end_date must be specified.")
+        if not (cleaned_data["start_date"] or cleaned_data["end_date"]):
+            raise forms.ValidationError(
+                "At least one of start_date or end_date must be specified.")
         return cleaned_data
 
 
-class TestCSRFForm(forms.Form):
-    yesno = forms.BooleanField(required=False)
+# class TestCSRFForm(forms.Form):
+#     yesno = forms.BooleanField(required=False)
 
 
 class PlaceSearchForm(forms.Form):
     name = forms.CharField(max_length=40, required=False)
     type = forms.ModelMultipleChoiceField(
         queryset=PlaceType.objects,
-        widget=forms.CheckboxSelectMultiple)
+        widget=forms.CheckboxSelectMultiple,
+        required=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not (cleaned_data["name"] or cleaned_data["type"]):
+            raise forms.ValidationError(
+                "At least one of name or type(s) must be specified.")
+        return cleaned_data

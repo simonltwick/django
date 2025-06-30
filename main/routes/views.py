@@ -26,7 +26,8 @@ from .models import (
     Place, Track, PlaceType, get_default_place_type, Preference)
 from .forms import (
     UploadGpxForm2, PlaceForm, PreferenceForm, TrackSearchForm, PlaceSearchForm,
-    TestCSRFForm)
+    # TestCSRFForm
+    )
 
 
 if TYPE_CHECKING:
@@ -68,8 +69,7 @@ def map(request):
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["POST", "GET"])
 @gzip_page
-def search(request, search_type: Optional[str]):
-    log.info("search(search_type=%s), method=%s", search_type, request.method)
+def search(request):
 
     if request.method == "GET":
         track_form = TrackSearchForm()
@@ -78,10 +78,12 @@ def search(request, search_type: Optional[str]):
             "track_form": track_form, "place_form": place_form})
 
     search_type = request.GET.get("search_type")
+    log.info("POST search/?search_type=%s", search_type)
     track_form = TrackSearchForm(request.POST)
     place_form = PlaceSearchForm(request.POST)
     if search_type == "track":
         if not track_form.is_valid():
+            log.error("search ? track: form errors=%s", track_form.errors)
             return render(request, "search.html", context={
                 "track_form": track_form, "place_form": place_form})
 
@@ -93,7 +95,9 @@ def search(request, search_type: Optional[str]):
         if end_date is not None:
             tracks = tracks.filter(start_time__lte=end_date)
         tracks=tracks[:request.user.routes_preference.track_search_result_limit]
-        tracks_json = json.loads(serialize("geojson",tracks))
+        tracks_json = json.loads(serialize("geojson", tracks))
+        log.info("search ? track: %d tracks returned",
+                 len(tracks_json["features"]))
         return JsonResponse({"status": "success", "tracks": tracks_json},
                             status=200)
     if search_type != 'place':
@@ -102,22 +106,40 @@ def search(request, search_type: Optional[str]):
 
     # search_type == 'place'
     if not place_form.is_valid():
+        log.error("search ? place: form errors=%s", place_form.errors)
         return render(request, "search.html", context={
             "track_form": track_form, "place_form": place_form})
 
-    log.info("place_search: form.cleaned_data=%s", place_form.cleaned_data)
-    return HttpResponse("Not implemented", status=501)
+    cleaned_data = place_form.cleaned_data
+    # log.info("place_search: form.cleaned_data=%s", cleaned_data)
+    places = Place.objects.filter(user=request.user)
+    if "name" in cleaned_data and cleaned_data["name"]:
+        # __icontains: case insensitive search for *value*
+        # log.info("search?place: filtering for name like*%s*", cleaned_data["name"])
+        places = places.filter(name__icontains=cleaned_data["name"])
+    if "type" in cleaned_data:
+        types = cleaned_data["type"]
+        # value is a queryset of selected types
+        if types.count() > 0:
+            # log.info("search?place: filtering for type in %s", cleaned_data["type"])
+            places = places.filter(type__in=cleaned_data["type"])
+    places = places[
+        :request.user.routes_preference.place_search_result_limit]
+    places_json = json.loads(serialize("geojson", places))
+    log.info("search ? place: %d places returned", len(places_json["features"]))
+    return JsonResponse({"status": "success", "places": places_json},
+                        status=200)
 
 
-def test_csrf(request):
-    if request.method == 'GET':
-        form = TestCSRFForm()
-        return render(request, 'test_csrf.html', context={'form': form})
-
-    log.info("test_csrf: POST=%s", request.POST)
-    form = TestCSRFForm(request.POST)
-    log.info("form received successfully.  is_valid=%s", form.is_valid())
-    return HttpResponse("OK", status=200)
+# def test_csrf(request):
+#     if request.method == 'GET':
+#         form = TestCSRFForm()
+#         return render(request, 'test_csrf.html', context={'form': form})
+#
+#     log.info("test_csrf: POST=%s", request.POST)
+#     form = TestCSRFForm(request.POST)
+#     log.info("form received successfully.  is_valid=%s", form.is_valid())
+#     return HttpResponse("OK", status=200)
 
 
 class TracksView(BikeLoginRequiredMixin, TemplateView):
