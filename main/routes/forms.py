@@ -28,7 +28,9 @@ class UploadGpxForm2(forms.Form):
         allowed_content_types = ['text/xml', 'application/octet-stream',
                                  'application/gpx+xml']
         if content_type not in allowed_content_types:
-            raise forms.ValidationError('Filetype not supported.')
+            pass
+            #raise forms.ValidationError(
+            #    f'Content-Type {content_type!r} not supported.')
 
         if uploaded_file.size > 2621440:
             raise forms.ValidationError(

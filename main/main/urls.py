@@ -23,7 +23,7 @@ urlpatterns = [
     path('admin/', admin.site.urls, name='admin'),
     # path('kitten/', include('kitten.urls', namespace='kitten'), name='kitten'),
     path('bike/', include('bike.urls', namespace='bike'), name='bike'),
-    path("routes/", include("routes.urls")),
+    path("routes/", include("routes.urls", namespace='routes')),
     path('accounts/', include('django.contrib.auth.urls')),
     # static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 ]

@@ -33,4 +33,5 @@ urlpatterns = [
          name="api_place_types"),
     path("preference", views.preference),
     path("api/preference", views.preference_as_json, name="api_preference"),
+    path("logout/", views.do_logout, name="logout"),
 ]

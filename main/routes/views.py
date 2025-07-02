@@ -10,6 +10,7 @@ from gpxpy.gpx import GPX
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
@@ -228,11 +229,15 @@ def upload_file(request, save=True):
                 tracks = Track.new_from_gpx(
                     gpx, form.cleaned_data['gpx_file'].name, user=request.user)
             except FileExistsError as e:
+                log.warning(e.args[0])
                 return HttpResponse(status=400, content=e.args[0])
             # gpx_id = form.cleaned_data["id"]
             for track in tracks:
                 track.save()
                 log.debug("saved track %s, id=%d", track.name, track.pk)
+            log.debug("request.GET=%s", request.GET)
+            if request.GET.get("map") == "False":
+                return HttpResponse("OK", status=200)
             return _show_tracks(request, tracks)
 
         log.info("form was not valid")
@@ -455,3 +460,8 @@ def csrf_failure(request, reason=""):
     log.error("CSRF failure for request %s, \nheaders=%s, \nreason=%s",
               request, request.headers, reason)
     return HttpResponseForbidden('CSRF failure')
+
+
+def do_logout(request):
+    logout(request)
+    return HttpResponse("Logged out", status=200)
