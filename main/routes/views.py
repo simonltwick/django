@@ -14,8 +14,10 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
+from django.contrib.gis.db.models.functions import NumPoints
 from django.http import (
-    HttpResponseRedirect, HttpResponse, JsonResponse, HttpResponseForbidden)
+    HttpResponseRedirect, HttpResponse, JsonResponse, HttpResponseForbidden,
+    Http404)
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_http_methods
@@ -168,24 +170,46 @@ class TracksView(BikeLoginRequiredMixin, TemplateView):
 
 
 @login_required(login_url=LOGIN_URL)
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "HEAD"])
 @gzip_page
 def track_json(request):
     """ return a selection of tracks based on search parameters including
-    &latlon=  &andlatlon=,  &orlatlon=, (name, date - not yet defined) """
+    &latlon=  &andlatlon=,  &orlatlon=, (name, date - not yet defined) 
+    also ?name= to determine whether a track exists or not (returns status 404
+    or 200 with the number of points in the track)"""
     # query = Track.objects
-    log.info("track_json: GET=%s", request.GET)
-    params = request.GET
-    defaults = {'latlon': None,  # float, float,
-                'andlatlon': None,  # float, float
-                }
-    limits = {key: params.get(key, default_value)
-              for key, default_value in defaults.items()}
-    prefs = Preference.objects.get_or_create(user=request.user)[0]
-    nearby_tracks: dict = Track.nearby(limits, prefs)
-    log.info("track_json returned %d tracks", len(nearby_tracks))
-    msg = json.loads(serialize("geojson", nearby_tracks))
-    return JsonResponse(msg, status=200)
+    log.info("track_json(%s): GET=%s", request.method, request.GET)
+    if request.method == "GET":
+        if not set(request.GET) & set(("latlon", "andlatlon"),):
+            return HttpResponse("No search criteria specified", status=400)
+        params = request.GET
+        defaults = {'latlon': None,  # float, float,
+                    'andlatlon': None,  # float, float
+                    }
+        limits = {key: params.get(key, default_value)
+                  for key, default_value in defaults.items()}
+        prefs = Preference.objects.get_or_create(user=request.user)[0]
+        nearby_tracks: dict = Track.nearby(limits, prefs)
+        log.info("track_json returned %d tracks", len(nearby_tracks))
+        msg = json.loads(serialize("geojson", nearby_tracks))
+        return JsonResponse(msg, status=200)
+
+    # "HEAD": just return num_points if the track is there.  Search by ?name=
+    name = request.GET.get("name")
+    if name is None:
+        log.error("HEAD request requires a search param ?name=")
+        return HttpResponse("HEAD request without search params ?name=", 
+                            status=400)
+    try:
+        track = Track.objects.annotate(num_points=NumPoints("track")
+                                       ).get(user=request.user, name=name)
+    except Track.DoesNotExist as e:
+        raise Http404 from e
+    log.info("Track %s found: %s, num_points=%s", name, track, track.num_points)
+    # HEAD request does not return body: set content-length header to num_points
+    response = HttpResponse(status=200)
+    response.headers["Content-Length"] = track.num_points
+    return response
 
 
 def parse_latlon(value: str) -> Tuple[float, float]:

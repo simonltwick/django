@@ -91,6 +91,11 @@ class Track(models.Model):
     ascent = models.FloatField(blank=True, null=True,
                                  help_text="Ascent in metres")
 
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=['user', 'name'], name='unique_name'),
+        ]
+
     @classmethod
     def new_from_gpx(cls, gpx: "GPX", fname: str, user: User) -> List["Track"]:
         """ convert a GPX object to a track (or possibly, several tracks)
@@ -151,12 +156,14 @@ class Track(models.Model):
 
     def __str__(self):
         s = self.name or self.start_time or "unnamed Track"
-        if s.moving_distance:
+        if self.moving_distance:
             preferred_distance_units = self.user.routes_preference.distance_units
             distance = DistanceUnits.convert(
-                s.moving_distance/1000.0,
-                DistanceUnits.KM, preferred_distance_units)
-            s += f" ({distance:d} {preferred_distance_units.display_name()})"
+                self.moving_distance/1000.0,
+                DistanceUnits.KILOMETRES, preferred_distance_units)
+            units_display_name = DistanceUnits.display_name(
+                preferred_distance_units)
+            s += f" ({distance:.0f} {units_display_name})"
         return s
 
     @classmethod
