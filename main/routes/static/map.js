@@ -58,7 +58,7 @@ const map = L.map("map", { layers: [layerOsm] })
 	// allow user to click anywhere & show popup with lat/lon
 	.on('click', onMapClick);
 
-// map.fitWorld();
+map.fitWorld();
 
 
 // map controls - scale, overlays
@@ -88,15 +88,13 @@ const trackStyle = {color: '#ff00ff',
 
 
 let tracksLayer; 
-showTracks(JSON.parse(document.getElementById("tracks").textContent));
-
 let placeIcons;
 
 // get preference & buildPlaceIcons cannot be run in parallel
 $.get("/routes/api/preference", "json", function(data){
 	json_data = JSON.parse(data);
 	updatePreference(json_data);
-	buildPlaceIcons();  // this calls showPlaces when icons built
+	buildPlaceIcons();
 });
 
 function buildPlaceIcons() {
@@ -107,8 +105,12 @@ function buildPlaceIcons() {
 function buildPlaceIconDict(data) {
 	refreshPlaceIconDict(data);
 	// console.info("buildPlaceIconDict:", data, placeIcons);
-	showPlaces(JSON.parse(document.getElementById("markers").textContent),);
 }
+
+
+/* show map dialog, pre-populated with a help/info message */
+let dialog = document.getElementById("map-dialog");
+dialog.showModal();
 
 /* ----- end of initialisation ------ */
 

@@ -28,8 +28,8 @@
   .plus-icon {color: green; font-size: 1em;}
 </style>
 <script defer src="{% static 'map.js' %}"></script>
-{{ markers|json_script:"markers" }}
-{{ tracks|json_script:"tracks" }}
+{{ markersCount|json_script:"markers_count" }}
+{{ tracksCount|json_script:"tracks_count" }}
 {{ ocm_api_key|json_script:"ocm-api-key" }}
 {% endblock %}
 
@@ -39,5 +39,17 @@
 
 <dialog id="map-dialog" closedby="any">
 <!-- dialog for showing larger forms etc. Content provided by js -->
+<a class="nav-link x-icon" href="#" onClick="onCloseMapDialog()"
+	data-bs-toggle="tooltip" title="Close dialog">
+	&times;
+	</a>
+<h4>Map page</h4>
+<p>There are {{ places_count }} places and {{ tracks_count }} tracks defined.
+</p>
+<ul>
+<li>To search for places or tracks, click on the map, or use the menu</li>
+<li>To add a new place, click on the map</li>
+<li>To upload GPX tracks, use the menu</li>
+</ul>
 </dialog>
 {% endblock %}

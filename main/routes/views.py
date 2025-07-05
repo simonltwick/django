@@ -49,22 +49,18 @@ class BikeLoginRequiredMixin(LoginRequiredMixin):
 
 def get_map_context(request) -> Dict:
     # geojson serialiser has to be defined in settings.py
-    ctx = {}
-    ctx["markers"] = json.loads(
-        serialize("geojson", Place.objects.filter(user=request.user).all())
-        )
-    ctx["tracks"] = json.loads(
-        serialize("geojson", Track.objects.filter(user=request.user).all())
-        )
-    ctx["ocm_api_key"] = settings.OCM_API_KEY
+    ctx = {
+        "places_count":  Place.objects.filter(user=request.user).count(),
+        "tracks_count": Track.objects.filter(user=request.user).count(),
+        "ocm_api_key": settings.OCM_API_KEY
+    }
     return ctx
 
 
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET"])
-@gzip_page
 def map(request):
-    """ return a map showing ALL tracks and markers """
+    """ return an empty map with an info/help popup dialog """
     context = get_map_context(request)
     return render(request, 'map.html', context=context)
 

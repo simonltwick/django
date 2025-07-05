@@ -40,6 +40,11 @@ def main():
 def upload_gpx_file(session, args, file: Path) -> bool:
     """ upload a gpx file specified in args, to server urls specified in args
         Session is a logged-in session to the server """
+        # TODO: can the uploaded file be GZIPped?
+        # see https://stackoverflow.com/questions/20425901/can-i-post-data-with-python-requests-lib-with-http-gzip-or-deflate-compression
+        # (to compress the request)
+        # and https://groups.google.com/g/django-users/c/b3JwuNzLRs4
+        # (to decompress at the host end)
     response = session.get(args.upload_url, headers=headers)
     if response.status_code != 200:
         log.error("GET upload_url failed, status=%d, text=%s",
