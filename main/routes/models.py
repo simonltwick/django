@@ -1,6 +1,6 @@
 """ models for routes app """
-from dataclasses import dataclass, field
-from enum import IntEnum
+import csv
+from io import StringIO
 import logging
 import os.path
 from typing import List, Dict, TYPE_CHECKING
@@ -14,6 +14,7 @@ from bike.models import DistanceUnits
 
 if TYPE_CHECKING:
     from gpxpy.gpx import GPX, GPXTrack
+    from django.core.files.uploadedfile import UploadedFile
 
 
 log = logging.getLogger(__name__)
@@ -49,8 +50,11 @@ class PlaceType(models.Model):
         return self.name
 
 
-def get_default_place_type():
-    return PlaceType.objects.get_or_create(name='Place')[0].id
+def get_default_place_type() -> PlaceType:
+    return PlaceType.objects.get_or_create(name='Place')[0]
+
+def get_default_place_type_pk() -> int:
+    return get_default_place_type().pk
 
 class Place(models.Model):
     """ a named point on the map """
@@ -58,13 +62,69 @@ class Place(models.Model):
     name = models.CharField(max_length=40)
     location = models.PointField()
     type = models.ForeignKey(PlaceType, on_delete=models.PROTECT,
-                             default=get_default_place_type)
+                             default=get_default_place_type_pk)
 
     def __str__(self):
         return str(self.name)
 
     def __repr__(self):
         return f"Place(name={self.name},location={self.location})"
+
+
+    @classmethod
+    def build_places_from_csv(cls, file: "UploadedFile", user: User,
+                              place_types: Dict[int, str],
+                              default_place_type: PlaceType
+                              ) -> List["Place"]:
+        placetype_name_to_pk = {name.lower(): pk
+                                for pk, name in place_types.items()}
+        default_type_pk = default_place_type.pk
+        encoding = file.charset or 'utf-8'
+        csv_contents = file.read().decode(encoding=encoding)
+        log.debug("csv_contents=%r", csv_contents)
+        csv_reader = csv.DictReader(
+            csv_contents.splitlines(),
+            fieldnames=["name", "latitude", "longitude", "type"])
+        header = next(csv_reader)  # ignore header row
+        log.debug("header row has values:", header)
+        places: List["Place"] = []
+        for row_num, row in enumerate(csv_reader):
+            log.debug("processing row %s ", row)
+            try:
+                col = "latitude"
+                lat = float(row[col])
+                col = "longitude"
+                lon = float(row[col])
+            except ValueError as e:
+                raise ValueError(
+                    f"Invalid value {row[col]!r} in row {row_num+1} for {col}"
+                    ) from e
+            type_pk = placetype_name_to_pk.get(
+                row["type"].lower(), default_type_pk)
+            place = cls(user=user, name=row["name"],
+                        location=Point(lon, lat), type_id=type_pk)
+            places.append(place)
+        return places
+
+    @classmethod
+    def nearby(cls, limits: Dict, prefs: "Preference"):
+        """ return a queryset of places according to limits such as
+        latlon: latlon (less than preferences.place_search_distance from latlon)
+        """
+        query = Place.objects.filter(user=prefs.user)
+        for key, value in limits.items():
+            # log.debug("Place.nearby: key=%s, value=%s", key, value)
+            if value is None:
+                continue # value can be stored as a list, terminated by None
+            if key in {"latlon", "andlatlon"}:
+                lat, lon = parse_floats(value, 2, f'{key} must be y,x')
+                query = query.filter(location__distance_lte=(Point(lon, lat), D(
+                    m=prefs.place_nearby_search_distance_metres)))
+            else:
+                raise QueryStringError(f"unrecognised query keyword {key!r}")
+        # limit the number of results returned
+        query = query[:prefs.place_search_result_limit]
+        return query
 
 
 class RawGpx(models.Model):

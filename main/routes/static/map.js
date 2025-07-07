@@ -2,9 +2,6 @@ let popup;  		//displayed popup
 let popMarker;		//marker of last popup
 let popLocation;	//location of last popup
 
-let placesLayer;	// map layer for places
-let oldplacesLayer; // saved placesLayer (to be replaced)
-
 let dragStartLatLng;  // start of drag action for place
 
 let nearbyTracksUrl;  // url for searching tracks
@@ -84,11 +81,13 @@ const trackStyle = {color: '#ff00ff',
     opacity: 0.5
 };
 
-// add tracks & markers sent with map
+// add layers for tracks & places
 
-
-let tracksLayer; 
+let placesLayer = L.geoJSON().addTo(map);   // map layer for places
+let oldplacesLayer; // saved placesLayer (to be replaced)
+let tracksLayer = L.geoJSON().addTo(map); 
 let placeIcons;
+
 
 // get preference & buildPlaceIcons cannot be run in parallel
 $.get("/routes/api/preference", "json", function(data){
@@ -373,6 +372,46 @@ function onTrackClick(event) {
 /*
 // ------ place handling ------
 */
+function nearbyPlaces(searchType) {
+	/* get places nearby popLocation.   depending on the value of searchType,
+	add to places already shown, replace places already shown, or limit the
+	search to those already shown.  This is done by resubmitting the 
+	query with the combined search term */
+	switch (searchType){
+		case undefined:
+			nearbyPlacesUrl = (
+				'/routes/api/place?latlon=' + popLocation.lat + ',' + popLocation.lng);
+		    break;
+		case "add":
+			nearbyPlacesUrl += (
+				"&orlatlon=" + popLocation.lat + ',' + popLocation.lng);
+			break;
+		case "reduce":
+			nearbyPlacesUrl += (
+				"&andlatlon=" + popLocation.lat + ',' + popLocation.lng);
+			break;
+		default:
+			log_error("nearbyPlaces: unexpected value for searchType: "
+					  + searchType);
+		};
+	// console.info("nearbyPlaces: settings=", settings, ", nearbyPlacesUrl=", nearbyPlacesUrl);
+	$.get(nearbyPlacesUrl, null, showPlaces, 'json').fail(
+		function(_, status, jqXHR){
+			log_error("nearbyPlaces request status=" + status +
+				', response=' + jqXHR);
+			console.error('jqXHR=', jqXHR);
+		});
+	map.closePopup();
+	// add search area to map
+	if (placesLayer) {placesLayer.clearLayers();}
+	// console.info("nearbyPlaces: preference=", preference);
+	L.circle(popLocation, {
+			radius: preference.place_nearby_search_distance_metres,
+			color: "blue",
+			weight: 1,
+			opacity: 0.5,
+			fill: false}).addTo(placesLayer);
+}
 // handle 'new place' 
 
 function createPlace() {

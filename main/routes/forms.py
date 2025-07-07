@@ -15,6 +15,7 @@ class UploadGpxForm2(forms.Form):
     """ a form to upload a gpx file.  Not a model form. """
     error_css_class = "error"
     required_css_class = "required"
+    # TODO: use a custom widget to allow <input ... accept=".gpx">
     gpx_file = forms.FileField()
 
     def clean_gpx_file(self):
@@ -46,6 +47,32 @@ class PlaceForm(forms.ModelForm):
     class Meta:
         model = Place
         fields=["name", "type"]
+
+
+class PlaceUploadForm(forms.Form):
+    error_css_class = "error"
+    required_css_class = "required"
+    # TODO: use a custom widget to allow <input ... accept=".csv">
+    csv_file = forms.FileField()
+
+    def clean_csv_file(self):
+        """ ensure valid content type and size.  ref:
+        http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
+        """
+        uploaded_file = self.cleaned_data['csv_file']
+        content_type = uploaded_file.content_type
+        log.info("uploaded file content_type=%s", content_type)
+
+        if content_type != 'text/csv':
+            raise forms.ValidationError(
+                f'Content-Type {content_type!r} not supported.')
+
+        if uploaded_file.size > 2621440:
+            raise forms.ValidationError(
+                'Please keep filesize under 2.5 MB. Current filesize %s'
+                f'{filesizeformat(uploaded_file.size)}')
+
+        return uploaded_file
 
 
 class CustomSelectWidget(forms.widgets.Select):

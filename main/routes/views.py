@@ -29,7 +29,7 @@ from .models import (
     Place, Track, PlaceType, get_default_place_type, Preference)
 from .forms import (
     UploadGpxForm2, PlaceForm, PreferenceForm, TrackSearchForm, PlaceSearchForm,
-    # TestCSRFForm
+    PlaceUploadForm, # TestCSRFForm
     )
 
 
@@ -176,15 +176,7 @@ def track_json(request):
     # query = Track.objects
     log.info("track_json(%s): GET=%s", request.method, request.GET)
     if request.method == "GET":
-        if not set(request.GET) & set(("latlon", "andlatlon"),):
-            return HttpResponse("No search criteria specified", status=400)
-        params = request.GET
-        defaults = {'latlon': None,  # float, float,
-                    'andlatlon': None,  # float, float
-                    }
-        limits = {key: params.get(key, default_value)
-                  for key, default_value in defaults.items()}
-        prefs = Preference.objects.get_or_create(user=request.user)[0]
+        limits, prefs = nearby_search_params(request)
         nearby_tracks: dict = Track.nearby(limits, prefs)
         log.info("track_json returned %d tracks", len(nearby_tracks))
         msg = json.loads(serialize("geojson", nearby_tracks))
@@ -220,13 +212,15 @@ def parse_latlon(value: str) -> Tuple[float, float]:
 def _show_tracks(request, tracks: List[Track]):
     """ INTERNAL METHOD: no url.  show the given tracks on a map.
     Used by upload_file. """
+    # FIXME: this no longer works to show initial tracks
+    raise NotImplementedError("No longer working.")
     ctx = {}
     ctx["tracks"] = json.loads(serialize("geojson", tracks))
     return render(request, "map.html", context=ctx)
 
 
 @login_required(login_url=LOGIN_URL)
-def upload_file(request, save=True):
+def upload_gpx(request, save=True):
     """ upload a gpx file and convert to a Track (or Tracks).
     If save=True, save the Track(s) in the DB, otherwise just view without
     saving
@@ -337,6 +331,77 @@ def place(request, pk=None):
     return render(request, 'place.html', context={"form": form, 'pk': pk})
 
 
+def nearby_search_params(request) -> Tuple[Dict, Preference]:
+    """ extract and format parameters for a "nearby" search request """
+    if not set(request.GET) & set(("latlon", "andlatlon"),):
+        return HttpResponse("No search criteria specified", status=400)
+    params = request.GET
+    defaults = {'latlon': None,  # float, float,
+                'andlatlon': None,  # float, float
+                }
+    limits = {key: params.get(key, default_value)
+              for key, default_value in defaults.items()}
+    prefs = Preference.objects.get_or_create(user=request.user)[0]
+    return limits, prefs
+
+
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET"])
+def place_json(request):
+    """ return a selection of places based on search parameters including
+    &latlon=  &andlatlon=,  &orlatlon=, """
+    # query = Place.objects
+    log.info("place_json(%s): GET=%s", request.method, request.GET)
+    assert request.method == "GET"
+    limits, prefs = nearby_search_params(request)
+    nearby_places: dict = Place.nearby(limits, prefs)
+    log.info("track_json returned %d places", len(nearby_places))
+    msg = json.loads(serialize("geojson", nearby_places))
+    return JsonResponse(msg, status=200)
+
+
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET", "POST"])
+def upload_csv(request):
+    """ upload a csv file of places with name, lat, lon, type """
+    default_place_type = get_default_place_type()
+    place_types = {place_type.pk: place_type.name
+    for place_type in PlaceType.objects.filter(user=request.user).all()}
+
+    if request.method == "GET":
+        form = PlaceUploadForm()
+
+    else:  # POST
+        log.debug("request.FILES=%s", request.FILES)
+        file = request.FILES['csv_file']
+        log.info("uploading file %s, size %d", file.name, file.size)
+        form = PlaceUploadForm(request.POST, request.FILES)
+        try:
+            if form.is_valid():
+                places = Place.build_places_from_csv(
+                    form.cleaned_data['csv_file'],
+                    request.user,
+                    place_types, default_place_type)
+                if not places:
+                    raise ValueError("No data rows in CSV file")
+
+                log.info("places csv file parsed ok")
+                for place in places:
+                    place.save()
+                log.debug("request.GET=%s", request.GET)
+                if request.GET.get("map") == "False":
+                    return HttpResponse("OK", status=200)
+                return _show_places(request, places)
+        except ValueError as e:
+            log.error("Error processing CSV file: %s", e)
+            form.add_error('csv_file', e)
+
+        log.info("form was not valid")
+    return render(request, 'place_csv_upload.html', context={
+            "form": form, "place_types": place_types,
+            "default_place_type": default_place_type})
+
+
 @login_required(login_url=LOGIN_URL)
 def place_delete(request, pk: int):
     """ handle a delete request """
@@ -389,7 +454,7 @@ def place_type_list_json(request):
             for place_type in PlaceType.objects.filter(user=request.user).all()
             }
     # default entry gives the default pk
-    data["default"] = get_default_place_type()
+    data["default"] = get_default_place_type().pk
     # log.info("PlaceTypeListJson returning %s", data)
     # must set safe=False in order to send lists, otherwise only dict allowed
     return JsonResponse(data, status=200)
@@ -432,7 +497,7 @@ class PlaceTypeDeleteView(BikeLoginRequiredMixin, DeleteView):
     template_name = "placetype_delete_form.html"
 
     def dispatch(self, request, *args, **kwargs):
-        if self.kwargs['pk'] == get_default_place_type():
+        if self.kwargs['pk'] == get_default_place_type().pk:
             return HttpResponse(
                 "Cannot delete the default place type", status=403)
         if not PlaceType.objects.filter(pk=self.kwargs['pk'],

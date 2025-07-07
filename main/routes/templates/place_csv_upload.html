@@ -1,0 +1,39 @@
+{% extends 'bike/base.html' %}
+{% block title %}
+Upload Places - CSV file
+{% endblock %}
+
+{% block content %}
+  <h1>Upload Places - CSV file</h1>
+  <h4>Instructions - file format</h4>
+  <p>The CSV file should have one row per place to be uploaded, and should have
+  the following columns:</p>
+  <ul><li>Name</li>
+  <li>Latitude</li>
+  <li>Longitude</li>
+  <li>Type (using the names below.   Upper/lower case is ignored.)
+  </li>
+  <ul>{% for place_type_pk, place_type_name in place_types.items %}
+    <li>{{ place_type_name }}
+    {% if place_type_pk == default_place_type.pk %}
+    <strong> -- default-- </strong>
+    {% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+  <p>Unrecognised place types will be given the default type of
+  {{ default_place_type.name }}.</p>
+  </ul>
+  <p>Columns in the CSV file are separated by commas, and text values which
+  include commas should be "enclosed in quotes".
+  The first row of the CSV file will be ignored, and is usually used for
+  column titles.</p>
+  <form method="POST" enctype="multipart/form-data"
+    action="{% url 'routes:upload_csv' %}">
+  {% csrf_token %} 
+  {{ form }}
+  <p class="invalid-feedback">{{ form.non_field_errors }}</p>
+  <p><input type="submit" class="btn btn-primary" value="Upload">
+  <a class="btn btn-secondary" href="/routes/map">Cancel</a></p>
+  </form>
+{% endblock %}
