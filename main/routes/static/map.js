@@ -168,7 +168,8 @@ const nearbyButtons2Html = `<p>
 
 function onMapClick(event) {
 	popLocation = event.latlng;
-	var buttonsHtml = map.hasLayer(tracks) ? nearbyButtons2Html : nearbyButtons1Html;
+	var buttonsHtml = ((tracksLayer && map.hasLayer(tracksLayer)) ?
+					   nearbyButtons2Html : nearbyButtons1Html);
 	popup = L.popup()
 		.setLatLng(popLocation)
 		.setContent(
