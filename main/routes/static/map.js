@@ -686,9 +686,25 @@ function afterPlaceTypesUpdate(data) {
 	getMapDialogData("/routes/place/types")
 }
 
+/* ---- edit tags for a single track or place ---- */
+function editTags(pk, itemtype) {
+	// called by clicking a track or place tag
+	requestUrl = "/routes/tags/" + itemtype + "/" + pk;
+	$.get(requestUrl, null, showMapDialog, 'html')
+		.fail(requestFailMsg);
+}
+
+function onTagsFormSubmit(event, itemtype) {
+	event.preventDefault();
+	let formData = new FormData(event.target);
+	requestUrl = "/routes/tags/"+ itemtype + "/"+ formData.get('pk');
+	postMapDialogData(formData, 'text', showPlaceForm);
+	onCloseMapDialog();
+}
+
+/* ------ preferences handling ------ */
 function onPreference() {
 	getMapDialogData("/routes/preference");
-	
 }
 
 function onPreferenceSubmit(event) {

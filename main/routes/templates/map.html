@@ -18,15 +18,8 @@
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
   crossorigin=""></script>
 
-<style>
-  body {margin: 0; padding: 0;}
-  html, body, #map {height: 100%; width: 100vw;}
-  #map-dialog {border-radius: 15px; border-style: none;}
-  #map-dialog::backdrop {filter: blur(5px) contrast(50%);}
-  .x-icon {position: absolute; top: 0; right: 0px; float: right;
-  			color: black; font-size: 1em; padding-top: 0;}
-  .plus-icon {color: green; font-size: 1em;}
-</style>
+<link rel="stylesheet" href="{% static 'map.css' %}" />
+
 <script defer src="{% static 'map.js' %}"></script>
 {{ markersCount|json_script:"markers_count" }}
 {{ tracksCount|json_script:"tracks_count" }}

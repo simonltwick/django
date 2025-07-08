@@ -56,6 +56,21 @@ def get_default_place_type() -> PlaceType:
 def get_default_place_type_pk() -> int:
     return get_default_place_type().pk
 
+
+def get_default_user() -> int:
+    """ WARNING this actually returns the user.pk, not the user.
+    Don't rename - required for historic migrations """
+    return User.objects.get(username='simon').pk
+
+
+class Tag(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=20, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Place(models.Model):
     """ a named point on the map """
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -63,6 +78,7 @@ class Place(models.Model):
     location = models.PointField()
     type = models.ForeignKey(PlaceType, on_delete=models.PROTECT,
                              default=get_default_place_type_pk)
+    tag = models.ManyToManyField(Tag, related_name="place")
 
     def __str__(self):
         return str(self.name)
@@ -150,6 +166,7 @@ class Track(models.Model):
                                           help_text="Moving distance in metres")
     ascent = models.FloatField(blank=True, null=True,
                                  help_text="Ascent in metres")
+    tag = models.ManyToManyField(Tag, related_name="track")
 
     class Meta:
         constraints = [models.UniqueConstraint(

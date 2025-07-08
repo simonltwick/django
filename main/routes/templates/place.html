@@ -9,6 +9,15 @@
 <table>
 {{ form.as_table }}
 </table>
+
+<ul class="tag-list tags-track-{{pk}}" onclick="editTags({{ pk }}, 'place')"
+	data-bs-toggle="tooltip" title="Edit tags">
+{% for tag in instance.tag.all %}
+<li>{{ tag.name }}</li>
+{% endfor %}
+<li>&nbsp;<i class="oi oi-pencil"></i>
+</li></ul>
+
 <button type="submit" class="btn btn-outline-primary">Save</button>
 {% url 'routes:place_types' as place_types_url %}
 <button class="btn btn-outline-secondary"

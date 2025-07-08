@@ -15,6 +15,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import NumPoints
+from django.db.models import Exists, OuterRef
 from django.http import (
     HttpResponseRedirect, HttpResponse, JsonResponse, HttpResponseForbidden,
     Http404)
@@ -26,7 +27,7 @@ from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView)
 
 from .models import (
-    Place, Track, PlaceType, get_default_place_type, Preference)
+    Place, Track, PlaceType, get_default_place_type, Tag, Preference)
 from .forms import (
     UploadGpxForm2, PlaceForm, PreferenceForm, TrackSearchForm, PlaceSearchForm,
     PlaceUploadForm, # TestCSRFForm
@@ -303,7 +304,8 @@ def place(request, pk=None):
         else:
             form = PlaceForm()
 
-        return render(request, 'place.html', context={"form": form, "pk": pk})
+        return render(request, 'place.html', context={"form": form, "pk": pk,
+                                                      "instance": place_inst})
 
     # handle POST request
     if "multipart/form-data" not in request.headers.get('Content-Type'):
@@ -507,6 +509,66 @@ class PlaceTypeDeleteView(BikeLoginRequiredMixin, DeleteView):
             request, *args, **kwargs)
 
 
+# ------ tags handling ------
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET", "POST"])
+def place_tags(request, pk: int):
+    """ show & process form for updating tags for a place """
+    # annotate tags with whether checked for this place
+    instance = get_object_or_404(Place, pk=pk, user=request.user)
+    if request.method == 'GET':
+        tags = Tag.objects.filter(
+            user=request.user
+            ).annotate(is_checked=Exists(Tag.place.through.objects.filter(
+                tag_id=OuterRef('pk'), place_id=pk)
+                )
+            ).order_by("-is_checked")
+        tags_str = ', '.join(f"{tag}: checked={tag.is_checked}" for tag in tags)
+        log.info("tags=%s", tags_str)
+        return render(request, 'tag_list.html', context={
+            "tags": tags, "object_type": "place", "pk": pk,
+            "instance": instance})
+
+    # else: POST
+    log.debug("place_tags: request.POST=%s", request.POST)
+    # ensure checked tags match checked tags in instance (including any unchecked)
+    checked_tag_ids = {int(key[4:]) for key in request.POST.keys()
+                       # only checked checkboxes are returned
+                       if key.startswith("tag_")}
+    current_tag_ids = {tag.id for tag in instance.tag.all()}
+    log.debug("current_tag_ids=%s, checked_tag_ids=%s", current_tag_ids,
+              checked_tag_ids)
+    removed_tag_ids = tuple(current_tag_ids - checked_tag_ids)
+    if removed_tag_ids:
+        log.info("removing tag ids %s",removed_tag_ids)
+        instance.tag.remove(*removed_tag_ids)
+    added_tag_ids = tuple(checked_tag_ids - current_tag_ids)
+    if added_tag_ids:
+        log.info("adding tag ids %s", added_tag_ids)
+        instance.tag.add(*added_tag_ids)
+    # add any new tags
+    new_tag_names = request.POST.get('new-tags')
+    if new_tag_names:
+        log.info("adding new tag names %s", new_tag_names.split(','))
+        for name in new_tag_names.split(','):
+            # create, save and link the new tag
+            instance.tag.create(name=name, user=request.user)
+    instance.save()
+    return HttpResponseRedirect(reverse_lazy("routes:place", kwargs={"pk": pk}))
+
+
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET", "POST"])
+def track_tags(request, pk: int):
+    """ show & process form for updating tags for a track """
+    queryset = Tag.objects.filter(user=request.user, track__id=pk)
+    return HttpResponse("Not yet implemented", status=501)
+
+    if request.method == 'GET':
+        pass
+
+
+# ------ preferences handling ------
 @login_required(login_url=LOGIN_URL)
 def preference(request):
     """ Preferences is a 1:1 object for each user.  Create it or get it """

@@ -46,7 +46,7 @@ class PlaceForm(forms.ModelForm):
     required_css_class = "required"
     class Meta:
         model = Place
-        fields=["name", "type"]
+        fields=["name", "type"]  # , "tag"]
 
 
 class PlaceUploadForm(forms.Form):
@@ -143,3 +143,10 @@ class PlaceSearchForm(forms.Form):
             raise forms.ValidationError(
                 "At least one of name or type(s) must be specified.")
         return cleaned_data
+
+
+class PlaceTagSelectForm(forms.ModelForm):
+    model=Place
+
+    class Meta:
+        fields=["tag"]
