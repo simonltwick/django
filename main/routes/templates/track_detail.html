@@ -1,0 +1,19 @@
+<!--  fragment for track popup -->
+<h4>{{ track.name }} - Detail</h4>
+
+<ul class="tag-list tags-track-{{ track.pk }}"
+	onclick="editTags({{ track.pk }}, 'track')"
+	data-bs-toggle="tooltip" title="Edit tags">
+
+{% for tag in track.tag.all %}
+<li>{{ tag.name }}</li>
+{% endfor %}
+
+<li>&nbsp;<i class="oi oi-pencil"></i>
+</li></ul>
+<table class="table table-compact">
+<tr><th>Start time</th><td>{{ track.start_time }} UTC</td></tr>
+<tr><th>Moving time</th><td>{{ moving_time }}</td></tr>
+<tr><th>Moving distance</th><td>{{ track.moving_distance|floatformat:"0g" }} m</td></tr>
+<tr><th>Ascent</th><td>{{ track.ascent|floatformat:"0" }} m</td></tr>
+</table>

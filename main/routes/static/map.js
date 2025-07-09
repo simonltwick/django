@@ -364,6 +364,12 @@ function onTrackClick(event) {
 		.fail(requestFailMsg);
 }
 
+function trackDetails() {
+	requestUrl = '/routes/track/' + popMarker.feature.properties.pk + '?detail=True';
+	$.get(requestUrl, null, showPopup, "html")
+		.fail(requestFailMsg);
+}
+
 /*
 // ------ place handling ------
 */

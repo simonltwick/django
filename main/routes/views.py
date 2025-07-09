@@ -147,10 +147,22 @@ def search(request):
 def track(request, pk: int):
     """ return track summary or detailed info depending on parm """
     track = get_object_or_404(Track, pk=pk, user=request.user)
-    template = ("track_detail.html" if request.GET.get("detail")
-                else "track.html")
-    return render(request, template, context={"track": track})
+    template, moving_time = "track.html", "n/a"
+    if request.GET.get("detail"):
+        template = "track_detail.html"
+        moving_time = as_hhmm(track.moving_time)
+    return render(request, template, context={
+        "track": track, "moving_time": moving_time})
 
+
+def as_hhmm(time_secs: float) -> str:
+    days, secs = divmod(time_secs, 24*3600)
+    mins = round(secs/60)
+    hrs, mins = divmod(mins, 60)
+    s = f"{hrs}h{mins:02d}"
+    if days:
+        s = f"{days} days, {s}"
+    return s
 
 class TracksView(BikeLoginRequiredMixin, TemplateView):
     """ show a track or tracks, requested by track id or a comma-separated list
