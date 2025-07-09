@@ -541,7 +541,37 @@ def place_tags(request, pk: int):
             "instance": instance})
 
     # else: POST
-    log.debug("place_tags: request.POST=%s", request.POST)
+    handle_tags_update(request, instance)
+    return HttpResponseRedirect(reverse_lazy("routes:place", kwargs={"pk": pk}))
+
+
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET", "POST"])
+def track_tags(request, pk: int):
+    """ show & process form for updating tags for a track """
+    # annotate tags with whether checked for this place
+    instance = get_object_or_404(Track, pk=pk, user=request.user)
+    if request.method == 'GET':
+        tags = Tag.objects.filter(
+            user=request.user
+            ).annotate(is_checked=Exists(Tag.track.through.objects.filter(
+                tag_id=OuterRef('pk'), track_id=pk)
+                )
+            ).order_by("-is_checked")
+        tags_str = ', '.join(f"{tag}: checked={tag.is_checked}" for tag in tags)
+        log.info("tags=%s", tags_str)
+        return render(request, 'tag_list.html', context={
+            "tags": tags, "object_type": "track", "pk": pk,
+            "instance": instance})
+
+    # else: POST
+    handle_tags_update(request, instance)
+    return HttpResponseRedirect(reverse_lazy("routes:track", kwargs={"pk": pk}))
+
+
+def handle_tags_update(request, instance):
+    """ handle a tags update post for either a place or a track """
+    log.debug("%s_tags: request.POST=%s", type(instance), request.POST)
     # ensure checked tags match checked tags in instance (including any unchecked)
     checked_tag_ids = {int(key[4:]) for key in request.POST.keys()
                        # only checked checkboxes are returned
@@ -565,18 +595,6 @@ def place_tags(request, pk: int):
             # create, save and link the new tag
             instance.tag.create(name=name, user=request.user)
     instance.save()
-    return HttpResponseRedirect(reverse_lazy("routes:place", kwargs={"pk": pk}))
-
-
-@login_required(login_url=LOGIN_URL)
-@require_http_methods(["GET", "POST"])
-def track_tags(request, pk: int):
-    """ show & process form for updating tags for a track """
-    queryset = Tag.objects.filter(user=request.user, track__id=pk)
-    return HttpResponse("Not yet implemented", status=501)
-
-    if request.method == 'GET':
-        pass
 
 
 # ------ preferences handling ------

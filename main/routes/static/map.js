@@ -354,23 +354,14 @@ function onTrackMouseLeave(ev) {
 function onTrackClick(event) {
 	L.DomEvent.stopPropagation(event);
 	popMarker = event.target;
-	requestUrl = '/routes/track/' + popMarker.feature.properties.pk; 
-	$.get(requestUrl, null, addTrackTags, 'html')
-		.fail(requestFailMsg);
-	popup = popMarker.getPopup();
-	if (!popup) {
-		popup = L.popup();
-		popMarker.bindPopup(popup);
-	}
+	popLocation = event.latlng;
+	requestUrl = '/routes/track/' + popMarker.feature.properties.pk;
+	// temp content while waiting for response
 	const popupContent = trackPopupContent
 		.replaceAll('\{\{name\}\}', popMarker.feature.properties.name);
-	popup.setContent(popupContent);
-	popMarker.openPopup();
-	popup.setLatLng(event.latLng);	// do this AFTER opening popup
-}
-
-function addTrackTags(data) {
-	popup.setContent(data);
+	showPopup(popupContent);
+	$.get(requestUrl, null, showPopup, 'html')
+		.fail(requestFailMsg);
 }
 
 /*
@@ -416,19 +407,12 @@ function nearbyPlaces(searchType) {
 			opacity: 0.5,
 			fill: false}).addTo(placesLayer);
 }
-// handle 'new place' 
 
 function createPlace() {
+	// handle 'new place' 
 	requestUrl = "/routes/place";
-	$.get(requestUrl, null, showPlaceForm, 'html')
+	$.get(requestUrl, null, showPopup, 'html')
 		.fail(requestFailMsg);
-}
-
-function showPlaceForm(data) {
-	popup = L.popup()
-		.setLatLng(popLocation)
-		.setContent(data)
-		.openOn(map);
 }
 
 function onPlaceFormSubmit(event) {
@@ -586,7 +570,7 @@ onClick="placeDelete({{id}})">Delete</button>`
 function onPlaceClick(event) {
 	// open a popup menu about the place
 	popMarker = event.target;
-	popLocation = popMarker.getLatLng();  // for showPlaceForm
+	popLocation = popMarker.getLatLng();  // for showPopup
 	let content = placePopupContent
 		.replace('\{\{name\}\}', popMarker.options.placeName)
 		.replace('\{\{id\}\}', popMarker.options.placeID)
@@ -604,7 +588,7 @@ function onPlaceClick(event) {
 function placeDetails() {
 	// console.info("popMarker=", popMarker);
 	requestUrl = "/routes/place/" + popMarker.options.placeID.toString();
-	$.get(requestUrl, null, showPlaceForm, 'html')
+	$.get(requestUrl, null, showPopup, 'html')
 		.fail(requestFailMsg);
 }
 
@@ -702,7 +686,7 @@ function onTagsFormSubmit(event, itemtype) {
 	event.preventDefault();
 	let formData = new FormData(event.target);
 	requestUrl = "/routes/tags/"+ itemtype + "/"+ formData.get('pk');
-	postMapDialogData(formData, 'text', showPlaceForm);
+	postMapDialogData(formData, 'text', showPopup);
 	onCloseMapDialog();
 }
 
@@ -740,6 +724,16 @@ function updatePreference(data) {
 	}
 	// init preference (a list of 1 item is sent)
 	preference = data[0].fields;
+}
+
+// ------ general purpose popup & modal dialog handling ------
+function showPopup(data) {
+	if (!popup) {		
+		popup = L.popup();
+	}
+	popup.setContent(data)
+		 .openOn(map)
+		 .setLatLng(popLocation);
 }
 
 function postMapDialogData(formData, dataType, successRoutine) {
