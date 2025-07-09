@@ -106,6 +106,11 @@ function buildPlaceIconDict(data) {
 	// console.info("buildPlaceIconDict:", data, placeIcons);
 }
 
+const trackPopupContent = `<h4>{{name}}</h4>
+<div class="spinner-border text-secondary" role="status">
+  <span class="visually-hidden">Loading tags...</span>
+</div>`;
+
 
 /* show map dialog, pre-populated with a help/info message */
 let dialog = document.getElementById("map-dialog");
@@ -347,27 +352,26 @@ function onTrackMouseLeave(ev) {
 }
 
 function onTrackClick(event) {
-	const layer = event.target;
-	const latLng = event.latlng;
-	popMarker = layer;
-	const trackID = layer.feature.properties.id;
-	requestUrl = '/tags/track/' + trackID; 
-	$.get(requestUrl, null, addTrackTags, 'json')
+	L.DomEvent.stopPropagation(event);
+	popMarker = event.target;
+	requestUrl = '/routes/track/' + popMarker.feature.properties.pk; 
+	$.get(requestUrl, null, addTrackTags, 'html')
 		.fail(requestFailMsg);
-	const popupContent = getTrackPopupContent(
-		trackID, layer.feature.properties.name, trackPopupSpinner);
-	popup = layer.getPopup();
+	popup = popMarker.getPopup();
 	if (!popup) {
 		popup = L.popup();
-		layer.bindPopup(popup);
+		popMarker.bindPopup(popup);
 	}
+	const popupContent = trackPopupContent
+		.replaceAll('\{\{name\}\}', popMarker.feature.properties.name);
 	popup.setContent(popupContent);
-	layer.openPopup();
-	popup.setLatLng(latLng);	// do this AFTER opening popup
-	L.DomEvent.stopPropagation(event);
-	// return false;  // stop propagation - doesn't work
+	popMarker.openPopup();
+	popup.setLatLng(event.latLng);	// do this AFTER opening popup
 }
 
+function addTrackTags(data) {
+	popup.setContent(data);
+}
 
 /*
 // ------ place handling ------

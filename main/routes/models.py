@@ -1,6 +1,5 @@
 """ models for routes app """
 import csv
-from io import StringIO
 import logging
 import os.path
 from typing import List, Dict, TYPE_CHECKING
@@ -46,7 +45,7 @@ class PlaceType(models.Model):
     icon = models.CharField(max_length=30, choices=ICON_CHOICES,
                             default="geo-green.svg")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 

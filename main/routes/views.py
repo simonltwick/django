@@ -141,10 +141,21 @@ def search(request):
 #     log.info("form received successfully.  is_valid=%s", form.is_valid())
 #     return HttpResponse("OK", status=200)
 
+# ------ Track handling ------
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET"])
+def track(request, pk: int):
+    """ return track summary or detailed info depending on parm """
+    track = get_object_or_404(Track, pk=pk, user=request.user)
+    template = ("track_detail.html" if request.GET.get("detail")
+                else "track.html")
+    return render(request, template, context={"track": track})
+
 
 class TracksView(BikeLoginRequiredMixin, TemplateView):
     """ show a track or tracks, requested by track id or a comma-separated list
     of track ids """
+    # FIXME: url broken - needs sorting out
     template_name = "map.html"
 
     def get(self, _request, *_args, **kwargs):

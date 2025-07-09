@@ -1,0 +1,22 @@
+<!--  fragment for track popup -->
+<h4>{{ track.name }}</h4>
+
+<ul class="tag-list tags-track-{{ track.pk }}"
+	onclick="editTags({{ track.pk }}, 'track')"
+	data-bs-toggle="tooltip" title="Edit tags">
+
+{% for tag in track.tag.all %}
+<li>{{ tag.name }}</li>
+{% endfor %}
+
+<li>&nbsp;<i class="oi oi-pencil"></i>
+</li></ul>
+
+<button class="btn btn-outline" type="button" onclick="trackDetails({{ track.pk }})">
+  Details</button>
+<button class="btn btn-outline" type="button" onclick="trackElevation({{ track.pk }})">
+  Elevation Profile</button>
+<button class="btn btn-outline" type="button" onclick="trackHide()">
+  Hide</button>
+<button class="btn btn-outline" type="button" onclick="trackHideOthers()">
+  Hide Others</button>`
