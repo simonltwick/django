@@ -1,6 +1,6 @@
 
 body {margin: 0; padding: 0;}
-html, body, #map {height: 100%; width: 100vw;}
+html, body, #map {height: 100%; width: 100%;}  /* 100vw;} */
 
 #map-dialog {border-radius: 15px; border-style: none;}
 #map-dialog::backdrop {filter: blur(5px) contrast(50%);}
@@ -36,4 +36,17 @@ html, body, #map {height: 100%; width: 100vw;}
 li.no-bullet {
 	list-style-type: none;
 	list-style: none;
+}
+
+.nav-control {
+	background-color: rgba(255, 255, 255, 0.7);
+	color: #bbb;
+	border: 2px solid rgba(0,0,0,0.3);
+	border-radius: 4px;
+	width: 30px;
+	height: 30px;
+	/*margin-left: 13px;
+	margin-top: 18px; */
+	text-align: center;
+	vertical-align: center;
 }

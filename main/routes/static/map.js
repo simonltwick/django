@@ -75,6 +75,29 @@ const layerControl = L.control.layers(
 	baseLayers, overlays, { position: "bottomleft" }
 ).addTo(map);
 
+class NavControl extends L.Control {
+	constructor (options) {
+		super(options);
+		this.container = document.createElement("div");
+		this.container.classList.add("leaflet-control");
+		this.container.classList.add("nav-control");
+	}
+	onAdd(map) {
+		document.getElementById("base-header").classList.toggle("d-none")
+		this.container.innerHTML = `<span class='oi oi-menu'
+			data-toggle='tooltip' title='Show/hide Menu'></span>`;
+		// connect event listeners
+		this.container.addEventListener("click", this.onClick)
+		return this.container;
+	}
+	onClick(event) {
+		// toggle the navbar visibility
+		L.DomEvent.stopPropagation(event);
+		document.getElementById("base-header").classList.toggle("d-none")
+	}
+}
+
+const navControl = new NavControl({position: "topright"}).addTo(map);
 
 const trackStyle = {color: '#ff00ff',
     weight: 2,
