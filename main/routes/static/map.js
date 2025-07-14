@@ -93,7 +93,7 @@ class NavControl extends L.Control {
 	onClick(event) {
 		// toggle the navbar visibility
 		L.DomEvent.stopPropagation(event);
-		document.getElementById("base-header").classList.toggle("d-none")
+		document.getElementById("base-header").classList.toggle("d-none") 
 	}
 }
 
