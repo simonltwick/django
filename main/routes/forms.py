@@ -47,6 +47,7 @@ class PlaceForm(forms.ModelForm):
     class Meta:
         model = Place
         fields=["name", "type"]  # , "tag"]
+        widgets = {"type": forms.RadioSelect}
 
 
 class PlaceUploadForm(forms.Form):

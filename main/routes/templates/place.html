@@ -1,4 +1,13 @@
 <!-- popup form for place details -->
+{% load static %}
+
+<style>
+/* add icons to placetype selection entries */
+label[for^="id_type"]::after {max-height: 16px; max-width: 16px; padding-left: 0.3em;}
+{% for icon_url in icons %}
+label[for="id_type_{{ forloop.counter0 }}"]::after {content:url("{% static icon_url %}");}
+{% endfor %}
+</style>
 
 <h4>Place details</h4>
 <form id="placeForm" onsubmit="onPlaceFormSubmit(event)">

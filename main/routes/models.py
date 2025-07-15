@@ -24,37 +24,37 @@ class QueryStringError(ValueError):
     """ signifies invalid query string in a web request """
     pass
 
-
-""" choices for place type icons.  icon name refers to an image in the
-static folder.  Does not have to be svg but recommended.
-In future, it may be possible to choose colour dynamically through css """
-ICON_CHOICES= {
-    "Beer": "cup-straw-pink.svg",
-    "Coffee": "cup-orange.svg",
-    "Tea": "teapot.svg",
-    "Place": "geo-green.svg",
-    "Camera": "camera-yellow.svg",
-    "Bullseye": "bullseye-blue.svg"
-    }
-
-
 class PlaceType(models.Model):
     """ a type of place, eg. Pub, Cafe """
+    # choices for place type icons.  icon name refers to an image in the
+    # static folder.  Does not have to be svg but recommended.
+    # Icons should be 16x16; in Inkscape document info choose Icon 16x16 size
+    # mapping between placetype.name and placetype.icon is stored in the DB,
+    # the ICON_CHOICES key is just a starting point and never used by the app
+    # In future, it may be possible to choose colour dynamically through css
+    ICON_CHOICES= {
+        "Beer": "cup-straw-pink.svg",
+        "Coffee": "cup-orange.svg",
+        "Tea": "teapot-brown-web.svg",
+        "Place": "geo-green.svg",
+        "Camera": "camera-yellow.svg",
+        "Bullseye": "bullseye-blue.svg"
+        }
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    name = models.CharField(max_length=40)
+    name = models.CharField(max_length=40, unique=True)
     icon = models.CharField(max_length=30, choices=ICON_CHOICES,
                             default="geo-green.svg")
+
 
     def __str__(self) -> str:
         return self.name
 
-
 def get_default_place_type() -> PlaceType:
+    """ used when removing blank=True/null=True from Place.type """
     return PlaceType.objects.get_or_create(name='Place')[0]
 
 def get_default_place_type_pk() -> int:
     return get_default_place_type().pk
-
 
 def get_default_user() -> int:
     """ WARNING this actually returns the user.pk, not the user.

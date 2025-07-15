@@ -320,6 +320,10 @@ def place(request, pk=None):
     """ insert or update place details """
     # log.info("place.%s(pk=%r, request.GET=%s, request.POST=%s)",
     #          request.method, pk, request.GET, request.POST)
+    # css for icons references use ID field of INPUT fields, which are 0-indexed
+    # not linked to the pk
+    icons = [f"icons/{item.get_icon_display()}"
+             for item in PlaceType.objects.all()]
     if request.method == 'GET':
         if pk is not None:
             place_inst = get_object_or_404(Place, pk=pk, user=request.user)
@@ -327,8 +331,8 @@ def place(request, pk=None):
         else:
             form = PlaceForm()
 
-        return render(request, 'place.html', context={"form": form, "pk": pk,
-                                                      "instance": place_inst})
+        return render(request, 'place.html', context={
+            "form": form, "pk": pk, "icons": icons, "instance": place_inst})
 
     # handle POST request
     if "multipart/form-data" not in request.headers.get('Content-Type'):
@@ -353,7 +357,8 @@ def place(request, pk=None):
             status=200)
 
     # handle form errors
-    return render(request, 'place.html', context={"form": form, 'pk': pk})
+    return render(request, 'place.html', context={
+        "form": form, "pk": pk, "icons": icons, "instance": place_inst})
 
 
 def nearby_search_params(request) -> Tuple[Dict, Preference]:

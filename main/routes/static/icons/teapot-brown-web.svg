@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="16"
+   height="16"
+   version="1.1"
+   viewBox="0 0 4.2333 4.2333"
+   id="svg148"
+   sodipodi:docname="teapot-brown-web.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <defs
+     id="defs152" />
+  <sodipodi:namedview
+     id="namedview150"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="47.75"
+     inkscape:cx="8"
+     inkscape:cy="8"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="0"
+     inkscape:window-y="32"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg148" />
+  <metadata
+     id="metadata132">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     transform="matrix(0.018811,0,0,0.018811,6.7531,-0.76730276)"
+     fill="none"
+     stroke="#c85000"
+     stroke-width="10"
+     id="g146">
+    <path
+       d="m -284.16,153.87 84.135,-0.25986 0.75595,8.0527 c 40.091,26.567 21.609,65.931 -5.171,94.605 l -0.50228,4.3567 c -25.669,-0.31005 -50.395,-0.11722 -74.278,0.0525 l -0.46089,-4.9664 c -30.501,-28.886 -42.785,-73.368 -5.0871,-91.818 z"
+       id="path134" />
+    <path
+       d="m -284.41,179.59 c -11.394,12.615 -10.084,26.636 -4.3379,39.144"
+       id="path136" />
+    <path
+       d="m -304.17,181.21 c -54.586,-42.659 -50.665,33.405 5.6563,51.088"
+       id="path138" />
+    <path
+       d="m -184.08,176.69 25.633,-15.685 19.248,2.9588 -0.1244,4.0002 c -5.4733,2.4412 -10.093,3.3581 -11.08,8.1408 -6.5229,31.223 -17.941,51.579 -43.098,66.645"
+       id="path140" />
+    <path
+       d="m -278.02,154.12 c 4.4414,-15.111 16.549,-17.001 31.194,-19.595 -17.117,-24.73 29.189,-24.72 12.071,0.2067 14.389,3.013 25.684,3.4371 30.746,19.52"
+       id="path142" />
+    <path
+       d="m -297.59,174.23 c -66.941,-58.614 -85.198,51.965 8.3099,71.487"
+       id="path144" />
+  </g>
+</svg>
