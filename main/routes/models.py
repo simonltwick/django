@@ -45,16 +45,18 @@ class PlaceType(models.Model):
     icon = models.CharField(max_length=30, choices=ICON_CHOICES,
                             default="geo-green.svg")
 
-
     def __str__(self) -> str:
         return self.name
+
 
 def get_default_place_type() -> PlaceType:
     """ used when removing blank=True/null=True from Place.type """
     return PlaceType.objects.get_or_create(name='Place')[0]
 
+
 def get_default_place_type_pk() -> int:
     return get_default_place_type().pk
+
 
 def get_default_user() -> int:
     """ WARNING this actually returns the user.pk, not the user.

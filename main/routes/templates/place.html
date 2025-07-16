@@ -9,7 +9,8 @@ label[for="id_type_{{ forloop.counter0 }}"]::after {content:url("{% static icon_
 {% endfor %}
 </style>
 
-<h4>Place details</h4>
+
+<h4>{% if pk %}Place details{% else %}Create Place{% endif %}</h4>
 <form id="placeForm" onsubmit="onPlaceFormSubmit(event)">
 <input type="hidden" name="pk" value="{{ pk|default_if_none:'' }}">
 <input id="place-lat" type="hidden" name="lat" value="">
@@ -19,6 +20,7 @@ label[for="id_type_{{ forloop.counter0 }}"]::after {content:url("{% static icon_
 {{ form.as_table }}
 </table>
 
+{% if pk %}
 <ul class="tag-list tags-track-{{pk}}" onclick="editTags({{ pk }}, 'place')"
 	data-bs-toggle="tooltip" title="Edit tags">
 {% for tag in instance.tag.all %}
@@ -26,6 +28,8 @@ label[for="id_type_{{ forloop.counter0 }}"]::after {content:url("{% static icon_
 {% endfor %}
 <li>&nbsp;<i class="oi oi-pencil"></i>
 </li></ul>
+{% else %}<p><small>After creating the place, edit it to add tags</small></p>
+{% endif %}
 
 <button type="submit" class="btn btn-outline-primary">Save</button>
 {% url 'routes:place_types' as place_types_url %}

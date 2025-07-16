@@ -330,6 +330,7 @@ def place(request, pk=None):
             form = PlaceForm(instance=place_inst)
         else:
             form = PlaceForm()
+            place_inst = None
 
         return render(request, 'place.html', context={
             "form": form, "pk": pk, "icons": icons, "instance": place_inst})
