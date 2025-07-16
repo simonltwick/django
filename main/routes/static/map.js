@@ -100,7 +100,7 @@ class NavControl extends L.Control {
 const navControl = new NavControl({position: "topright"}).addTo(map);
 
 const trackStyle = {color: '#ff00ff',
-    weight: 2,
+    weight: 3,
     opacity: 0.5
 };
 
