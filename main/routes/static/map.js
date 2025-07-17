@@ -169,29 +169,46 @@ function setMapBounds() {
 
 
 // create popup when user clicks on map
+const mapClickPopupContent = `</p>
+	<a class="btn" onClick="onRoutesSearch()">
+	  <span class="oi oi-magnifying-glass" data-toggle="tooltip" title="Search"
+	  />
+	</a>
+	<button type="button" class="btn btn-outline-secondary"
+	  onClick="createPlace()">
+	  New Place</button>
+	<a class="btn" onClick="onPreference()">
+	  <span class="oi oi-cog" data-toggle="tooltip" title="Preference"/>
+	</a>`
 // these buttons shown when no tracks are visible on the map
 const nearbyButtons1Html = `<p>
-<button onClick="nearbyTracks()" class="btn">Nearby Tracks</button>
-<button class="btn" onClick="nearbyPlaces()">Nearby Places</button>
-</p>`;
-
+	<button class="btn btn-outline-secondary" onClick="nearbyTracks()">
+	  Nearby Tracks</button>
+	<button class="btn btn-outline-secondary" onClick="nearbyPlaces()">
+	  Nearby Places</button>
+	</p>`;
 // these buttons shown if tracks are already visible on the map
 const nearbyButtons2Html = `<p>
-<div class="btn-group">
-<button onClick="nearbyTracks()" class="btn">Nearby Tracks</button>
-  <button type="button" class="btn dropdown-toggle dropdown-toggle-split"
-	data-bs-toggle="dropdown" aria-expanded="false">
-    <span class="visually-hidden">Toggle Dropdown</span>
-  </button>
-  <ul class="dropdown-menu">
-    <li><button class="btn dropdown-item" onClick="nearbyTracks('add')">
-	  Add to tracks already displayed</button></li>
-    <li><button class="btn dropdown-item" onClick="nearbyTracks('reduce')">
-	  Search only tracks already displayed</button></li>
-  </ul>
-</div>
-<button class="btn" onClick="nearbyPlaces()">Nearby Places</button>
-</p>`;
+	<div class="btn-group" role="group">
+	<button onClick="nearbyTracks()" class="btn btn-outline-secondary">
+	  Nearby Tracks</button>
+	  <button type="button" 
+	    class="btn btn-outline-secondary dropdown-toggle"
+		data-toggle="dropdown" aria-expanded="false" aria-haspopup="true"
+		id="nearby-tracks1">
+	    <!-- <span class="invisible">Toggle Dropdown</span> -->
+	  </button>
+	  <div class="dropdown-menu" aria-labelledby="nearby-tracks1">
+	    <a href="#" class="btn btn-outline-secondary dropdown-item"
+			onClick="nearbyTracks('add')">
+		  	Add to tracks already displayed</a>
+	    <a href="#" class="btn btn-outline-secondary dropdown-item" 
+			onClick="nearbyTracks('reduce')">
+		  	Search only tracks already displayed</button></a>
+	  </div>
+	</div>
+	<button class="btn btn-outline-secondary" onClick="nearbyPlaces()">Nearby Places</button>
+	</p>`;
 
 function onMapClick(event) {
 	popLocation = event.latlng;
@@ -200,18 +217,9 @@ function onMapClick(event) {
 	popup = L.popup()
 		.setLatLng(popLocation)
 		.setContent(
-			'<p>You clicked at ' + popLocation.toString() + `</p>
-			<a class="btn" onClick="onRoutesSearch()">
-				<span class="oi oi-magnifying-glass"
-				  data-toggle="tooltip" title="Search">
-			</a>
-			<button type="button" class="btn" onClick="createPlace()">
-			New Place</button>
-			<a class="btn" onClick="onPreference()">
-							<span class="oi oi-cog"
-							  data-toggle="tooltip" title="Preference">
-						</a>` +
-			buttonsHtml)
+			'<p>You clicked at ' + popLocation.toString()
+			+ mapClickPopupContent
+			+ buttonsHtml)
 		.openOn(map);
 	// TODO: if tracks layer is not shown, don't show additional track options      
 }
@@ -329,21 +337,23 @@ function nearbyTracks(searchType) {
 			fill: false}).addTo(tracksLayer);
 }
 
-function showTracks(track_list) {
+function showTracks(trackList) {
 	// add tracks to the map
-	if (track_list.length < 1) {
+	if (trackList.length < 1) {
 		alert("No matching tracks found");
 		return
 	}
-	if (tracksLayer) {tracksLayer.clearLayers();}
-	// console.info('showTracks(): track_list=', track_list)
-	tracksLayer = L.geoJSON(track_list, {
+	// console.info('showTracks(): trackList=', trackList)
+	const oldTracksLayer = tracksLayer;
+	tracksLayer = L.geoJSON(trackList, {
 		style: trackStyle,
 		onEachFeature: onTrackShow
 	});
+	// copy the search circle to the new tracksLayer
+	oldTracksLayer.eachLayer((layer) => tracksLayer.addLayer(layer));
 	// tracksHidden = [];
 	// showSidebarSection(true, 'track');
-	tracksLayer = replaceMapOverlay(tracksLayer, tracksLayer, "Tracks");
+	tracksLayer = replaceMapOverlay(oldTracksLayer, tracksLayer, "Tracks");
 	tracksBounds = tracksLayer.getBounds();
 	setMapBounds();
 }
