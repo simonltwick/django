@@ -1,4 +1,9 @@
 <!-- popup form for confirming place deletion -->
+<button type="button" class="close" aria-label="Close"
+  onClick="onCloseMapDialog()"
+  data-bs-toggle="tooltip" title="Close dialog">
+  <span aria-hidden="true">&times;</span>
+</button>
 
 <h4>Confirm Place Type delete: {{ object }}</h4>
 <form id="placeTypeDeleteForm" onsubmit="onPlaceTypeDoDelete(event)">

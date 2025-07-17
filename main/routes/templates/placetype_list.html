@@ -1,9 +1,11 @@
 {% load static %}
 {% get_static_prefix as STATIC_PREFIX %}
-<a class="nav-link x-icon" href="#" onClick="onCloseMapDialog()"
-	data-bs-toggle="tooltip" title="Close dialog">
-	&times;
-	</a>
+<button type="button" class="close" aria-label="Close"
+  onClick="onCloseMapDialog()"
+  data-bs-toggle="tooltip" title="Close dialog">
+  <span aria-hidden="true">&times;</span>
+</button>
+
 <h4>Place Types</h4>
 <table>
 {% for place_type in object_list %}

@@ -1,8 +1,10 @@
 {% load static %}
-<a class="nav-link x-icon" href="#" onClick="onCloseMapDialog()"
-	data-bs-toggle="tooltip" title="Close dialog">
-	&times;
-	</a>
+<button type="button" class="close" aria-label="Close"
+  onClick="onCloseMapDialog()"
+  data-bs-toggle="tooltip" title="Close dialog">
+  <span aria-hidden="true">&times;</span>
+</button>
+
 <h4>Place Type {{ object }}</h4>
 <form onsubmit="onPlaceTypeSubmit(event)" method="post">
 	{% csrf_token %}
