@@ -106,10 +106,12 @@ const trackStyle = {color: '#ff00ff',
 
 // add layers for tracks & places
 
-let placesLayer = L.geoJSON().addTo(map);   // map layer for places
-let oldplacesLayer; // saved placesLayer (to be replaced)
-let tracksLayer = L.geoJSON().addTo(map); 
 let placeIcons;
+let placesLayer = L.geoJSON().addTo(map);   // map layer for places
+layerControl.addOverlay(placesLayer, "Places");
+let tracksLayer = L.geoJSON().addTo(map); 
+layerControl.addOverlay(tracksLayer, "Tracks");
+let tracksHidden = [];
 
 
 // get preference & buildPlaceIcons cannot be run in parallel
@@ -140,18 +142,6 @@ let dialog = document.getElementById("map-dialog");
 dialog.showModal();
 
 /* ----- end of initialisation ------ */
-
-function showPlaces(data) {
-	if (placesLayer) {placesLayer.clearLayers();}
-	placesLayer = L.geoJSON(data, {
-		pointToLayer: getPlaceMarker,
-		onEachFeature: onPlaceShow
-	});
-	// showSidebarSection(true, 'place');
-	placesLayer = replaceMapOverlay(placesLayer, placesLayer, "Places");
-	placesBounds = placesLayer.getBounds();
-	setMapBounds();
-}
 
 function setMapBounds() {
 	// resize the map to fit placesBounds and tracksBounds
@@ -212,7 +202,7 @@ const nearbyButtons2Html = `<p>
 
 function onMapClick(event) {
 	popLocation = event.latlng;
-	var buttonsHtml = ((tracksLayer && map.hasLayer(tracksLayer)) ?
+	let buttonsHtml = ((tracksLayer && map.hasLayer(tracksLayer)) ?
 					   nearbyButtons2Html : nearbyButtons1Html);
 	popup = L.popup()
 		.setLatLng(popLocation)
@@ -275,7 +265,7 @@ function searchResults(data) {
 function requestFailMsg(jqXHR, textStatus, errorThrown) {
 	console.error("Request failed:",
 		{jqHXR: jqXHR, textStatus: textStatus, errorThrown: errorThrown});
-	var msg = jqXHR;
+	let msg = jqXHR;
 	if (jqXHR.status) {
 		msg = "Status code " + jqXHR.status + ": " + jqXHR.statusText;
 	}
@@ -351,7 +341,7 @@ function showTracks(trackList) {
 	});
 	// copy the search circle to the new tracksLayer
 	oldTracksLayer.eachLayer((layer) => tracksLayer.addLayer(layer));
-	// tracksHidden = [];
+	tracksHidden = [];
 	// showSidebarSection(true, 'track');
 	tracksLayer = replaceMapOverlay(oldTracksLayer, tracksLayer, "Tracks");
 	tracksBounds = tracksLayer.getBounds();
@@ -370,6 +360,48 @@ function onTrackShow(feature, layer) {
 		mouseout: onTrackMouseLeave,
 		});
 	// addToTrackSidebar(feature, layer);
+}
+
+function trackHide(marker) {
+	if (!marker) {
+		marker = popMarker;
+	}
+	// only tracks have marker.feature.properties (search circle doesn't)
+	if (!(marker.feature && marker.feature.properties)) {
+		return;
+	}
+	//tracksGeoLayer.remove(marker);  // removes the whole tracksGeoLayer
+	marker.removeFrom(tracksLayer);
+	tracksHidden.push(marker);
+	if (marker.feature.properties.startStopMarkers) {
+		for (const startStopMarker
+				of marker.feature.properties.startStopMarkers) {
+			startStopMarker[0].removeFrom(tracksOverlay);
+			startStopMarker[1].removeFrom(tracksOverlay);
+		}
+	}
+	popMarker.closePopup();
+}
+
+function trackHideOthers() {
+	tracksLayer.eachLayer(function(marker) {
+		if (marker !== popMarker) {
+			trackHide(marker)
+		}
+	});
+	popMarker.closePopup();
+}
+
+function tracksUnhide() {
+	/* unhide any hidden tracks */
+	tracksHidden.forEach(trackUnhide);
+	tracksHidden = [];
+}
+
+function trackUnhide(marker) {
+	/* unhide a track by adding back to TracksGeoLayer */
+	tracksLayer.addLayer(marker);
+	// addTrackStartStopMarkers(marker.feature, marker);
 }
 
 function onTrackMouseOver(ev) {
@@ -447,6 +479,20 @@ function nearbyPlaces(searchType) {
 			fill: false}).addTo(placesLayer);
 }
 
+function showPlaces(data) {
+	const oldPlacesLayer = placesLayer;
+	placesLayer = L.geoJSON(data, {
+		pointToLayer: getPlaceMarker,
+		onEachFeature: onPlaceShow
+	});
+	// copy the search circle to the new placesLayer
+	oldPlacesLayer.eachLayer((layer) => placesLayer.addLayer(layer));
+	// showSidebarSection(true, 'place');
+	placesLayer = replaceMapOverlay(oldPlacesLayer, placesLayer, "Places");
+	placesBounds = placesLayer.getBounds();
+	setMapBounds();
+}
+
 function createPlace() {
 	// handle 'new place' 
 	requestUrl = "/routes/place";
@@ -498,12 +544,7 @@ function placeInsertOK(data) {
 		.on("click", onPlaceClick);
 	//console.info("placeInsertOK(data=", data, "): feature=", fakeFeature,
 	//			 ", latlon=", popLocation, " -> marker=", placeMarker);
-	oldPlacesLayer = placesLayer;
-	if (!placesLayer) {
-		placesLayer = L.layerGroup([]);
-	}
 	placesLayer.addLayer(placeMarker);
-	replaceMapOverlay(oldPlacesLayer, placesLayer, "Places");
 	popup.remove();
 }
 
@@ -568,8 +609,8 @@ function onPlaceMoveConfirm(event) {
 	newPos = popMarker.getLatLng();
 	document.getElementById("place-move-lat").value = newPos.lat;
 	document.getElementById("place-move-lon").value = newPos.lng;
-	var formData = new FormData(event.target);
-	var pk = formData.get("pk")
+	let formData = new FormData(event.target);
+	let pk = formData.get("pk")
 	requestUrl = "/routes/place/" + pk + "/move"
 		
 	$.ajax({
@@ -651,8 +692,8 @@ function onPlaceDoDelete(event) {
 	// after confirmation, do the delete (with csrf token)
 	//if (confirm("delete " + popMarker.options.placeName + " (pk=" + pk + ")?")
 	event.preventDefault();
-	var formData = new FormData(event.target);
-	var pk = formData.get("pk")
+	let formData = new FormData(event.target);
+	let pk = formData.get("pk")
 	requestUrl = "/routes/place/" + pk.toString() + "/delete"
 	// alert("onPlaceDoDelete: requestUrl=(" + requestUrl);
 	postMapDialogData(formData, 'json', function(data) {
@@ -674,7 +715,7 @@ function onPlaceTypeEdit(pk) {
 function onPlaceTypeSubmit(event) {
 	event.preventDefault();
 	let formData = new FormData(event.target);
-	var pk = formData.get("pk")
+	let pk = formData.get("pk")
 	requestUrl = "/routes/place/type/" + (pk ? pk : "");
 	postMapDialogData(formData, "text", afterPlaceTypesUpdate);
 }
@@ -682,7 +723,7 @@ function onPlaceTypeSubmit(event) {
 function onPlaceTypeDoDelete(event) {
 	event.preventDefault();
 		let formData = new FormData(event.target);
-		var pk = formData.get("pk")
+		let pk = formData.get("pk")
 		if (!pk) {throw "pk is null";}
 		requestUrl = "/routes/place/type/" + (pk ? pk : "") + "/delete";
 		postMapDialogData(formData, 'text', afterPlaceTypesUpdate);
