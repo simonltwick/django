@@ -29,8 +29,8 @@ from django.views.generic import (
 from .models import (
     Place, Track, PlaceType, get_default_place_type, Tag, Preference)
 from .forms import (
-    UploadGpxForm2, PlaceForm, PreferenceForm, TrackSearchForm, PlaceSearchForm,
-    PlaceUploadForm, # TestCSRFForm
+    UploadGpxForm2, PlaceForm, PreferenceForm, TrackDetailForm, TrackSearchForm,
+    PlaceSearchForm, PlaceUploadForm, # TestCSRFForm
     )
 
 
@@ -142,16 +142,27 @@ def search(request):
 
 # ------ Track handling ------
 @login_required(login_url=LOGIN_URL)
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "POST"])
 def track(request, pk: int):
     """ return track summary or detailed info depending on parm """
     track = get_object_or_404(Track, pk=pk, user=request.user)
-    template, moving_time = "track.html", "n/a"
-    if request.GET.get("detail"):
+    if request.method == "GET":
+        template, moving_time = "track.html", "n/a"
+        form = None
+        if request.GET.get("detail"):
+            template = "track_detail.html"
+            form = TrackDetailForm(instance=track)
+            moving_time = as_hhmm(track.moving_time)
+
+    else:  # POST (detail implied)
+        form = TrackDetailForm(request.POST, instance=track)
+        if form.is_valid():
+            form.save()
+            return HttpResponse(status=200)
         template = "track_detail.html"
         moving_time = as_hhmm(track.moving_time)
     return render(request, template, context={
-        "track": track, "moving_time": moving_time})
+        "track": track, "moving_time": moving_time, "form": form})
 
 
 def as_hhmm(time_secs: float) -> str:

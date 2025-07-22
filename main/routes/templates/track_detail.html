@@ -11,9 +11,16 @@
 
 <li>&nbsp;<i class="oi oi-pencil"></i>
 </li></ul>
+<form onsubmit="onTrackDetailSubmit(event)">
+{% csrf_token %}
+<input type="hidden" name="pk" value="{{ track.pk }}">
 <table class="table table-compact">
 <tr><th>Start time</th><td>{{ track.start_time }} UTC</td></tr>
 <tr><th>Moving time</th><td>{{ moving_time }}</td></tr>
 <tr><th>Moving distance</th><td>{{ track.moving_distance|floatformat:"0g" }} m</td></tr>
 <tr><th>Ascent</th><td>{{ track.ascent|floatformat:"0" }} m</td></tr>
+<tr><th>Creator</th><td>{{ track.creator }}</td></tr>
+{{ form.as_table }}
 </table>
+<button type="submit" class="btn btn-outline-primary">Save</button>
+</form>

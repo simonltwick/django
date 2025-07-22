@@ -109,6 +109,12 @@ class PlaceTypeForm(forms.ModelForm):
             "At least one search criteria must be specified.")
 
 
+class TrackDetailForm(forms.ModelForm):
+    class Meta:
+        model = Track
+        fields = ["description"]
+
+
 track_years = [
     dt.year for dt in Track.objects.dates('start_time', 'year', order='DESC')]
 

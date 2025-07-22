@@ -450,6 +450,28 @@ function trackDetails() {
 		.fail(requestFailMsg);
 }
 
+function onTrackDetailSubmit(event) {
+	event.preventDefault();
+	let formData = new FormData(event.target);
+	let pk = formData.get("pk");
+	let requestUrl = "/routes/track/" + (pk ? pk: "")
+	$.ajax({
+		url: requestUrl,
+		method: "POST",
+		data: formData,
+		processData: false,
+	    contentType: false,
+		dataType: "html",
+		success: function(data) {
+			if (data){showPopup(data);
+			} else {
+				popup.close();
+			}
+		},
+		error: requestFailMsg
+	});
+}
+
 /*
 // ------ place handling ------
 */
