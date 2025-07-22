@@ -159,6 +159,8 @@ class Track(models.Model):
     name = models.CharField(unique=True, max_length=40)
     track = models.MultiLineStringField(dim=3)
     # , srid=4326 is the default)
+    creator = models.CharField(max_length=50, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
     start_time = models.DateTimeField(blank=True, null=True)
     end_time = models.DateTimeField(blank=True, null=True)
     moving_time = models.FloatField(blank=True, null=True,
@@ -200,6 +202,8 @@ class Track(models.Model):
             log.info("converting track #%d name: %s in file %s",
                      track_num, track.name, fname)
             new_track = cls(user=user)
+            if hasattr(gpx, "creator"):
+                new_track.creator = gpx.creator
 
             # check filename is unique
             fname = os.path.basename(fname)  # remove dirname if present

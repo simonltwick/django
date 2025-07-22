@@ -20,7 +20,7 @@ const layerOsm = L.tileLayer(tilesOsm, { attribution: attrOsm });
 const linkOsm = '<a href="http://openstreetmap.org">OpenStreetMap</a>';
 
 // OpenCycleMap layer - requires an API key from thunderforest.com
-const ocmApiKey = JSON.parse(document.getElementById('ocm-api-key').textContent);
+const ocmApiKey = JSON.parse(document.getElementById('ocmApiKey').textContent);
 const hrefOcm = '<a href="http://thunderforest.com/">Thunderforest</a>';
 const attrOcm = '&copy; ' + linkOsm + ' Contributors & ' + hrefOcm;
 const tilesOcm = 'http://{s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey='
@@ -114,6 +114,19 @@ layerControl.addOverlay(tracksLayer, "Tracks");
 let tracksHidden = [];
 
 
+// show initial tracks, or if none, show welcome dialog
+let dialog = document.getElementById("map-dialog");
+const initialTracks = JSON.parse(document.getElementById('initialTracks'
+	).textContent);
+
+if (initialTracks) {
+	showTracks(initialTracks);
+} else {
+	/* show map dialog, pre-populated with a help/info message */
+	dialog.showModal();
+}
+
+// init preferences & place icons
 // get preference & buildPlaceIcons cannot be run in parallel
 $.get("/routes/api/preference", "json", function(data){
 	json_data = JSON.parse(data);
@@ -131,15 +144,6 @@ function buildPlaceIconDict(data) {
 	// console.info("buildPlaceIconDict:", data, placeIcons);
 }
 
-const trackPopupContent = `<h4>{{name}}</h4>
-<div class="spinner-border text-secondary" role="status">
-  <span class="visually-hidden">Loading tags...</span>
-</div>`;
-
-
-/* show map dialog, pre-populated with a help/info message */
-let dialog = document.getElementById("map-dialog");
-dialog.showModal();
 
 /* ----- end of initialisation ------ */
 
@@ -416,11 +420,22 @@ function onTrackMouseLeave(ev) {
 	layerChangeState(ev.target, 'track', false, null);
 }
 
+const trackPopupContent = `<h4>{{name}}</h4>
+<div class="spinner-border text-secondary" role="status">
+  <span class="invisible">Loading tags...</span>
+</div>`;
+
 function onTrackClick(event) {
 	L.DomEvent.stopPropagation(event);
 	popMarker = event.target;
 	popLocation = event.latlng;
-	requestUrl = '/routes/track/' + popMarker.feature.properties.pk;
+	let pk = popMarker.feature.properties.pk;
+	if (!pk) {
+		showPopup("<h4>"+ popMarker.feature.properties.name + `</h4>
+			<p>GPX for view only - no details stored in the database</p>`);
+		return;
+	}
+	requestUrl = '/routes/track/' + pk;
 	// temp content while waiting for response
 	const popupContent = trackPopupContent
 		.replaceAll('\{\{name\}\}', popMarker.feature.properties.name);
@@ -812,8 +827,8 @@ function showPopup(data) {
 		popup = L.popup();
 	}
 	popup.setContent(data)
-		 .openOn(map)
-		 .setLatLng(popLocation);
+		 .setLatLng(popLocation)
+		 .openOn(map);
 }
 
 function postMapDialogData(formData, dataType, successRoutine) {

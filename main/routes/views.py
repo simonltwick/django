@@ -49,7 +49,6 @@ class BikeLoginRequiredMixin(LoginRequiredMixin):
 
 
 def get_map_context(request) -> Dict:
-    # geojson serialiser has to be defined in settings.py
     ctx = {
         "places_count":  Place.objects.filter(user=request.user).count(),
         "tracks_count": Track.objects.filter(user=request.user).count(),
@@ -236,10 +235,13 @@ def parse_latlon(value: str) -> Tuple[float, float]:
 def _show_tracks(request, tracks: List[Track]):
     """ INTERNAL METHOD: no url.  show the given tracks on a map.
     Used by upload_file. """
-    # FIXME: this no longer works to show initial tracks
-    raise NotImplementedError("No longer working.")
-    ctx = {}
-    ctx["tracks"] = json.loads(serialize("geojson", tracks))
+    ctx = get_map_context(request)
+    # geojson serialiser has to be defined in settings.py
+    # don't serialise tag field because it requires track to have an id
+    # - if using view gpx the track is not saved
+    ctx["tracks"] = json.loads(
+        serialize("geojson", tracks, fields=["name", "track", "id"])
+        )
     return render(request, "map.html", context=ctx)
 
 
@@ -255,13 +257,14 @@ def upload_gpx(request, save=True):
     """
     if request.method == "POST":
         file = request.FILES.get('gpx_file')
-        log.info("uploading file %s, size %d", file.name, file.size)
+        log.info("uploading file %s, size %d, save=%s", file.name, file.size,
+                 save)
         form = UploadGpxForm2(request.POST, request.FILES)
         if form.is_valid():
             gpx = convert_file_to_gpx(form.cleaned_data['gpx_file'])
             if not gpx:
                 return HttpResponse("Failed to parse file", status=400)
-            log.info("gpx file %s parsed ok", gpx)
+            log.info("gpx file %s parsed ok, creator=%s", gpx, gpx.creator)
 
             try:
                 tracks = Track.new_from_gpx(
@@ -270,9 +273,10 @@ def upload_gpx(request, save=True):
                 log.warning(e.args[0])
                 return HttpResponse(status=400, content=e.args[0])
             # gpx_id = form.cleaned_data["id"]
-            for track in tracks:
-                track.save()
-                log.debug("saved track %s, id=%d", track.name, track.pk)
+            if save:
+                for track in tracks:
+                    track.save()
+                    log.debug("saved track %s, id=%d", track.name, track.pk)
             log.debug("request.GET=%s", request.GET)
             if request.GET.get("map") == "False":
                 return HttpResponse("OK", status=200)

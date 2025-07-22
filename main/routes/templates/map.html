@@ -21,9 +21,9 @@
 <link rel="stylesheet" href="{% static 'map.css' %}" />
 
 <script defer src="{% static 'map.js' %}"></script>
-{{ markersCount|json_script:"markers_count" }}
-{{ tracksCount|json_script:"tracks_count" }}
-{{ ocm_api_key|json_script:"ocm-api-key" }}
+{{ tracks|json_script:"initialTracks" }}
+{{ ocm_api_key|json_script:"ocmApiKey" }}
+
 {% endblock %}
 
 
