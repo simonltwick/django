@@ -55,7 +55,13 @@ const map = L.map("map", { layers: [layerOsm] })
 	// allow user to click anywhere & show popup with lat/lon
 	.on('click', onMapClick);
 
-map.fitWorld();
+try {
+	const initBounds = JSON.parse(document.getElementById('initBounds').textContent);
+	console.info("initBounds=", initBounds);
+	map.fitBounds(initBounds);
+} catch {
+	map.fitWorld();
+}
 
 
 // map controls - scale, overlays

@@ -14,6 +14,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
+from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import NumPoints
 from django.db.models import Exists, OuterRef
 from django.http import (
@@ -57,11 +58,38 @@ def get_map_context(request) -> Dict:
     return ctx
 
 
+def get_db_bounds(user) -> Optional[Tuple[Tuple[float, float],
+                                          Tuple[float, float]
+                                          ]]:
+    """ get the extent (bounds) of tracks & places, as a pair of lat-lon 
+    2-tuples - lower left, upper right bound.
+    Extent returns x,y coordinates, i.e. lon-lat """
+    track_bounds: Optional[Tuple] = Track.objects.filter(user=user).aggregate(
+        Extent('track'))['track__extent']
+    place_bounds: Optional[Tuple] = Place.objects.filter(user=user).aggregate(
+        Extent('location'))["location__extent"]
+    log.info("get_db_bounds(user=%s): track_bounds=%s, place_bounds=%s",
+             user.id, track_bounds, place_bounds)
+    if not track_bounds:
+        return ((place_bounds[1], place_bounds[0]),
+                (place_bounds[3], place_bounds[2]))
+
+    if not place_bounds:
+        return ((track_bounds[1], track_bounds[0]),
+                (track_bounds[3], track_bounds[2]))
+
+    return ((min(track_bounds[1], place_bounds[1]),
+             min(track_bounds[0], place_bounds[0])),
+            (max(track_bounds[3], place_bounds[3]),
+             max(track_bounds[2], place_bounds[2])))
+
+
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET"])
 def map(request):
     """ return an empty map with an info/help popup dialog """
     context = get_map_context(request)
+    context["bounds"] = get_db_bounds(request.user)
     return render(request, 'map.html', context=context)
 
 
