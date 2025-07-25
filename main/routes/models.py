@@ -215,7 +215,7 @@ class Track(models.Model):
                 fname_base, ext = os.path.splitext(fname)
                 new_track.name = f"{fname_base}#{track_num}{ext}"
             if cls.objects.filter(name=new_track.name, user=user).exists():
-                raise FileExistsError(f"duplicate filename: {new_track.name}")
+                raise FileExistsError(new_track.name)
 
             # add track segments
             segments = []

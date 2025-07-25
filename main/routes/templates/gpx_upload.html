@@ -10,6 +10,7 @@
   {% csrf_token %} 
   {{ form }}
   <p class="invalid-feedback">{{ form.non_field_errors }} </p>
+  <br />
   <p><input type="submit" class="btn btn-primary"
   	value="{% if save %}Upload{% else %}View{% endif %}">
   <a class="btn btn-secondary" href="/routes/map">Cancel</a></p>

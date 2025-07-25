@@ -11,34 +11,56 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
+# ref for multiple file uploads:
+# https://docs.djangoproject.com/en/5.2/topics/http/file-uploads/
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            result = [single_file_clean(d, initial) for d in data]
+        else:
+            result = [single_file_clean(data, initial)]
+        return result
+
+
 class UploadGpxForm2(forms.Form):
     """ a form to upload a gpx file.  Not a model form. """
     error_css_class = "error"
     required_css_class = "required"
     # TODO: use a custom widget to allow <input ... accept=".gpx">
-    gpx_file = forms.FileField()
+    gpx_file = MultipleFileField()
 
     def clean_gpx_file(self):
         """ ensure valid content type and size.  ref:
         http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
         """
-        uploaded_file = self.cleaned_data['gpx_file']
-        log.info("uploaded file content_type=%s", uploaded_file.content_type)
+        uploaded_files = self.cleaned_data['gpx_file']
+        for i, f in enumerate(uploaded_files):
+            log.info("gpx file #%d: %s content_type=%s",
+                     i+1, f.name, f.content_type)
+    
+            content_type = f.content_type
+            allowed_content_types = ['text/xml', 'application/octet-stream',
+                                     'application/gpx+xml']
+            if content_type not in allowed_content_types:
+                pass
+                #raise forms.ValidationError(
+                #    f'Content-Type {content_type!r} not supported.')
+    
+            if f.size > 2621440:
+                raise forms.ValidationError(
+                    'Please keep filesize under 2.5 MB. Current filesize %s'
+                    f'{filesizeformat(f.size)}')
 
-        content_type = uploaded_file.content_type
-        allowed_content_types = ['text/xml', 'application/octet-stream',
-                                 'application/gpx+xml']
-        if content_type not in allowed_content_types:
-            pass
-            #raise forms.ValidationError(
-            #    f'Content-Type {content_type!r} not supported.')
-
-        if uploaded_file.size > 2621440:
-            raise forms.ValidationError(
-                'Please keep filesize under 2.5 MB. Current filesize %s'
-                f'{filesizeformat(uploaded_file.size)}')
-
-        return uploaded_file
+        return uploaded_files
 
 
 class PlaceForm(forms.ModelForm):

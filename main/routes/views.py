@@ -295,31 +295,34 @@ def upload_gpx(request, save=True):
     https://web.archive.org/web/20160425053015/http://ipasic.com/article/uploading-parsing-and-saving-gpx-data-postgis-geodjango
     """
     if request.method == "POST":
-        file = request.FILES.get('gpx_file')
-        log.info("uploading file %s, size %d, save=%s", file.name, file.size,
-                 save)
         form = UploadGpxForm2(request.POST, request.FILES)
         if form.is_valid():
-            gpx = convert_file_to_gpx(form.cleaned_data['gpx_file'])
-            if not gpx:
-                return HttpResponse("Failed to parse file", status=400)
-            log.info("gpx file %s parsed ok, creator=%s", gpx, gpx.creator)
+            files = form.cleaned_data['gpx_file']
+            tracks: List[Track] = []
+            duplicate_filenames: List[str] = []
+            for file in files:
+                try:
+                    tracks.extend(handle_uploaded_gpx(request, file))
+                except TypeError as e:
+                    return HttpResponse(e, status=400)
+                except FileExistsError as e:
+                    duplicate_filenames.append(e.args[0])
 
-            try:
-                tracks = Track.new_from_gpx(
-                    gpx, form.cleaned_data['gpx_file'].name, user=request.user)
-            except FileExistsError as e:
-                log.warning(e.args[0])
-                return HttpResponse(status=400, content=e.args[0])
-            # gpx_id = form.cleaned_data["id"]
-            if save:
-                for track in tracks:
-                    track.save()
-                    log.debug("saved track %s, id=%d", track.name, track.pk)
-            log.debug("request.GET=%s", request.GET)
-            if request.GET.get("map") == "False":
-                return HttpResponse("OK", status=200)
-            return _show_tracks(request, tracks)
+            if duplicate_filenames:
+                log.warning("uploaded gpx filename(s) already in DB: %s",
+                            ', '.join(duplicate_filenames))
+                form.add_error("gpx_file",
+                               "The following track names are already "
+                               f"uploaded: {', '.join(duplicate_filenames)}")
+            else:
+                if save:
+                    for track in tracks:
+                        track.save()
+                        log.debug("saved track %s, id=%d", track.name, track.pk)
+                log.debug("request.GET=%s", request.GET)
+                if request.GET.get("map") == "False":
+                    return HttpResponse("OK", status=200)
+                return _show_tracks(request, tracks)
 
         log.info("form was not valid")
     else:
@@ -327,13 +330,20 @@ def upload_gpx(request, save=True):
     return render(request, "gpx_upload.html", {"form": form, "save": save})
 
 
-def convert_file_to_gpx(file: "UploadedFile") -> Optional[GPX]:
-    """ upload a gpx file and convert to a GPX object """
-    log.info("gpx file %s is valid", file.name)
+def handle_uploaded_gpx(request, file: "UploadedFile") -> List[Track]:
+    """ parse a gpx file and turn it into a list of Tracks.
+    Each GPX file can contain multiple tracks. """
+    log.info("uploading file %s, size %d", file.name, file.size)
+    # upload a gpx file and convert to a GPX object
     # decode the file as a text file (not binary)
     encoding = file.charset or 'utf-8'
     xml_string = file.read().decode(encoding=encoding)
-    return GPXParser(xml_string).parse()
+    gpx = GPXParser(xml_string).parse()
+    if not gpx:
+        raise TypeError(f"Failed to parse {file.name}" )
+    log.info("gpx file %s parsed ok, creator=%s", file.name, gpx.creator)
+    tracks = Track.new_from_gpx(gpx, file.name, user=request.user)
+    return tracks
 
 
 def test_save_gpx(_request):
