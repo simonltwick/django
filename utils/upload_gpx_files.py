@@ -5,6 +5,8 @@ Upload GPX files
 Upload GPX files in a directory, or recursively, checking first if they
 already exist on the server, and logging which files have been uploaded
 
+Help: upload_gpx_files.py -h 
+
 Created on 2 Jul 2025
 
 @author: simon
@@ -163,7 +165,7 @@ def handle_args() -> argparse.Namespace:
                         " into sub-directories (default: false)", default=False)
     parser.add_argument("--filename-filter", help="filter that filenames must "
                         "completely match to be uploaded, specified as a "
-                        "regular expression. Default: %(default)",
+                        "regular expression. Default: %(default)s",
                         type=re_pattern,
                         # 2019-05-30-09-30-15.gpx or 2019-05-30 09.05.15 Day.gpx
                         default=r"20(\d\d-){2}\d\d(( (\d\d.){2}\d\d Day)|"
@@ -173,24 +175,24 @@ def handle_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--query_url", help="url to query if the track filename exists "
-        "(default=%(default))",
+        "(default=%(default)s)",
         default="http://localhost:8000/routes/api/track?name=")
     parser.add_argument(
         "--login_path", help="the PATH only part of the path to login to server"
-        " (the host name is assumed to be the same).   (default=%(default))",
+        " (the host name is assumed to be the same).   (default=%(default)s)",
         default="/accounts/login/")
     parser.add_argument(
         "--logout_path", help="the PATH only part of the logout url"
-        " (the host name is assumed to be the same).  Default:%(default)",
+        " (the host name is assumed to be the same).  Default:%(default)s",
         default="/routes/logout/")
     parser.add_argument(
         "--upload_path", help="the PATH only part of the upload url"
-        " (the host name is assumed to be the same).  Default:%(default)",
+        " (the host name is assumed to be the same).  Default:%(default)s",
         default="/routes/gpx/upload")
     parser.add_argument(
         "--db-filename", help="the filename of the db file that tracks which"
         " files have already been uploaded to the server.  Default:"
-        " %(default)", default=Path(__file__).parent / 'gpx_upload_log.db')
+        " %(default)s", default=Path(__file__).parent / 'gpx_upload_log.db')
     # add a few derived arguments: upload_path
     args = parser.parse_args()
     url = urlparse(args.query_url)._replace(query='')
