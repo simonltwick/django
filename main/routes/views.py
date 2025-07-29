@@ -2,7 +2,7 @@
 """ views for routes app """
 import json
 import logging
-from typing import TYPE_CHECKING, Optional, List, Dict, Tuple
+from typing import TYPE_CHECKING, Optional, List, Dict, Tuple,Set
 
 from gpxpy.parser import GPXParser
 from gpxpy.gpx import GPX
@@ -16,7 +16,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import NumPoints
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, QuerySet
+from django.db.utils import IntegrityError
 from django.http import (
     HttpResponseRedirect, HttpResponse, JsonResponse, HttpResponseForbidden,
     Http404)
@@ -285,7 +286,7 @@ def _show_tracks(request, tracks: List[Track]):
 
 
 @login_required(login_url=LOGIN_URL)
-def upload_gpx(request, save=True):
+def upload_gpx(request, save: bool=True):
     """ upload a gpx file and convert to a Track (or Tracks).
     If save=True, save the Track(s) in the DB, otherwise just view without
     saving
@@ -302,7 +303,7 @@ def upload_gpx(request, save=True):
             duplicate_filenames: List[str] = []
             for file in files:
                 try:
-                    tracks.extend(handle_uploaded_gpx(request, file))
+                    tracks.extend(handle_uploaded_gpx(request, file, save=save))
                 except TypeError as e:
                     return HttpResponse(e, status=400)
                 except FileExistsError as e:
@@ -316,23 +317,52 @@ def upload_gpx(request, save=True):
                                f"uploaded: {', '.join(duplicate_filenames)}")
             else:
                 if save:
-                    for track in tracks:
-                        track.save()
-                        log.debug("saved track %s, id=%d", track.name, track.pk)
-                log.debug("request.GET=%s", request.GET)
-                if request.GET.get("map") == "False":
-                    return HttpResponse("OK", status=200)
-                return _show_tracks(request, tracks)
+                    errors = save_uploaded_tracks(request, tracks)
+                    for error in errors:
+                        form.add_error("gpx_file", error)
+                if form.is_valid():  # re-check for errors
+                    # log.debug("request.GET=%s", request.GET)
+                    if request.GET.get("map") == "False":
+                        return HttpResponse("OK", status=200)
+                    return _show_tracks(request, tracks)
 
-        log.info("form was not valid")
+        log.info("errors were found")
     else:
         form = UploadGpxForm2()
-    return render(request, "gpx_upload.html", {"form": form, "save": save})
+    tags = get_all_tags(request)
+    return render(request, "gpx_upload.html", {"form": form, "save": save, "tags": tags})
 
 
-def handle_uploaded_gpx(request, file: "UploadedFile") -> List[Track]:
+def save_uploaded_tracks(request, tracks) -> List[str]:
+    """ save any uploaded tracks, with tags, and return a list of errors """
+    # create new tags & get tag ids of new & checked tags
+    tag_ids = get_checked_tag_ids(request)
+    new_tag_names = get_new_tag_names(request)
+    for tag_name in new_tag_names:
+        tag = Tag(user=request.user, name=tag_name)
+        tag.save()
+        log.debug("added new tag %s, id=%d",tag.name, tag.pk)
+        tag_ids.add(tag.pk)
+    # save the tracks & link to tags
+    errors: List[str] = []
+    for track in tracks:
+        try:
+            track.save()
+        except IntegrityError as e:
+            log.error("Error saving track %s of %s: %r, track.track=%s",
+                      track.name, len(tracks), e, str(track.track)[:1000])
+            errors.append(f"Error saving track {track.name}: "
+                           f"{e!r}")
+            continue
+        log.debug("saved track %s, id=%d", track.name, track.pk)
+        track.tag.add(*tag_ids)
+    return errors
+
+
+def handle_uploaded_gpx(request, file: "UploadedFile", save: bool) -> List[Track]:
     """ parse a gpx file and turn it into a list of Tracks.
-    Each GPX file can contain multiple tracks. """
+    Each GPX file can contain multiple tracks. 
+    If Save is False, don't check for duplicate filename """
     log.info("uploading file %s, size %d", file.name, file.size)
     # upload a gpx file and convert to a GPX object
     # decode the file as a text file (not binary)
@@ -342,7 +372,7 @@ def handle_uploaded_gpx(request, file: "UploadedFile") -> List[Track]:
     if not gpx:
         raise TypeError(f"Failed to parse {file.name}" )
     log.info("gpx file %s parsed ok, creator=%s", file.name, gpx.creator)
-    tracks = Track.new_from_gpx(gpx, file.name, user=request.user)
+    tracks = Track.new_from_gpx(gpx, file.name, user=request.user, save=save)
     return tracks
 
 
@@ -605,8 +635,8 @@ def place_tags(request, pk: int):
                 tag_id=OuterRef('pk'), place_id=pk)
                 )
             ).order_by("-is_checked")
-        tags_str = ', '.join(f"{tag}: checked={tag.is_checked}" for tag in tags)
-        log.info("tags=%s", tags_str)
+        # tags_str = ', '.join(f"{tag}: checked={tag.is_checked}" for tag in tags)
+        # log.info("tags=%s", tags_str)
         return render(request, 'tag_list.html', context={
             "tags": tags, "object_type": "place", "pk": pk,
             "instance": instance})
@@ -629,8 +659,8 @@ def track_tags(request, pk: int):
                 tag_id=OuterRef('pk'), track_id=pk)
                 )
             ).order_by("-is_checked")
-        tags_str = ', '.join(f"{tag}: checked={tag.is_checked}" for tag in tags)
-        log.info("tags=%s", tags_str)
+        # tags_str = ', '.join(f"{tag}: checked={tag.is_checked}" for tag in tags)
+        # log.info("tags=%s", tags_str)
         return render(request, 'tag_list.html', context={
             "tags": tags, "object_type": "track", "pk": pk,
             "instance": instance})
@@ -640,13 +670,39 @@ def track_tags(request, pk: int):
     return HttpResponseRedirect(reverse_lazy("routes:track", kwargs={"pk": pk}))
 
 
+def get_all_tags(request) -> List[Tag]:
+    """ return a list of all tags for a user, marking those checked or named
+    in the previous POST request """
+    tags = Tag.objects.filter(user=request.user).all()
+    if request.method == 'POST':
+        # check POST data for checked tags and set .is_checked
+        checked_tag_ids: Set[str] = get_checked_tag_ids(request)
+        new_tag_names: Set[str] = set(get_new_tag_names(request))
+        for tag in tags:
+            tag.is_checked = (tag.pk in checked_tag_ids
+                              or tag.name in new_tag_names)
+    return tags
+
+
+def get_checked_tag_ids(request) -> Set[str]:
+    """ return the set of checked tag keys from a post request """
+    # only checked checkboxes are returned in the POST data
+    return {int(key[4:]) for key in request.POST.keys()
+        if key.startswith("tag_")}
+
+
+def get_new_tag_names(request) -> List[str]:
+    """ return a list of non-blank new tag names """
+    return [tag_name.strip()
+            for tag_name in request.POST.get('new-tags').split(',')
+            if tag_name.strip()]
+
+
 def handle_tags_update(request, instance):
     """ handle a tags update post for either a place or a track """
     log.debug("%s_tags: request.POST=%s", type(instance), request.POST)
     # ensure checked tags match checked tags in instance (including any unchecked)
-    checked_tag_ids = {int(key[4:]) for key in request.POST.keys()
-                       # only checked checkboxes are returned
-                       if key.startswith("tag_")}
+    checked_tag_ids = get_checked_tag_ids(request)
     current_tag_ids = {tag.id for tag in instance.tag.all()}
     log.debug("current_tag_ids=%s, checked_tag_ids=%s", current_tag_ids,
               checked_tag_ids)
@@ -659,10 +715,10 @@ def handle_tags_update(request, instance):
         log.info("adding tag ids %s", added_tag_ids)
         instance.tag.add(*added_tag_ids)
     # add any new tags
-    new_tag_names = request.POST.get('new-tags')
+    new_tag_names = get_new_tag_names(request)
     if new_tag_names:
-        log.info("adding new tag names %s", new_tag_names.split(','))
-        for name in new_tag_names.split(','):
+        log.info("adding new tag names %s", new_tag_names)
+        for name in new_tag_names:
             # create, save and link the new tag
             instance.tag.create(name=name, user=request.user)
     instance.save()

@@ -1,11 +1,6 @@
-<!-- fragment form for tags for a track or place -->
-<a class="nav-link x-icon" href="#" onClick="onCloseMapDialog()"
-	data-bs-toggle="tooltip" title="Close dialog">
-	&times;
-	</a>
-<h4>Tags for {{instance}}</h4>
-<form id="tagsForm" onsubmit="onTagsFormSubmit(event, '{{object_type}}')">
-{% csrf_token %}
+<!-- fragment of a form for tags for uploaded tracks -->
+<fieldset>
+<legend>Tags for {{ instance|default:"uploaded file(s)" }}</legend>
 <input type="hidden" name="pk" value="{{ pk }}">
 {% if tags %}
 <ul class="no-bullet tag-list">
@@ -23,6 +18,4 @@
 <input id="new-tags" name="new-tags" type="text"
   pattern="[A-Za-z][A-Za-z0-9+\-&amp;]*">
 <div class="form-text">Separate tag names by commas</div></div>
-<br />
-<button type="submit" class="btn btn-outline-primary">Save</button>
-</form>
+</fieldset>

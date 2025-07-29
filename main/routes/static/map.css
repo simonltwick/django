@@ -9,35 +9,6 @@ html, body, #map {height: 100%; width: 100%;}  /* 100vw;} */
 			color: black; font-size: 1em; padding-top: 0;}
 .plus-icon {color: green; font-size: 1em;}
 
-
-.tag-list>li, button.tag-edit {
-	display: inline;
-	border-style: solid; /* solid solid none; */
-	border-color: gray;
-	border-width: 1px;
-	border-radius: 1em 2px 2px 1em;
-	padding-top: 1px;
-	padding-bottom: 1px;
-	padding-left: 4px;
-	padding-right: 2px;
-	margin: 1px;
-	/* or use clip-path to specify a custom shape */
-}
-
-.tag-list>li:hover {
-	cursor: pointer;
-	background-color: lightgray;
-}
-
-.tag-list input:checked+label {
-	font-weight: bold;
-}
-
-li.no-bullet {
-	list-style-type: none;
-	list-style: none;
-}
-
 .nav-control {
 	background-color: rgba(255, 255, 255, 0.7);
 	color: #bbb;

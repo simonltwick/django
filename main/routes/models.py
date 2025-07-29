@@ -177,9 +177,11 @@ class Track(models.Model):
         ]
 
     @classmethod
-    def new_from_gpx(cls, gpx: "GPX", fname: str, user: User) -> List["Track"]:
+    def new_from_gpx(cls, gpx: "GPX", fname: str, user: User, save: bool
+                     ) -> List["Track"]:
         """ convert a GPX object to a track (or possibly, several tracks)
-        but DO NOT SAVE the tracks """
+        but DO NOT SAVE the tracks 
+        If Save is false, don't check for duplicate filenames."""
 
         # """
         # if gpx.waypoints:
@@ -214,7 +216,8 @@ class Track(models.Model):
             else:
                 fname_base, ext = os.path.splitext(fname)
                 new_track.name = f"{fname_base}#{track_num}{ext}"
-            if cls.objects.filter(name=new_track.name, user=user).exists():
+            if save and cls.objects.filter(name=new_track.name, user=user
+                                           ).exists():
                 raise FileExistsError(new_track.name)
 
             # add track segments
@@ -227,12 +230,16 @@ class Track(models.Model):
                                              point.elevation)
                     points.append(point_in_segment.coords)
 
-                segments.append(LineString(points))
+                if points:
+                    segments.append(LineString(points))
 
-            new_track.track = MultiLineString(segments)
-            # new_track.gpx_file = file_instance
-            new_track.add_gpx_stats(track)
-            tracks.append(new_track)
+            if segments:
+                new_track.track = MultiLineString(segments)
+                # log.debug("track %s has %d segments",
+                #           new_track.name, len(segments))
+                # new_track.gpx_file = file_instance
+                new_track.add_gpx_stats(track)
+                tracks.append(new_track)
 
         return tracks
 

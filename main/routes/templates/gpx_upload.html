@@ -1,6 +1,12 @@
 {% extends 'bike/base.html' %}
+{% load static %}
+
 {% block title %}
 {% if save %}Upload{% else %}View{% endif %} GPX file
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{% static 'tags.css' %}" />
 {% endblock %}
 
 {% block content %}
@@ -8,6 +14,9 @@
   <form method="POST" enctype="multipart/form-data"
     action="{% if save %}{% url 'routes:gpx_upload' %}{% else %}{% url 'routes:gpx_view' %}{% endif %}">
   {% csrf_token %} 
+  {% if save %}
+  {% include "tags_for_upload.html" %}
+  {% endif %}
   {{ form }}
   <p class="invalid-feedback">{{ form.non_field_errors }} </p>
   <br />
