@@ -242,14 +242,15 @@ def track_json(request):
         limits, prefs = nearby_search_params(request)
         nearby_tracks: dict = Track.nearby(limits, prefs)
         log.info("track_json returned %d tracks", len(nearby_tracks))
-        msg = json.loads(serialize("geojson", nearby_tracks))
+        msg = json.loads(serialize(
+            "geojson", nearby_tracks, fields=["name", "track", "pk"]))
         return JsonResponse(msg, status=200)
 
     # "HEAD": just return num_points if the track is there.  Search by ?name=
     name = request.GET.get("name")
     if name is None:
         log.error("HEAD request requires a search param ?name=")
-        return HttpResponse("HEAD request without search params ?name=", 
+        return HttpResponse("HEAD request without search params ?name=",
                             status=400)
     try:
         track = Track.objects.annotate(num_points=NumPoints("track")
@@ -280,7 +281,7 @@ def _show_tracks(request, tracks: List[Track]):
     # don't serialise tag field because it requires track to have an id
     # - if using view gpx the track is not saved
     ctx["tracks"] = json.loads(
-        serialize("geojson", tracks, fields=["name", "track", "id"])
+        serialize("geojson", tracks, fields=["name", "track", "id", "pk"])
         )
     return render(request, "map.html", context=ctx)
 

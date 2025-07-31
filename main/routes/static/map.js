@@ -435,6 +435,8 @@ function onTrackClick(event) {
 	L.DomEvent.stopPropagation(event);
 	popMarker = event.target;
 	popLocation = event.latlng;
+	console.info("onTrackClick: popMarker.feature.properties=", 
+		popMarker.feature.properties);
 	let pk = popMarker.feature.properties.pk;
 	if (!pk) {
 		showPopup("<h4>"+ popMarker.feature.properties.name + `</h4>
