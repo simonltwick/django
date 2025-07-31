@@ -109,6 +109,22 @@ const trackStyle = {color: '#ff00ff',
     weight: 3,
     opacity: 0.5
 };
+const startMarkerStyle = {
+	radius: 2,  // should be bigger than the track style
+	weight: 1,  // line around circumference
+	opacity: 0.5,
+	color: "#00ff00",
+	fill: true,
+	fillOpacity: 0.5
+	};
+const stopMarkerStyle = {
+	radius: 2,  // should be bigger than the track style
+	weight: 1,  // line around circumference
+	opacity: 0.5,
+	color: "#ff0000",  // for fill and circumference
+	fill: true,
+	fillOpacity: 0.5
+	};
 
 // add layers for tracks & places
 
@@ -368,10 +384,10 @@ function showTracks(trackList) {
 }
 
 function onTrackShow(feature, layer) {
-	/*if (feature.geometry && feature.geometry.type
+	if (feature.geometry && feature.geometry.type
 			&& feature.geometry.type == "MultiLineString") {
 		addTrackStartStopMarkers(feature, layer);
-	} */
+	}
 	
 	layer.on({
 		click: onTrackClick,
@@ -380,6 +396,25 @@ function onTrackShow(feature, layer) {
 		});
 	// addToTrackSidebar(feature, layer);
 }
+
+function addTrackStartStopMarkers(feature, _layer) {
+	// add start & stop markers to the layer representation of a track
+	let startStopMarkers = [];
+	feature.geometry.coordinates.forEach(function(trackSegCoords) {
+		if (trackSegCoords.length) {
+			let startLatLng = [trackSegCoords[0][1], trackSegCoords[0][0]];
+			let startMarker = L.circleMarker(startLatLng, startMarkerStyle)
+				.addTo(tracksLayer);
+			let end = trackSegCoords.length -1;
+			let stopLatLng = [trackSegCoords[end][1], trackSegCoords[end][0]];
+			let stopMarker = L.circleMarker(stopLatLng, stopMarkerStyle)
+				.addTo(tracksLayer);
+			startStopMarkers.push([startMarker, stopMarker]);
+		}
+	});
+	feature.properties.startStopMarkers = startStopMarkers;
+}
+
 
 function trackHide(marker) {
 	if (!marker) {
@@ -395,8 +430,8 @@ function trackHide(marker) {
 	if (marker.feature.properties.startStopMarkers) {
 		for (const startStopMarker
 				of marker.feature.properties.startStopMarkers) {
-			startStopMarker[0].removeFrom(tracksOverlay);
-			startStopMarker[1].removeFrom(tracksOverlay);
+			startStopMarker[0].removeFrom(tracksLayer);
+			startStopMarker[1].removeFrom(tracksLayer);
 		}
 	}
 	popMarker.closePopup();
@@ -444,8 +479,6 @@ function onTrackClick(event) {
 	L.DomEvent.stopPropagation(event);
 	popMarker = event.target;
 	popLocation = event.latlng;
-	console.info("onTrackClick: popMarker.feature.properties=", 
-		popMarker.feature.properties);
 	let pk = popMarker.feature.properties.pk;
 	if (!pk) {
 		showPopup("<h4>"+ popMarker.feature.properties.name + `</h4>
