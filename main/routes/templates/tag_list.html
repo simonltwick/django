@@ -3,7 +3,7 @@
 	data-bs-toggle="tooltip" title="Close dialog">
 	&times;
 	</a>
-<h4>Tags for {{instance}}</h4>
+<h4>Tags for {{instance.name}}</h4>
 <form id="tagsForm" onsubmit="onTagsFormSubmit(event, '{{object_type}}')">
 {% csrf_token %}
 <input type="hidden" name="pk" value="{{ pk }}">
