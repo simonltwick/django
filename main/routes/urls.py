@@ -9,6 +9,7 @@ app_name = 'routes'  # for url namespacing
 urlpatterns = [
 #     path("map/", TemplateView.as_view(template_name="map.html")),
     path("map/", views.map, name="map"),
+    path("map/search", views.map, {"search": True}, name="map_search"),
     path("gpx/upload", views.upload_gpx, name="gpx_upload"),
     path("gpx/view", views.upload_gpx, {"save": False}, name="gpx_view"),
     # path("track/test", views.test_save_gpx),

@@ -25,6 +25,7 @@
 {{ tracks|json_script:"initialTracks" }}
 {{ bounds|json_script:"initBounds" }}
 {{ ocm_api_key|json_script:"ocmApiKey" }}
+{{ search|json_script:"initSearch" }}
 
 {% endblock %}
 
@@ -38,6 +39,9 @@
 	data-bs-toggle="tooltip" title="Close dialog">
 	&times;
 	</a>
+{% if search %}
+<h4>Search</h4>
+{% else %}
 <h4>Map page</h4>
 <p>There are {{ places_count }} places and {{ tracks_count }} tracks defined.
 </p>
@@ -46,5 +50,6 @@
 <li>To add a new place, click on the map</li>
 <li>To upload GPX tracks, use the menu</li>
 </ul>
+{% endif %}
 </dialog>
 {% endblock %}

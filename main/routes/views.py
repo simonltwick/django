@@ -87,10 +87,12 @@ def get_db_bounds(user) -> Optional[Tuple[Tuple[float, float],
 
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET"])
-def map(request):
-    """ return an empty map with an info/help popup dialog """
+def map(request, search: bool=False):
+    """ return an empty map with an info/help popup dialog.
+    If search is true, popup a map search dialog instead """
     context = get_map_context(request)
     context["bounds"] = get_db_bounds(request.user)
+    context["search"] = search
     return render(request, 'map.html', context=context)
 
 

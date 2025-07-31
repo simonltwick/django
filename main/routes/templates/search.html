@@ -3,9 +3,13 @@
 	data-bs-toggle="tooltip" title="Close dialog">
 	&times;
 	</a>
+	
 <h4>Search</h4>
+<small class="text-muted">To search by location, click anywhere on the map and
+click the magnifying glass icon.   Otherwise, use this form.</small>
+
 <nav>
-<ul class="nav nav-tabs" id="searchTab" role="tablist">
+ <ul class="nav nav-tabs" id="searchTab" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active" id="tracks-search-tab" type="button" role="tab"
     data-toggle="tab" data-target="#tracks-search"
@@ -18,12 +22,12 @@
     aria-controls="places-search" aria-selected="false">
     Places</button>
   </li>
-</ul>
+ </ul>
 </nav>
 
-    <form id="searchForm" onsubmit="onSearchFormSubmit(event)">
-      {% csrf_token %}
-<div class="tab-content" id="searchTabContent">
+<form id="searchForm" onsubmit="onSearchFormSubmit(event)">
+ {% csrf_token %}
+ <div class="tab-content" id="searchTabContent">
   <div class="tab-pane fade show active" id="tracks-search" role="tabpanel"
   	aria-labelledby="tracks-tab">
 	  <table>{{ track_form.as_table }}</table>
@@ -33,7 +37,6 @@
     
       <table>{{ place_form.as_table }}</table>
   </div>
-</div>
-	  <button type="submit" class="btn btn-outline-primary">Search</button>
-	</form>
-
+ </div>
+ <button type="submit" class="btn btn-outline-primary">Search</button>
+</form>

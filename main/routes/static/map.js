@@ -132,6 +132,12 @@ if (initialTracks) {
 	dialog.showModal();
 }
 
+// was the map initialised for a search?  if so, show the search dialog
+const initSearch = JSON.parse(document.getElementById('initSearch').textContent);
+if (initSearch) {
+	onRoutesSearch();
+}
+
 // init preferences & place icons
 // get preference & buildPlaceIcons cannot be run in parallel
 $.get("/routes/api/preference", "json", function(data){
@@ -149,6 +155,7 @@ function buildPlaceIconDict(data) {
 	refreshPlaceIconDict(data);
 	// console.info("buildPlaceIconDict:", data, placeIcons);
 }
+
 
 
 /* ----- end of initialisation ------ */
@@ -238,7 +245,9 @@ function replaceMapOverlay(oldOverlay, newOverlay, overlayName) {
 function onRoutesSearch() {
 	// search tracks or places from a form.
 	getMapDialogData("/routes/api/search/");
-	popup.close();
+	if (popup) {
+		popup.close();
+	}
 }
 
 function onSearchFormSubmit(event) {
