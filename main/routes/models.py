@@ -230,7 +230,7 @@ class Track(models.Model):
                                              point.elevation)
                     points.append(point_in_segment.coords)
 
-                if points:
+                if len(points) > 1:
                     segments.append(LineString(points))
 
             if segments:
