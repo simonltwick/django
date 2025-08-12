@@ -54,7 +54,7 @@ class UploadGpxForm2(forms.Form):
                 pass
                 #raise forms.ValidationError(
                 #    f'Content-Type {content_type!r} not supported.')
-    
+
             if f.size > 2621440:
                 raise forms.ValidationError(
                     'Please keep filesize under 2.5 MB. Current filesize %s'
@@ -103,7 +103,7 @@ class CustomSelectWidget(forms.widgets.Select):
 
 
 class PreferenceForm(forms.ModelForm):
-    error_css_class = "error"
+    error_css_class = "text-danger"
     required_css_class = "required"
     class Meta:
         model = Preference
@@ -112,7 +112,7 @@ class PreferenceForm(forms.ModelForm):
 
 
 class PlaceTypeForm(forms.ModelForm):
-    error_css_class = "error"
+    error_css_class = "text-danger"
     required_css_class = "required"
 
     class Meta:
@@ -142,16 +142,22 @@ track_years = [
 
 
 class TrackSearchForm(forms.Form):
+    error_css_class = "text-danger"
     start_date = forms.DateField(
         required=False, widget=forms.SelectDateWidget(years=track_years))
     end_date = forms.DateField(
         required=False, widget=forms.SelectDateWidget(years=track_years))
+    track_tags = forms.CharField(
+        max_length=50, required=False,
+        help_text="Enter tag names separated by commas")
 
     def clean(self):
         cleaned_data = super().clean()
-        if not (cleaned_data["start_date"] or cleaned_data["end_date"]):
+        if not (cleaned_data["start_date"] or cleaned_data["end_date"]
+                or cleaned_data["track_tags"]):
             raise forms.ValidationError(
-                "At least one of start_date or end_date must be specified.")
+                "At least one of start date, end date or tags "
+                "must be specified.")
         return cleaned_data
 
 
@@ -160,17 +166,22 @@ class TrackSearchForm(forms.Form):
 
 
 class PlaceSearchForm(forms.Form):
+    error_css_class = "text-danger"
     name = forms.CharField(max_length=40, required=False)
     type = forms.ModelMultipleChoiceField(
         queryset=PlaceType.objects,
         widget=forms.CheckboxSelectMultiple,
         required=False)
+    place_tags = forms.CharField(
+        max_length=50, required=False,
+        help_text="Enter tag names separated by commas")
 
     def clean(self):
         cleaned_data = super().clean()
-        if not (cleaned_data["name"] or cleaned_data["type"]):
+        if not (cleaned_data["name"] or cleaned_data["type"]
+                or cleaned_data["place_tags"]):
             raise forms.ValidationError(
-                "At least one of name or type(s) must be specified.")
+                "At least one of name, type or tags must be specified.")
         return cleaned_data
 
 

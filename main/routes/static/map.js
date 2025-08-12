@@ -57,7 +57,6 @@ const map = L.map("map", { layers: [layerOsm] })
 
 try {
 	const initBounds = JSON.parse(document.getElementById('initBounds').textContent);
-	console.info("initBounds=", initBounds);
 	map.fitBounds(initBounds);
 } catch {
 	map.fitWorld();
@@ -273,6 +272,11 @@ function onSearchFormSubmit(event) {
 	requestUrl = '/routes/api/search/?search_type=' + searchType;
 	$.post(requestUrl, $('#searchForm').serialize(), searchResults, null
 		).fail(requestFailMsg); 
+	if (searchType == "track") {
+		tracksLayer.clearLayers();
+	} else {
+		placesLayer.clearLayers();
+	}
 	/* this automatically parses result data to json or html/text */
 }
 
@@ -305,7 +309,7 @@ function requestFailMsg(jqXHR, textStatus, errorThrown) {
 		msg = "Status code " + jqXHR.status + ": " + jqXHR.statusText;
 	}
 	msg = "Server request " + requestUrl + " returned " + msg;
-	window.alert(msg + ': ' + textStatus);
+	alert(msg + ': ' + textStatus);
 	// log_error(msg, errMsg);
 }
 

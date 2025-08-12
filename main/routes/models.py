@@ -66,7 +66,7 @@ def get_default_user() -> int:
 
 class Tag(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    name = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=20, unique=True, db_collation="NOCASE")
 
     def __str__(self):
         return self.name

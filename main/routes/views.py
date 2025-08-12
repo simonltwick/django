@@ -108,7 +108,6 @@ def search(request):
             "track_form": track_form, "place_form": place_form})
 
     search_type = request.GET.get("search_type")
-    log.info("POST search/?search_type=%s", search_type)
     track_form = TrackSearchForm(request.POST)
     place_form = PlaceSearchForm(request.POST)
     if search_type == "track":
@@ -124,12 +123,20 @@ def search(request):
         end_date = track_form.cleaned_data["end_date"]
         if end_date is not None:
             tracks = tracks.filter(start_time__lte=end_date)
+        tags = track_form.cleaned_data.get("track_tags")
+        if tags is not None:
+            tag_names = [tag.strip() for tag in tags.split(',')]
+            tags = Tag.objects.filter(user=request.user, name__in=tag_names
+                                      ).distinct()
+            tracks = tracks.filter(tag__in=tags).distinct()
+        result_count = tracks.count()
         tracks=tracks[:request.user.routes_preference.track_search_result_limit]
         tracks_json = json.loads(serialize("geojson", tracks))
-        log.info("search ? track: %d tracks returned",
-                 len(tracks_json["features"]))
-        return JsonResponse({"status": "success", "tracks": tracks_json},
-                            status=200)
+        log.info("search ? track: %d of %d tracks returned",
+                 len(tracks_json["features"]), result_count)
+        return JsonResponse(
+            {"status": "success", "count": result_count, "tracks": tracks_json},
+            status=200)
     if search_type != 'place':
         log.error("search_type not recognised: POST=%s", request.POST)
         return HttpResponse("Search_type not defined", status=400)
@@ -153,6 +160,12 @@ def search(request):
         if types.count() > 0:
             # log.info("search?place: filtering for type in %s", cleaned_data["type"])
             places = places.filter(type__in=cleaned_data["type"])
+    tags = cleaned_data.get("place_tags")
+    if tags is not None:
+        tag_names = [tag.strip() for tag in tags.split(',')]
+        tags = Tag.objects.filter(user=request.user, name__in=tag_names
+                                  ).distinct()
+        places = places.filter(tag__in=tags).distinct()
     places = places[
         :request.user.routes_preference.place_search_result_limit]
     places_json = json.loads(serialize("geojson", places))

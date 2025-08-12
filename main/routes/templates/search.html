@@ -28,15 +28,17 @@ click the magnifying glass icon.   Otherwise, use this form.</small>
 <form id="searchForm" onsubmit="onSearchFormSubmit(event)">
  {% csrf_token %}
  <div class="tab-content" id="searchTabContent">
+ 
   <div class="tab-pane fade show active" id="tracks-search" role="tabpanel"
   	aria-labelledby="tracks-tab">
-	  <table>{{ track_form.as_table }}</table>
+	  <table class="table table-sm">{{ track_form.as_table }}</table>
   </div>
+
   <div class="tab-pane fade" id="places-search" role="tabpanel"
     aria-labelledby="places-search-tab">
-    
-      <table>{{ place_form.as_table }}</table>
+      <table class="table table-sm">{{ place_form.as_table }}</table>
   </div>
+
  </div>
  <button type="submit" class="btn btn-outline-primary">Search</button>
 </form>
