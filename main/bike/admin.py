@@ -7,7 +7,7 @@ from .models import (
 
 admin.site.register(Component)
 admin.site.register(ComponentType)
-admin.site.register(Ride)
+# admin.site.register(Ride)
 admin.site.register(Bike)
 admin.site.register(Odometer)
 admin.site.register(Preferences)
@@ -44,3 +44,9 @@ class MaintActionHistoryAdmin(admin.ModelAdmin):
     readonly_fields=('bike', 'component', 'action',)
     fields=('bike', 'component', 'action',
             'completed_date', 'distance', 'distance_units')
+
+
+@admin.register(Ride)
+class RideAdmin(admin.ModelAdmin):
+    readonly_fields=('rider',)
+    date_hierarchy='date'

@@ -56,7 +56,6 @@ urlpatterns = [
          name='mileage'),
     path('mileage_graph', views.mileage_graph, name='mileage_graph'),
     path('mileage_graph/<int:year>', views.mileage_graph, name='mileage_graph'),
-    
 
     path('odometer/readings', views.OdometerList.as_view(),
          name='odometer_readings'),
