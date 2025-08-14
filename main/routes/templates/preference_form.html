@@ -5,7 +5,7 @@
   <span aria-hidden="true">&times;</span>
 </button>
 <h4>Preferences for {{ object.user }}</h4>
-<form onsubmit="onPreferencesSubmit(event)" method="post">
+<form onsubmit="onPreferenceSubmit(event)" method="post">
 	{% csrf_token %}
 	<input type="hidden" name="pk" value="{{ object.pk|default_if_none:'' }}">
 	<table>

@@ -271,8 +271,6 @@ class Track(models.Model):
                     m=prefs.track_nearby_search_distance_metres)))
             else:
                 raise QueryStringError(f"unrecognised query keyword {key!r}")
-        # limit the number of results returned
-        query = query[:prefs.track_search_result_limit]
         return query
 
     def add_gpx_stats(self, gpx_track: "GPXTrack"):

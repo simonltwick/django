@@ -890,7 +890,7 @@ function afterPreferenceSubmit(data) {
 
 function updatePreference(data) {
 	if (data[0].model != "routes.preference") {
-		console.error("Invalid preference data:", data);
+		console.error("Invalid preference data:", data, "data[0]=", data[0]);
 		throw "invalid preference data";
 	}
 	// init preference (a list of 1 item is sent)

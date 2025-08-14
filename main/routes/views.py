@@ -132,9 +132,6 @@ def search(request):
             tracks = tracks.filter(tag__in=tags).distinct()
         result_count = tracks.count()
         result_limit = request.user.routes_preference.track_search_result_limit
-        if result_count > result_limit:
-            messages.warning(
-                request, f"showing {result_limit} of {result_count} tracks")
         tracks=tracks[:result_limit]
         tracks_json = json.loads(serialize("geojson", tracks))
         log.info("search ? track: %d of %d tracks returned",
@@ -260,8 +257,11 @@ def track_json(request):
     log.info("track_json(%s): GET=%s", request.method, request.GET)
     if request.method == "GET":
         limits, prefs = nearby_search_params(request)
-        nearby_tracks: dict = Track.nearby(limits, prefs)
-        log.info("track_json returned %d tracks", len(nearby_tracks))
+        nearby_tracks: QuerySet = Track.nearby(limits, prefs)
+        result_count = nearby_tracks.count()
+        nearby_tracks = nearby_tracks[:prefs.track_search_result_limit]
+        log.info("track_json returned %d of %d tracks", len(nearby_tracks),
+                 result_count)
         msg = json.loads(serialize(
             "geojson", nearby_tracks, fields=["name", "track", "pk"]))
         return JsonResponse(msg, status=200)
@@ -761,7 +761,6 @@ def test(request):
     messages.error(request, "Failed.")
     messages.warning(request, "Watch out!")
     return render(request, 'test.html')
-    
 
 # ------ preferences handling ------
 @login_required(login_url=LOGIN_URL)
@@ -793,9 +792,8 @@ def preference_as_json(request):
         preference.track_nearby_search_distance_metres)
     fields["place_nearby_search_distance_metres"] = (
         preference.place_nearby_search_distance_metres)
-    data = json.dumps(json_data)
     # log.info("preference_as_json: data=%s", data)
-    return JsonResponse(data, safe=False, status=200)
+    return JsonResponse(json_data, safe=False, status=200)
 
 
 def csrf_failure(request, reason=""):
