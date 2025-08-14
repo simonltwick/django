@@ -354,6 +354,13 @@ def save_uploaded_tracks(request, tracks) -> List[str]:
     # create new tags & get tag ids of new & checked tags
     tag_ids = get_checked_tag_ids(request)
     new_tag_names = get_new_tag_names(request)
+    if new_tag_names:
+        # check if new tag names already exist
+        new_tags_already_defined = Tag.objects.filter(
+            user=request.user, name__in=new_tag_names).all()
+        for tag in new_tags_already_defined:
+            tag_ids.add(tag.name)
+            new_tag_names.remove(tag.name)
     for tag_name in new_tag_names:
         tag = Tag(user=request.user, name=tag_name)
         tag.save()
