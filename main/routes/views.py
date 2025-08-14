@@ -131,7 +131,11 @@ def search(request):
                                       ).distinct()
             tracks = tracks.filter(tag__in=tags).distinct()
         result_count = tracks.count()
-        tracks=tracks[:request.user.routes_preference.track_search_result_limit]
+        result_limit = request.user.routes_preference.track_search_result_limit
+        if result_count > result_limit:
+            messages.warning(
+                request, f"showing {result_limit} of {result_count} tracks")
+        tracks=tracks[:result_limit]
         tracks_json = json.loads(serialize("geojson", tracks))
         log.info("search ? track: %d of %d tracks returned",
                  len(tracks_json["features"]), result_count)
@@ -718,7 +722,7 @@ def get_checked_tag_ids(request) -> Set[str]:
 def get_new_tag_names(request) -> List[str]:
     """ return a list of non-blank new tag names """
     return [tag_name.strip()
-            for tag_name in request.POST.get('new-tags').split(',')
+            for tag_name in request.POST.get('new-tags', '').split(',')
             if tag_name.strip()]
 
 
