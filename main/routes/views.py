@@ -16,6 +16,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import NumPoints
+from django.contrib import messages
 from django.db.models import Exists, OuterRef, QuerySet
 from django.db.utils import IntegrityError
 from django.http import (
@@ -746,6 +747,17 @@ def handle_tags_update(request, instance):
             instance.tag.create(name=name, user=request.user)
     instance.save()
 
+
+# --- test ---
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET"])
+def test(request):
+    messages.info(request, "Hello world.")
+    messages.success(request, "Succeeded.")
+    messages.error(request, "Failed.")
+    messages.warning(request, "Watch out!")
+    return render(request, 'test.html')
+    
 
 # ------ preferences handling ------
 @login_required(login_url=LOGIN_URL)

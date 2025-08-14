@@ -76,3 +76,25 @@ ul.bike-breadcrumb li a:hover {
 	visibility: hidden;
 	display: none;
 }
+
+body {
+	position: relative;
+	width: 100%;
+	/* this allows #messages to position absolutely within body */
+}
+
+#messages  {
+  position: fixed;
+  top: 0;
+  right: 30%;
+  left: 30%;
+  border:1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0.25rem;
+  padding: .5rem 2rem .5rem 2rem;
+  background: #fff;
+  /*	color: #f65656; */
+  box-shadow: 0 5px 10px -5px rgba(0, 0, 0, 0.5);
+  transition:  all 0.2s ease-in-out;
+  visibility: hidden;
+  /*	opacity: 0; */
+}

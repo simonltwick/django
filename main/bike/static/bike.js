@@ -25,3 +25,9 @@ function mark_link_deleted(id) {
 	console.info("results: input.checked=", $('#' + delete_id).prop("checked"),
 		"link.style.textDecoration=", link.style.textDecoration);
 }
+
+function showMessages() {
+	let element = document.getElementById("messages");
+	element.style.visibility = "visible";
+	setTimeout(() => element.style.visibility = "hidden", 3500);
+}
