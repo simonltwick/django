@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """ views for routes app """
+import datetime as dt
 import json
 import logging
 from typing import TYPE_CHECKING, Optional, List, Dict, Tuple,Set
@@ -120,16 +121,25 @@ def search(request):
         tracks = Track.objects.filter(user=request.user)
         start_date = track_form.cleaned_data.get("start_date")
         if start_date is not None:
-            tracks = tracks.filter(start_time__gte=start_date)
+            start_datetime = dt.datetime.combine(start_date, dt.time(),
+                                                 tzinfo=dt.timezone.utc)
+            tracks = tracks.filter(start_time__gte=start_datetime)
+            log.debug("track search: start_time>=%r", start_datetime)
         end_date = track_form.cleaned_data["end_date"]
         if end_date is not None:
-            tracks = tracks.filter(start_time__lte=end_date)
+            end_datetime = dt.datetime.combine(end_date, dt.time(23, 59, 59),
+                                               tzinfo=dt.timezone.utc)
+            tracks = tracks.filter(start_time__lte=end_datetime)
+            log.debug("track search: start_time<=%r", end_datetime)
         tags = track_form.cleaned_data.get("track_tags")
         if tags is not None:
-            tag_names = [tag.strip() for tag in tags.split(',')]
-            tags = Tag.objects.filter(user=request.user, name__in=tag_names
-                                      ).distinct()
-            tracks = tracks.filter(tag__in=tags).distinct()
+            tag_names = [tag.strip() for tag in tags.split(',')
+                         if tag]
+            if tag_names:
+                tags = Tag.objects.filter(user=request.user, name__in=tag_names
+                                          ).distinct()
+                tracks = tracks.filter(tag__in=tags).distinct()
+                log.debug("track search: tag names in %s", tag_names)
         result_count = tracks.count()
         result_limit = request.user.routes_preference.track_search_result_limit
         tracks=tracks[:result_limit]
