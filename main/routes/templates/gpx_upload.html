@@ -14,10 +14,13 @@
   <form method="POST" enctype="multipart/form-data"
     action="{% if save %}{% url 'routes:gpx_upload' %}{% else %}{% url 'routes:gpx_view' %}{% endif %}">
   {% csrf_token %} 
+
+  {{ form }}
+
   {% if save %}
   {% include "tags_for_upload.html" %}
   {% endif %}
-  {{ form }}
+
   <p class="invalid-feedback">{{ form.non_field_errors }} </p>
   <br />
   <p><input type="submit" class="btn btn-primary"
