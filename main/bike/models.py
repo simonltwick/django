@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+
+from collections import defaultdict
+import datetime as dt
+from enum import IntEnum
+from functools import cache
+import logging
+from typing import Optional, List, Dict, Union
+
 # from django import contrib
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -6,12 +15,6 @@ from django.db.models import Sum, F, Q, ExpressionWrapper, fields
 from django.db.models.functions import Now, TruncDate
 from django.urls import reverse
 from django.utils import timezone
-
-from collections import defaultdict
-import datetime as dt
-from enum import IntEnum
-import logging
-from typing import Optional, List, Dict, Union
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -129,6 +132,15 @@ class AscentUnits:
     FEET = 2
     CHOICES = ((METRES, 'm'), (FEET, 'Ft'))
 
+    @classmethod
+    def conversion_factor(cls, from_units, to_units):
+        factors = {AscentUnits.METRES: {AscentUnits.METRES: 1.0,
+                                        AscentUnits.FEET: 3.28084},
+                   AscentUnits.FEET: {AscentUnits.FEET: 1.0,
+                                      AscentUnits.METRES: 1.0/3.28084}
+                   }
+        return factors[from_units][to_units]
+
 
 class Preferences(models.Model):
     __original_distance_units = None
@@ -172,6 +184,25 @@ class Preferences(models.Model):
         super(Preferences, self).save(
             force_insert=force_insert, force_update=force_update,
             *args, **kwargs)
+
+    @staticmethod
+    def conversion_factor_distance(user: User) -> float:
+        """ return the conversion factor from metres to user's chosen distance
+        unit """
+        pref_distance_unit = user.preferences.distance_units
+        conv_factor = DistanceUnits.conversion_factor(
+            from_units=DistanceUnits.KILOMETRES, to_units=pref_distance_unit
+            ) / 1000.0
+        return conv_factor
+        
+    @staticmethod
+    def conversion_factor_ascent(user: User) -> float:
+        """ return the conversion factor from metres to user's chosen ascent
+        unit """
+        pref_ascent_unit = user.preferences.ascent_units
+        conv_factor = AscentUnits.conversion_factor(
+            from_units=AscentUnits.METRES, to_units=pref_ascent_unit)
+        return conv_factor
 
 
 class Link(models.Model):

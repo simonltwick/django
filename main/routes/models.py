@@ -9,7 +9,7 @@ from django.contrib.gis.db import models
 from django.contrib.gis.geos import Point, LineString, MultiLineString
 from django.contrib.gis.measure import D  # synonym for Distance
 
-from bike.models import DistanceUnits
+from bike.models import DistanceUnits, Preferences
 
 if TYPE_CHECKING:
     from gpxpy.gpx import GPX, GPXTrack
@@ -175,6 +175,22 @@ class Track(models.Model):
         constraints = [models.UniqueConstraint(
             fields=['user', 'name'], name='unique_name'),
         ]
+
+    @property
+    def ascent_user_units(self) -> float:
+        """ return the ascent in units of the user's preference """
+        if self.ascent is None:
+            return None
+        conv_factor = Preferences.conversion_factor_ascent(self.user)
+        return self.ascent * conv_factor
+
+    @property
+    def moving_distance_user_units(self) -> float:
+        """return moving distance in units of the user's preference """
+        if self.moving_distance is None:
+            return None
+        conv_factor = Preferences.conversion_factor_distance(self.user)
+        return self.moving_distance * conv_factor
 
     @classmethod
     def new_from_gpx(cls, gpx: "GPX", fname: str, user: User, save: bool

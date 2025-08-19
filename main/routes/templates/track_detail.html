@@ -17,8 +17,10 @@
 <table class="table table-compact">
 <tr><th>Start time</th><td>{{ track.start_time }} UTC</td></tr>
 <tr><th>Moving time</th><td>{{ moving_time }}</td></tr>
-<tr><th>Moving distance</th><td>{{ track.moving_distance|floatformat:"0g" }} m</td></tr>
-<tr><th>Ascent</th><td>{{ track.ascent|floatformat:"0" }} m</td></tr>
+<tr><th>Moving distance</th><td>{{ track.moving_distance_user_units|floatformat:"1" }}
+	{{ track.user.preferences.get_distance_units_display }}</td></tr>
+<tr><th>Ascent</th><td>{{ track.ascent_user_units|floatformat:"0" }}
+	{{ track.user.preferences.get_ascent_units_display }}</td></tr>
 <tr><th>Creator</th><td>{{ track.creator }}</td></tr>
 {{ form.as_table }}
 </table>
