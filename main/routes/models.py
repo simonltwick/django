@@ -242,8 +242,9 @@ class Track(models.Model):
                 points = []
                 for point in segment.points:
 
-                    point_in_segment = Point(point.longitude, point.latitude,
-                                             point.elevation)
+                    # if elevation is None, replace with 0.0
+                    point_in_segment = Point(
+                        point.longitude, point.latitude, point.elevation or 0.0)
                     points.append(point_in_segment.coords)
 
                 if len(points) > 1:
