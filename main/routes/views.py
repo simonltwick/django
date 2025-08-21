@@ -71,8 +71,6 @@ def get_db_bounds(user) -> Optional[Tuple[Tuple[float, float],
         Extent('track'))['track__extent']
     place_bounds: Optional[Tuple] = Place.objects.filter(user=user).aggregate(
         Extent('location'))["location__extent"]
-    log.info("get_db_bounds(user=%s): track_bounds=%s, place_bounds=%s",
-             user.id, track_bounds, place_bounds)
     if not track_bounds:
         return ((place_bounds[1], place_bounds[0]),
                 (place_bounds[3], place_bounds[2]))
@@ -101,8 +99,9 @@ def map(request, search: bool=False):
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["POST", "GET"])
 @gzip_page
-def search(request):
-
+def search(request) -> JsonResponse|HttpResponse:
+    """ handle a search for tracks or places, returning results as Json,
+    or returning the HTML form if form errors """
     if request.method == "GET":
         track_form = TrackSearchForm()
         place_form = PlaceSearchForm()
@@ -118,37 +117,8 @@ def search(request):
             return render(request, "search.html", context={
                 "track_form": track_form, "place_form": place_form})
 
-        tracks = Track.objects.filter(user=request.user)
-        start_date = track_form.cleaned_data.get("start_date")
-        if start_date is not None:
-            start_datetime = dt.datetime.combine(start_date, dt.time(),
-                                                 tzinfo=dt.timezone.utc)
-            tracks = tracks.filter(start_time__gte=start_datetime)
-            log.debug("track search: start_time>=%r", start_datetime)
-        end_date = track_form.cleaned_data["end_date"]
-        if end_date is not None:
-            end_datetime = dt.datetime.combine(end_date, dt.time(23, 59, 59),
-                                               tzinfo=dt.timezone.utc)
-            tracks = tracks.filter(start_time__lte=end_datetime)
-            log.debug("track search: start_time<=%r", end_datetime)
-        tags = track_form.cleaned_data.get("track_tags")
-        if tags is not None:
-            tag_names = [tag.strip() for tag in tags.split(',')
-                         if tag]
-            if tag_names:
-                tags = Tag.objects.filter(user=request.user, name__in=tag_names
-                                          ).distinct()
-                tracks = tracks.filter(tag__in=tags).distinct()
-                log.debug("track search: tag names in %s", tag_names)
-        result_count = tracks.count()
-        result_limit = request.user.routes_preference.track_search_result_limit
-        tracks=tracks[:result_limit]
-        tracks_json = json.loads(serialize("geojson", tracks))
-        log.info("search ? track: %d of %d tracks returned",
-                 len(tracks_json["features"]), result_count)
-        return JsonResponse(
-            {"status": "success", "count": result_count, "tracks": tracks_json},
-            status=200)
+        return _do_track_search(request, track_form)
+
     if search_type != 'place':
         log.error("search_type not recognised: POST=%s", request.POST)
         return HttpResponse("Search_type not defined", status=400)
@@ -159,6 +129,12 @@ def search(request):
         return render(request, "search.html", context={
             "track_form": track_form, "place_form": place_form})
 
+    return _do_place_search(request, place_form)
+
+
+def _do_place_search(request, place_form) -> JsonResponse:
+    """ carry out a place search, returning a Json response.
+    Expects a valid place_form """
     cleaned_data = place_form.cleaned_data
     # log.info("place_search: form.cleaned_data=%s", cleaned_data)
     places = Place.objects.filter(user=request.user)
@@ -178,13 +154,52 @@ def search(request):
         tags = Tag.objects.filter(user=request.user, name__in=tag_names
                                   ).distinct()
         places = places.filter(tag__in=tags).distinct()
-    places = places[
-        :request.user.routes_preference.place_search_result_limit]
+    result_count = places.count()
+    result_limit = request.user.routes_preference.place_search_result_limit
+    places = places[:result_limit]
     places_json = json.loads(serialize("geojson", places))
-    log.info("search ? place: %d places returned", len(places_json["features"]))
-    return JsonResponse({"status": "success", "places": places_json},
+    log.info("search ? place: %d of %d places returned",
+             len(places_json["features"]), result_limit)
+    return JsonResponse({"status": "success", "result_count": result_count,
+                         "result_limit": result_limit, "places": places_json},
                         status=200)
 
+
+def _do_track_search(request, track_form) -> JsonResponse:
+    """ carry out a track search, returning a JSON response.
+    Expects a valid track_form """
+    tracks = Track.objects.filter(user=request.user)
+    start_date = track_form.cleaned_data.get("start_date")
+    if start_date is not None:
+        start_datetime = dt.datetime.combine(start_date, dt.time(),
+                                             tzinfo=dt.timezone.utc)
+        tracks = tracks.filter(start_time__gte=start_datetime)
+        log.debug("track search: start_time>=%r", start_datetime)
+    end_date = track_form.cleaned_data["end_date"]
+    if end_date is not None:
+        end_datetime = dt.datetime.combine(end_date, dt.time(23, 59, 59),
+                                           tzinfo=dt.timezone.utc)
+        tracks = tracks.filter(start_time__lte=end_datetime)
+        log.debug("track search: start_time<=%r", end_datetime)
+    tags = track_form.cleaned_data.get("track_tags")
+    if tags is not None:
+        tag_names = [tag.strip() for tag in tags.split(',')
+                     if tag]
+        if tag_names:
+            tags = Tag.objects.filter(user=request.user, name__in=tag_names
+                                      ).distinct()
+            tracks = tracks.filter(tag__in=tags).distinct()
+            log.debug("track search: tag names in %s", tag_names)
+    result_count = tracks.count()
+    result_limit = request.user.routes_preference.track_search_result_limit
+    tracks=tracks[:result_limit]
+    tracks_json = json.loads(serialize("geojson", tracks))
+    log.info("search ? track: %d of %d tracks returned",
+             len(tracks_json["features"]), result_count)
+    return JsonResponse(
+        {"status": "success", "count": result_count, 
+         "result_limit": result_limit, "tracks": tracks_json},
+        status=200)
 
 # def test_csrf(request):
 #     if request.method == 'GET':
@@ -269,12 +284,17 @@ def track_json(request):
         limits, prefs = nearby_search_params(request)
         nearby_tracks: QuerySet = Track.nearby(limits, prefs)
         result_count = nearby_tracks.count()
-        nearby_tracks = nearby_tracks[:prefs.track_search_result_limit]
-        log.info("track_json returned %d of %d tracks", len(nearby_tracks),
-                 result_count)
-        msg = json.loads(serialize(
+        result_limit = prefs.track_search_result_limit
+        nearby_tracks = nearby_tracks[:result_limit]
+        if result_count > result_limit:
+            log.info("track_json returned %d of %d tracks", result_count,
+                     result_limit)
+        else:
+            log.info("track_json returned %d tracks", result_count)
+        tracks_json = json.loads(serialize(
             "geojson", nearby_tracks, fields=["name", "track", "pk"]))
-        return JsonResponse(msg, status=200)
+        return JsonResponse({"status": "success", "result_count": result_count,
+         "result_limit": result_limit, "tracks": tracks_json}, status=200)
 
     # "HEAD": just return num_points if the track is there.  Search by ?name=
     name = request.GET.get("name")

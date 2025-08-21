@@ -53,7 +53,7 @@
     	</title>
 
 </head>
-<body></body>
+<body>
 <header id="base-header" class="container-fluid masthead">
 
   <nav class="navbar navbar-expand-sm navbar-dark bg-primary">
@@ -194,19 +194,19 @@
   </div>
 </header>
 
-<body>
+<!-- <div style="position: relative;">  -->
 
+<ul id="messages" class="d-none">
 {% if messages %}
-<div style="position: relative;">
-<ul id="messages">
     {% for message in messages %}
     <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>
         {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}Important: {% endif %}
         {{ message }}
     </li>
     {% endfor %}
-</ul></div>
 {% endif %}
+</ul>
+<!-- </div>  -->
 
 {% block map %}{% endblock %}  <!-- can't be in a responsive container or in <main> -->
 <main>

@@ -95,6 +95,5 @@ body {
   /*	color: #f65656; */
   box-shadow: 0 5px 10px -5px rgba(0, 0, 0, 0.5);
   transition:  all 0.2s ease-in-out;
-  visibility: hidden;
   /*	opacity: 0; */
 }

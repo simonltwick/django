@@ -92,13 +92,15 @@ class NavControl extends L.Control {
 		this.container.innerHTML = `<span class='oi oi-menu'
 			data-toggle='tooltip' title='Show/hide Menu'></span>`;
 		// connect event listeners
-		this.container.addEventListener("click", this.onClick)
+		this.container.addEventListener("click", this.onClick);
 		return this.container;
 	}
 	onClick(event) {
 		// toggle the navbar visibility
 		L.DomEvent.stopPropagation(event);
-		document.getElementById("base-header").classList.toggle("d-none")
+		// hiding/unhiding of base-header is also done by showMessages
+		// in bike.js
+		document.getElementById("base-header").classList.toggle("d-none");
 	}
 }
 
@@ -156,8 +158,7 @@ if (initSearch) {
 // init preferences & place icons
 // get preference & buildPlaceIcons cannot be run in parallel
 $.get("/routes/api/preference", "json", function(data){
-	json_data = JSON.parse(data);
-	updatePreference(json_data);
+	updatePreference(data);
 	buildPlaceIcons();
 });
 
@@ -170,7 +171,6 @@ function buildPlaceIconDict(data) {
 	refreshPlaceIconDict(data);
 	// console.info("buildPlaceIconDict:", data, placeIcons);
 }
-
 
 
 /* ----- end of initialisation ------ */
@@ -289,14 +289,30 @@ function searchResults(data) {
 	// json data was returned, so display it
 	onCloseMapDialog();
 	if (data.hasOwnProperty("tracks"))  {
-		console.info("searchResults: showing", data.tracks.features.length, "tracks");
+		displaySearchResultsInfo(data, "tracks");
 		showTracks(data["tracks"]);
 	} else if (data.hasOwnProperty("places")) {
-		console.info("searchResults: showing", data.places.features.length, "places");
+		displaySearchResultsInfo(data, "places");
 		showPlaces(data["places"]);
 	} else {
-		console.info("Unrecognised search results:", data);
+		console.error("Unrecognised search results:", data);
 		alert("Unrecognised response to search request");
+	}
+}
+
+function displaySearchResultsInfo(data, result_type) {
+	/* display a console message and if results are truncated, a message in the
+	messages area */
+	if (data["result_count"] > data["result_limit"]) {
+		let msg = ("showing " + data["result_limit"] + " of " +
+			data["result_count"] + " " + result_type);
+		displayMessage(msg, "text-warning");
+		console.warn("searchResults:", msg);
+		return;	
+	}
+	console.info("searchResults: showing " + data["result_count"] + " " + result_type);
+	if (data["result_count"] == 0) {
+		displayMessage("no matching " + result_type, "text-warning");
 	}
 }
 
@@ -309,7 +325,7 @@ function requestFailMsg(jqXHR, textStatus, errorThrown) {
 		msg = "Status code " + jqXHR.status + ": " + jqXHR.statusText;
 	}
 	msg = "Server request " + requestUrl + " returned " + msg;
-	alert(msg + ': ' + textStatus);
+	displayMessage(msg + ': ' + textStatus, "text-error");
 	// log_error(msg, errMsg);
 }
 
@@ -319,7 +335,8 @@ function ajaxFail(jqXHR, textStatus, errorThrown) {
 }
 
 function log_error(msg) {
-	alert(msg);
+	console.error(msg);
+	displayMessage(msg, text_error);
 }
 
 /*
@@ -348,7 +365,7 @@ function nearbyTracks(searchType) {
 					  + searchType);
 		};
 	// console.info("nearbyTracks: settings=", settings, ", nearbyTracksUrl=", nearbyTracksUrl);
-	$.get(nearbyTracksUrl, null, showTracks, 'json').fail(
+	$.get(nearbyTracksUrl, null, searchResults, 'json').fail(
 		function(_, status, jqXHR){
 			log_error("nearbyTracks request status=" + status +
 				', response=' + jqXHR);
@@ -369,7 +386,7 @@ function nearbyTracks(searchType) {
 function showTracks(trackList) {
 	// add tracks to the map
 	if (trackList.length < 1) {
-		alert("No matching tracks found");
+		displayMessage("No matching tracks found");
 		return
 	}
 	// console.info('showTracks(): trackList=', trackList)

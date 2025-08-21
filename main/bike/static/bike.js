@@ -26,8 +26,35 @@ function mark_link_deleted(id) {
 		"link.style.textDecoration=", link.style.textDecoration);
 }
 
+function displayMessage(message, msgClass) {
+	/* display a message in the message area.  msg_class, if provided,
+	is a bootstrap class such as text-info/warning/error/success */
+	let html = "<li";
+	if (msgClass) {
+		html += ' class="' + msgClass + '"';
+	}
+	html += ">" + message + "</li>";
+	// console.info("displayMessage(", message, ") -> html: ", html);
+	$("#messages").html(html);
+	showMessages();
+}
+
 function showMessages() {
+	/* show pre-set messages 
+	If the header is not shown, we have to show it or messages are invisible
+	*/
 	let element = document.getElementById("messages");
-	element.style.visibility = "visible";
-	setTimeout(() => element.style.visibility = "hidden", 3500);
+	let baseHeaderElement = document.getElementById("base-header")
+	let navIsHidden = baseHeaderElement.classList.contains("d-none");
+	if (navIsHidden) {
+		baseHeaderElement.classList.remove("d-none");
+	}
+	element.classList.remove("d-none") ;
+
+	setTimeout(function() {
+		element.classList.add("d-none");
+		if (navIsHidden) {
+			baseHeaderElement.classList.add("d-none");
+		}
+	}, 3500);
 }
