@@ -868,7 +868,7 @@ function onPlaceTypeDoDelete(event) {
 
 function afterPlaceTypesUpdate(data) {
 	// update placeTypes if JSON sent, else show html response in the dialog
-	console.info("afterPlaceTypesUpdate:", data);
+	// console.info("afterPlaceTypesUpdate:", data);
 	try {
 		data = JSON.parse(data);  // is it json?
 		}
