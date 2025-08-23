@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/search/", views.search, name="search"),
     # path("api/search/<search_type>", views.search, name="search"),
     path("api/track", views.track_json),
+    path("api/track/<int:pk>/delete", views.TrackDeleteView.as_view()),
     path("api/place", views.place_json),
     path("place/", views.place, name="place"),
     path("place/<int:pk>", views.place, name="place"),

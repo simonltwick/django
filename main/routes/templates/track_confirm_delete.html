@@ -1,0 +1,16 @@
+<!-- popup form for confirming track deletion -->
+<button type="button" class="close" aria-label="Close"
+  onClick="popup.close()"
+  data-bs-toggle="tooltip" title="Close popup">
+  <span aria-hidden="true">&times;</span>
+</button>
+
+<h4>Confirm Track Delete</h4>
+<form id="trackDeleteForm" onsubmit="onTrackConfirmDelete(event, {{ object.pk }})">
+{% csrf_token %}
+<input type="hidden" name="pk" value="{{ object.pk }}">
+<p>Track: {{ object }}</p>
+{{ form.errors }}
+<button type="submit" class="btn btn-danger">Delete</button>
+<button class="btn btn-outline-secondary" onclick="popup.close()">Cancel</button>
+</form>

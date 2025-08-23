@@ -445,16 +445,9 @@ function trackHide(marker) {
 	if (!(marker.feature && marker.feature.properties)) {
 		return;
 	}
-	//tracksGeoLayer.remove(marker);  // removes the whole tracksGeoLayer
-	marker.removeFrom(tracksLayer);
 	tracksHidden.push(marker);
-	if (marker.feature.properties.startStopMarkers) {
-		for (const startStopMarker
-				of marker.feature.properties.startStopMarkers) {
-			startStopMarker[0].removeFrom(tracksLayer);
-			startStopMarker[1].removeFrom(tracksLayer);
-		}
-	}
+	removeTrack(marker);
+	//tracksGeoLayer.remove(marker);  // removes the whole tracksGeoLayer
 	popMarker.closePopup();
 }
 
@@ -465,6 +458,17 @@ function trackHideOthers() {
 		}
 	});
 	popMarker.closePopup();
+}
+
+function removeTrack(marker) {
+	marker.removeFrom(tracksLayer);
+	if (marker.feature.properties.startStopMarkers) {
+		for (const startStopMarker
+				of marker.feature.properties.startStopMarkers) {
+			startStopMarker[0].removeFrom(tracksLayer);
+			startStopMarker[1].removeFrom(tracksLayer);
+		}
+	}
 }
 
 function tracksUnhide() {
@@ -525,7 +529,7 @@ function onTrackDetailSubmit(event) {
 	event.preventDefault();
 	let formData = new FormData(event.target);
 	let pk = formData.get("pk");
-	let requestUrl = "/routes/track/" + (pk ? pk: "")
+	requestUrl = "/routes/track/" + (pk ? pk: "")
 	$.ajax({
 		url: requestUrl,
 		method: "POST",
@@ -542,6 +546,31 @@ function onTrackDetailSubmit(event) {
 		error: requestFailMsg
 	});
 }
+
+function onTrackRequestDelete(trackPk) {
+	requestUrl = "/routes/api/track/" + trackPk + "/delete"
+	$.get(requestUrl, null, showPopup, 'html')
+		.fail(requestFailMsg);
+}
+
+function onTrackConfirmDelete(event, pk) {
+	event.preventDefault();
+	requestUrl = "/routes/api/track/" + pk + "/delete"
+	$.post(requestUrl, $('#trackDeleteForm').serialize(), onTrackDeleted,
+			).fail(requestFailMsg); 
+}
+
+function onTrackDeleted(data) {
+	if (data) {
+		// unexpected html returned
+		showPopup(data)
+	} else {
+		displayMessage("Track deleted.");
+		removeTrack(popMarker);
+		popup.close();
+	}
+}
+
 
 /*
 // ------ place handling ------

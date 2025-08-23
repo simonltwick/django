@@ -149,11 +149,7 @@ def _do_place_search(request, place_form) -> JsonResponse:
             # log.info("search?place: filtering for type in %s", cleaned_data["type"])
             places = places.filter(type__in=cleaned_data["type"])
     tags = cleaned_data.get("place_tags")
-    if tags is not None:
-        tag_names = [tag.strip() for tag in tags.split(',')]
-        tags = Tag.objects.filter(user=request.user, name__in=tag_names
-                                  ).distinct()
-        places = places.filter(tag__in=tags).distinct()
+    places = filter_by_tags(request, places, tags)
     result_count = places.count()
     result_limit = request.user.routes_preference.place_search_result_limit
     places = places[:result_limit]
@@ -182,14 +178,7 @@ def _do_track_search(request, track_form) -> JsonResponse:
         tracks = tracks.filter(start_time__lte=end_datetime)
         log.debug("track search: start_time<=%r", end_datetime)
     tags = track_form.cleaned_data.get("track_tags")
-    if tags is not None:
-        tag_names = [tag.strip() for tag in tags.split(',')
-                     if tag]
-        if tag_names:
-            tags = Tag.objects.filter(user=request.user, name__in=tag_names
-                                      ).distinct()
-            tracks = tracks.filter(tag__in=tags).distinct()
-            log.debug("track search: tag names in %s", tag_names)
+    tracks = filter_by_tags(request, tracks, tags)
     result_count = tracks.count()
     result_limit = request.user.routes_preference.track_search_result_limit
     tracks=tracks[:result_limit]
@@ -200,6 +189,19 @@ def _do_track_search(request, track_form) -> JsonResponse:
         {"status": "success", "count": result_count, 
          "result_limit": result_limit, "tracks": tracks_json},
         status=200)
+
+
+def filter_by_tags(request, queryset: QuerySet, tags: str) -> QuerySet:
+    """ if tags are defined, return the filtered queryset, otherwise,
+    return it unchanged """
+    if tags is not None:
+        tag_names = [tag.strip() for tag in tags.split(',') if tag]
+        if tag_names:
+            tags = Tag.objects.filter(user=request.user, name__in=tag_names
+                                      ).distinct()
+            log.debug("filter_by_tags: tag names in %s", tag_names)
+            return queryset.filter(tag__in=tags).distinct()
+    return queryset
 
 # def test_csrf(request):
 #     if request.method == 'GET':
@@ -454,6 +456,15 @@ def test_save_gpx(_request):
     #     reverse("routes:tracks_view", kwargs={"trackids": trackids}))
 
 
+class TrackDeleteView(DeleteView):
+    model=Track
+    template_name = "track_confirm_delete.html"
+
+    def form_valid(self, _form):
+        self.object.delete()
+        return HttpResponse(status=200)
+
+
 # ------------- place handling ---------------
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET", "POST"])
@@ -666,7 +677,7 @@ class PlaceTypeUpdateView(BikeLoginRequiredMixin, UpdateView):
 class PlaceTypeDeleteView(BikeLoginRequiredMixin, DeleteView):
     model = PlaceType
     success_url = reverse_lazy("routes:api_place_types")
-    template_name = "placetype_delete_form.html"
+    template_name = "placetype_confirm_delete.html"
 
     def dispatch(self, request, *args, **kwargs):
         if self.kwargs['pk'] == get_default_place_type().pk:
