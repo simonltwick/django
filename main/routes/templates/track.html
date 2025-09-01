@@ -16,6 +16,7 @@
   Details</button>
 <button disabled class="btn btn-outline" type="button" onclick="trackElevation({{ track.pk }})">
   Elevation Profile</button>
+<a href="{% url "routes:track_download" track.pk %}" class="btn btn-outline">Download GPX</a>
 <button class="btn btn-outline" type="button" onclick="trackHide()">
   Hide</button>
 <button class="btn btn-outline" type="button" onclick="trackHideOthers()">

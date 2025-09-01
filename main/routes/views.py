@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """ views for routes app """
 import datetime as dt
+from io import BytesIO
 import json
 import logging
 from typing import TYPE_CHECKING, Optional, List, Dict, Tuple,Set
@@ -22,7 +23,7 @@ from django.db.models import Exists, OuterRef, QuerySet
 from django.db.utils import IntegrityError
 from django.http import (
     HttpResponseRedirect, HttpResponse, JsonResponse, HttpResponseForbidden,
-    Http404)
+    Http404, FileResponse)
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_http_methods
@@ -315,13 +316,11 @@ def track_json(request):
     response.headers["Content-Length"] = track.num_points
     return response
 
-
 def parse_latlon(value: str) -> Tuple[float, float]:
     """ parse a string containing two floats """
     values = value.split(',')
-    if len(values) > 2:
-        raise ValueError(f"Too many values for latlon: {value!r}")
     float_values = tuple(float(v) for v in values)
+    assert len(float_values) == 2, f"expecting 2 values for latlon, not {value!r}"
     return float_values
 
 
@@ -336,6 +335,28 @@ def _show_tracks(request, tracks: List[Track]):
         serialize("geojson", tracks, fields=["name", "track", "id", "pk"])
         )
     return render(request, "map.html", context=ctx)
+
+
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET"])
+@gzip_page
+def track_download(request, pk: int):
+    """ create a gpx file for a track and download it, using a name specified
+    in the url query parameters """
+    track = get_object_or_404(Track, pk=pk, user=request.user)
+    gpx = track.as_gpx(name=request.GET.get("name"))
+    gpx_xml = gpx.to_xml()  # prettyprint=True for debug
+    # build response
+    filename = gpx.name
+    if not filename.lower().endswith('.gpx'):
+        filename += ".gpx"
+    bytes_io = BytesIO(gpx_xml.encode('utf-8'))
+    response = FileResponse(bytes_io, as_attachment=True, filename=filename)
+    log.debug("gpx response content-type before updating was %s",
+              response.headers["content-type"])
+    response.headers["content-type"] = 'application/gpx+xml; charset=utf-8'
+    # response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @login_required(login_url=LOGIN_URL)

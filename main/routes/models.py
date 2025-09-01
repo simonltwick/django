@@ -2,8 +2,9 @@
 import csv
 import logging
 import os.path
-from typing import List, Dict, TYPE_CHECKING
+from typing import List, Dict, Optional, TYPE_CHECKING
 
+from gpxpy.gpx import GPX, GPXTrack, GPXTrackSegment, GPXTrackPoint
 from django.contrib.auth.models import User
 from django.contrib.gis.db import models
 from django.contrib.gis.geos import Point, LineString, MultiLineString
@@ -12,7 +13,6 @@ from django.contrib.gis.measure import D  # synonym for Distance
 from bike.models import DistanceUnits, Preferences
 
 if TYPE_CHECKING:
-    from gpxpy.gpx import GPX, GPXTrack
     from django.core.files.uploadedfile import UploadedFile
 
 
@@ -198,7 +198,6 @@ class Track(models.Model):
         """ convert a GPX object to a track (or possibly, several tracks)
         but DO NOT SAVE the tracks 
         If Save is false, don't check for duplicate filenames."""
-
         # """
         # if gpx.waypoints:
         #     for waypoint in gpx.waypoints:
@@ -259,6 +258,31 @@ class Track(models.Model):
                 tracks.append(new_track)
 
         return tracks
+
+    def as_gpx(self, name: Optional[str]=None) -> "GPX":
+        """ return the track's "track" field as a gpxpy.GPX object.
+        The gpx file will have no timestamps, as these are not stored, but
+        it will have elevations if these are present. """
+        gpx = GPX()
+        gpx.name = name or self.name
+        if self.creator:
+            gpx.creator = self.creator
+        if self.description:
+            gpx.description = self.description
+        gpx_track = GPXTrack()
+        gpx.tracks.append(gpx_track)
+
+        for linestring in self.track:
+            gpx_segment = GPXTrackSegment()
+            gpx_track.segments.append(gpx_segment)
+
+            for point in linestring:
+                gpx_point = GPXTrackPoint(
+                    latitude=point[1], longitude=point[0],
+                    elevation=point[2] or None)
+                gpx_segment.points.append(gpx_point)
+
+        return gpx
 
     def __str__(self):
         s = self.name or self.start_time or "unnamed Track"
