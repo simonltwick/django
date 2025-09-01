@@ -211,7 +211,7 @@ def filter_by_tags(request, queryset: QuerySet, tags: str) -> QuerySet:
 #     log.info("test_csrf: POST=%s", request.POST)
 #     form = TestCSRFForm(request.POST)
 #     log.info("form received successfully.  is_valid=%s", form.is_valid())
-#     return HttpResponse("OK", status=200)
+#     return HttpResponse(status=204)  # ok, no content
 
 # ------ Track handling ------
 @login_required(login_url=LOGIN_URL)
@@ -231,7 +231,7 @@ def track(request, pk: int):
         form = TrackDetailForm(request.POST, instance=track)
         if form.is_valid():
             form.save()
-            return HttpResponse(status=200)
+            return HttpResponse(status=204)  # ok, no content
         template = "track_detail.html"
         moving_time = as_hhmm(track.moving_time)
     return render(request, template, context={
@@ -311,7 +311,7 @@ def track_json(request):
         raise Http404 from e
     log.info("Track %s found: %s, num_points=%s", name, track, track.num_points)
     # HEAD request does not return body: set content-length header to num_points
-    response = HttpResponse(status=200)
+    response = HttpResponse(status=204)  # ok, no content
     response.headers["Content-Length"] = track.num_points
     return response
 
@@ -376,7 +376,7 @@ def upload_gpx(request, save: bool=True):
                 if form.is_valid():  # re-check for errors
                     # log.debug("request.GET=%s", request.GET)
                     if request.GET.get("map") == "False":
-                        return HttpResponse("OK", status=200)
+                        return HttpResponse(status=204)  # ok, no content
                     return _show_tracks(request, tracks)
 
         log.info("errors were found")
@@ -462,7 +462,7 @@ class TrackDeleteView(DeleteView):
 
     def form_valid(self, _form):
         self.object.delete()
-        return HttpResponse(status=200)
+        return HttpResponse(status=204)  # ok, no content
 
 
 # ------------- place handling ---------------
@@ -573,7 +573,7 @@ def upload_csv(request):
                     place.save()
                 log.debug("request.GET=%s", request.GET)
                 if request.GET.get("map") == "False":
-                    return HttpResponse("OK", status=200)
+                    return HttpResponse(status=204)  # ok, no content
                 return _show_places(request, places)
         except ValueError as e:
             log.error("Error processing CSV file: %s", e)
@@ -615,7 +615,7 @@ def place_move(request, pk: int):
     assert request.POST.get("pk") == str(pk), "url mismatch to form data for pk"
     place_inst.location = Point(float(lon), float(lat))
     place_inst.save()
-    return HttpResponse(status=200)
+    return HttpResponse(status=204)  # ok, no content
 
 
 # ---- place types ----
