@@ -329,11 +329,6 @@ function requestFailMsg(jqXHR, textStatus, errorThrown) {
 	// log_error(msg, errMsg);
 }
 
-function ajaxFail(jqXHR, textStatus, errorThrown) {
-	// translate to a requestFailMsg call
-	requestFailMsg({ "status": textStatus, "statusText": errorThrown });
-}
-
 function log_error(msg) {
 	console.error(msg);
 	displayMessage(msg, text_error);
@@ -505,7 +500,7 @@ function onTrackClick(event) {
 	popMarker = event.target;
 	popLocation = event.latlng;
 	let pk = popMarker.feature.properties.pk;
-	if (!pk) {
+	if (pk == "None") {
 		showPopup("<h4>"+ popMarker.feature.properties.name + `</h4>
 			<p>GPX for view only - no details stored in the database</p>`);
 		return;
