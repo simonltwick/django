@@ -46,7 +46,7 @@ class UploadGpxForm2(forms.Form):
         for i, f in enumerate(uploaded_files):
             log.info("gpx file #%d: %s content_type=%s",
                      i+1, f.name, f.content_type)
-    
+
             content_type = f.content_type
             allowed_content_types = ['text/xml', 'application/octet-stream',
                                      'application/gpx+xml']
@@ -61,6 +61,20 @@ class UploadGpxForm2(forms.Form):
                     f'{filesizeformat(f.size)}')
 
         return uploaded_files
+
+
+
+
+class UploadBoundaryForm(forms.Form):
+    """ a form to upload a gpx file.  Not a model form. """
+    error_css_class = "text-danger"
+    required_css_class = "required"
+    # TODO: use a custom widget to allow <input ... accept=".gpx">
+    category = forms.CharField(max_length=40, help_text="A category for the "
+                               "uploaded boundary or boundaries, for example, "
+                               "English Counties")
+    gpx_file = MultipleFileField()
+
 
 
 class PlaceForm(forms.ModelForm):

@@ -1,0 +1,22 @@
+{% extends 'bike/base.html' %}
+{% load static %}
+
+{% block title %}
+Boundaries
+{% endblock %}
+
+{% block content %}
+<h4>Boundaries</h4>
+<a class="btn btn-outline" href="{% url 'routes:boundary_upload' %}"
+  data-bs-toggle="tooltip" title="Upload boundary GPX file(s)">Upload</a>
+<table>
+<tr><th>Category</th><th>Name</th></tr>
+{% for boundary in object_list %}
+<tr><td>{{ boundary.category }}</td>
+  <td><a href="{% url 'routes:boundary' boundary.pk %}">{{ boundary.name }}</a>
+  </td></tr>
+{% empty %}
+<p>(No boundaries found.)</p>
+{% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'bike/base.html' %}
+{% load static %}
+
+{% block title %}
+Upload Boundary GPX file(s)
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{% static 'tags.css' %}" />
+{% endblock %}
+
+{% block content %}
+  <h1>Upload Boundary GPX file(s)</h1>
+  <p>You can upload one or more gpx files as boundaries. Each file will be
+  saved as a separate boundary, taking the name of the GPX file.   Uploaded
+  boundaries will have the category you enter below.</p>
+  <form method="POST" enctype="multipart/form-data"
+    action="{% url 'routes:boundary_upload' %}">
+  {% csrf_token %} 
+
+  <table>	
+  {{ form.as_table }}
+  </table>
+
+  <br />
+  <p><input type="submit" class="btn btn-primary" value="Upload">
+  <a class="btn btn-secondary" href="{% url 'routes:boundaries' %}">Cancel</a>
+  </p>
+  </form>
+{% endblock %}

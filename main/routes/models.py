@@ -7,7 +7,8 @@ from typing import List, Dict, Optional, TYPE_CHECKING
 from gpxpy.gpx import GPX, GPXTrack, GPXTrackSegment, GPXTrackPoint
 from django.contrib.auth.models import User
 from django.contrib.gis.db import models
-from django.contrib.gis.geos import Point, LineString, MultiLineString
+from django.contrib.gis.geos import (
+    Point, LineString, MultiLineString, Polygon)
 from django.contrib.gis.measure import D  # synonym for Distance
 
 from bike.models import DistanceUnits, Preferences
@@ -316,12 +317,45 @@ class Track(models.Model):
         self.ascent = gpx_track.get_uphill_downhill().uphill
 
 
-# class Boundary(models.Model):
-#     """ a perimeter for searching or clipping tracks, e.g. a county """
-#     user = models.ForeignKey(User, on_delete=models.CASCADE)
-#     category = models.CharField(max_length=40)
-#     name = models.CharField(max_length=40)
-#     track = models.PolygonField(dim=2)
+class Boundary(models.Model):
+    """ a perimeter for searching or clipping tracks, e.g. a county """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    category = models.CharField(max_length=40, db_collation="NOCASE")
+    name = models.CharField(max_length=40, db_collation="NOCASE")
+    polygon = models.PolygonField(dim=2)
+
+    class Meta:
+        verbose_name_plural="Boundaries"
+        constraints = [models.UniqueConstraint(
+            fields=['user', 'category', 'name'], name='unique_boundary'),
+        ]
+
+    def __str__(self):
+        return f"{self.category}:{self.name}"
+
+    @classmethod
+    def polygon_from_gpx(cls, gpx: "GPX") -> Polygon:
+        """ convert a GPX object to a polygon.
+        Points from all track segments are simply concatenated. """
+
+        if len(gpx.tracks) != 1:
+            raise ValueError("Boundary GPX must contain 1 track, not "
+                             f"{len(gpx.tracks)}")
+
+        track = gpx.tracks[0]
+        points = []
+        for segment in track.segments:
+            for point in segment.points:
+                point = Point(point.longitude, point.latitude)
+                points.append(point.coords)
+
+        if len(points) <= 3:
+            raise ValueError("Boundary GPX must contain > 2 points.")
+
+        if points[0] != points[-1]:
+            points.append(points[0])  # close the LinearRing
+        polygon = Polygon(points)
+        return polygon
 
 
 # ------ Settings handling ------

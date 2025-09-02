@@ -4,6 +4,7 @@ import datetime as dt
 from io import BytesIO
 import json
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional, List, Dict, Tuple,Set
 
 from gpxpy.parser import GPXParser
@@ -25,17 +26,17 @@ from django.http import (
     HttpResponseRedirect, HttpResponse, JsonResponse, HttpResponseForbidden,
     Http404, FileResponse)
 from django.shortcuts import render, get_object_or_404
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.gzip import gzip_page
 from django.views.generic import (
-    TemplateView, ListView, CreateView, UpdateView, DeleteView)
+    TemplateView, ListView, CreateView, UpdateView, DeleteView, DetailView)
 
 from .models import (
-    Place, Track, PlaceType, get_default_place_type, Tag, Preference)
+    Place, Track, Boundary, PlaceType, get_default_place_type, Tag, Preference)
 from .forms import (
     UploadGpxForm2, PlaceForm, PreferenceForm, TrackDetailForm, TrackSearchForm,
-    PlaceSearchForm, PlaceUploadForm, # TestCSRFForm
+    PlaceSearchForm, PlaceUploadForm, UploadBoundaryForm,  # TestCSRFForm
     )
 
 
@@ -444,6 +445,12 @@ def handle_uploaded_gpx(request, file: "UploadedFile", save: bool) -> List[Track
     """ parse a gpx file and turn it into a list of Tracks.
     Each GPX file can contain multiple tracks. 
     If Save is False, don't check for duplicate filename """
+    gpx = parse_uploaded_gpx(request, file)
+    tracks = Track.new_from_gpx(gpx, file.name, user=request.user, save=save)
+    return tracks
+
+
+def parse_uploaded_gpx(request, file: "UploadedFile") -> GPX:
     log.info("uploading file %s, size %d", file.name, file.size)
     # upload a gpx file and convert to a GPX object
     # decode the file as a text file (not binary)
@@ -453,8 +460,7 @@ def handle_uploaded_gpx(request, file: "UploadedFile", save: bool) -> List[Track
     if not gpx:
         raise TypeError(f"Failed to parse {file.name}" )
     log.info("gpx file %s parsed ok, creator=%s", file.name, gpx.creator)
-    tracks = Track.new_from_gpx(gpx, file.name, user=request.user, save=save)
-    return tracks
+    return gpx
 
 
 def test_save_gpx(_request):
@@ -477,7 +483,7 @@ def test_save_gpx(_request):
     #     reverse("routes:tracks_view", kwargs={"trackids": trackids}))
 
 
-class TrackDeleteView(DeleteView):
+class TrackDeleteView(BikeLoginRequiredMixin, DeleteView):
     model=Track
     template_name = "track_confirm_delete.html"
 
@@ -485,6 +491,74 @@ class TrackDeleteView(DeleteView):
         self.object.delete()
         return HttpResponse(status=204)  # ok, no content
 
+
+# ------ boundary handling ------
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET", "POST"])
+def boundary_upload(request):
+    """ upload one or more gpx files and convert to a Boundary (or Boundaries).    
+    """
+    if request.method == "GET":
+        form = UploadBoundaryForm()
+
+    else:  # POST
+        form = UploadBoundaryForm(request.POST, request.FILES)
+        if form.is_valid():
+            files = form.cleaned_data['gpx_file']
+            errors: List[str] = []
+            boundaries: List[Boundary] = []
+            for file in files:
+                try:
+                    gpx = parse_uploaded_gpx(request, file)
+                    polygon = Boundary.polygon_from_gpx(gpx)
+                    filename = Path(file.name).stem
+                except (TypeError, ValueError) as e:
+                    log.error("uploading boundary %s: %r", file.name, e)
+                    form.add_error("gpx_file", f"{file.name}: {e}")
+                    continue
+
+                boundary = Boundary(
+                    user=request.user,
+                    category = form.cleaned_data["category"],
+                    name = filename,
+                    polygon = polygon
+                    )
+                boundaries.append(boundary)
+
+                if Boundary.objects.filter(user=request.user,
+                                           category=boundary.category,
+                                           name=boundary.name).exists():
+                    log.error("boundary already exists in DB: %s:%s",
+                              boundary.category, boundary.name)
+                    form.add_error("gpx_file", "Duplicate boundary: "
+                                   f"{boundary.category}:{boundary.name}")
+
+            if form.is_valid():
+                for boundary in boundaries:
+                    boundary.save()
+                success_url = request.GET.get("next") or reverse(
+                    "routes:boundaries")
+                return HttpResponseRedirect(success_url)
+
+        log.info("errors were found")
+    return render(request, "boundary_upload.html", {"form": form})
+
+
+class BoundaryListView(BikeLoginRequiredMixin, ListView):
+    model = Boundary
+    paginate_by = 50  # if pagination is desired
+    template_name = "boundary_list.html"
+
+    def get_queryset(self):
+        return Boundary.objects.filter(user=self.request.user)
+
+
+class BoundaryDetailView(BikeLoginRequiredMixin, DetailView):
+    model = Boundary
+    template_name = "boundary.html"
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(Boundary, user=self.request.user, pk=self.kwargs["pk"])
 
 # ------------- place handling ---------------
 @login_required(login_url=LOGIN_URL)
