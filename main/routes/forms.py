@@ -33,7 +33,7 @@ class MultipleFileField(forms.FileField):
 
 class UploadGpxForm2(forms.Form):
     """ a form to upload a gpx file.  Not a model form. """
-    error_css_class = "error"
+    error_css_class = "text-danger"
     required_css_class = "required"
     # TODO: use a custom widget to allow <input ... accept=".gpx">
     gpx_file = MultipleFileField()
@@ -64,7 +64,7 @@ class UploadGpxForm2(forms.Form):
 
 
 class PlaceForm(forms.ModelForm):
-    error_css_class = "error"
+    error_css_class = "text-danger"
     required_css_class = "required"
     class Meta:
         model = Place
@@ -73,7 +73,7 @@ class PlaceForm(forms.ModelForm):
 
 
 class PlaceUploadForm(forms.Form):
-    error_css_class = "error"
+    error_css_class = "text-danger"
     required_css_class = "required"
     # TODO: use a custom widget to allow <input ... accept=".csv">
     csv_file = forms.FileField()
@@ -132,6 +132,7 @@ class PlaceTypeForm(forms.ModelForm):
 
 
 class TrackDetailForm(forms.ModelForm):
+    error_css_class = "text-danger"
     class Meta:
         model = Track
         fields = ["description"]
