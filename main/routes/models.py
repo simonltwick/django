@@ -196,7 +196,7 @@ class Track(models.Model):
     def new_from_gpx(cls, gpx: "GPX", fname: str, user: User, save: bool
                      ) -> List["Track"]:
         """ convert a GPX object to a track (or possibly, several tracks)
-        but DO NOT SAVE the tracks 
+        but DOES NOT SAVE the tracks 
         If Save is false, don't check for duplicate filenames."""
         # """
         # if gpx.waypoints:
