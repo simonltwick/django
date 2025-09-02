@@ -11,7 +11,7 @@ urlpatterns = [
     path('bike/<int:bike_id>/rides', views.RidesList.as_view(), name='rides'),
     path('rides/<int:year>/<int:month>', views.rides_month,
          name='rides_month'),
-    path('ride/new', views.RideCreate.as_view(), name='ride_new'),
+    path('ride/new', views.ride, name='ride_new'),
     path('ride/<int:pk>', views.RideUpdate.as_view(), name='ride'),
     path('ride/<int:pk>/delete', views.RideDelete.as_view(),
          name='ride_delete'),

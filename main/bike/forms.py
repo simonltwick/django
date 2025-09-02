@@ -25,6 +25,7 @@ class DaysDurationInput(forms.TextInput):
 
 
 class RideSelectionForm(forms.Form):
+    error_css_class = "text-danger"
     max_entries = forms.IntegerField(
         required=False, initial=20, min_value=1,
         label="Maximum number to display",
@@ -46,6 +47,7 @@ ComponentFormSet = modelformset_factory(
 
 
 class ComponentForm(forms.ModelForm):
+    error_css_class = "text-danger"
     class Meta:
         model = Component
         fields = ['name', 'specification', 'date_acquired', 'supplier', 'notes']
@@ -55,6 +57,7 @@ class ComponentForm(forms.ModelForm):
 
 
 class PreferencesForm(forms.ModelForm):
+    error_css_class = "text-danger"
     class Meta:
         model = Preferences
         fields = ('distance_units', 'ascent_units',
@@ -64,6 +67,7 @@ class PreferencesForm(forms.ModelForm):
 
 
 class RideForm(forms.ModelForm):
+    error_css_class = "text-danger"
     class Meta:
         model = Ride
         fields = ['bike', 'date', 'distance', 'distance_units',
@@ -75,6 +79,7 @@ class RideForm(forms.ModelForm):
 
 
 class OdometerAdjustmentForm(forms.ModelForm):
+    error_css_class = "text-danger"
     class Meta:
         model = Odometer
         fields = ['distance', 'initial_value', 'comment']
@@ -84,6 +89,7 @@ class OdometerAdjustmentForm(forms.ModelForm):
 
 
 class OdometerForm(forms.ModelForm):
+    error_css_class = "text-danger"
     model = Odometer
     # fields are defined in OdometerFormSet factory call
 
@@ -119,6 +125,7 @@ class OdometerForm(forms.ModelForm):
 
 
 class BaseOdometerFormSet(forms.BaseModelFormSet):
+    error_css_class = "text-danger"
     def clean(self):
         """ check that at least one formset has a distance entered """
         distance_entries = sum(
@@ -148,11 +155,13 @@ MaintActionLinkFormSet = inlineformset_factory(
 
 
 class DateTimeForm(forms.Form):
+    error_css_class = "text-danger"
     reading_date_time = forms.DateTimeField(
         label='Reading date & time', initial=dt.datetime.now)
 
 
 class MaintenanceActionUpdateForm(forms.ModelForm):
+    error_css_class = "text-danger"
     class Meta:
         model = MaintenanceAction
         fields = ['description', 'due_date', 'due_distance',
@@ -168,6 +177,7 @@ class MaintenanceActionUpdateForm(forms.ModelForm):
 
 
 class MaintCompletionDetailsForm(forms.ModelForm):
+    error_css_class = "text-danger"
     class Meta:
         model = MaintenanceActionHistory
         fields = ['completed_date', 'distance']

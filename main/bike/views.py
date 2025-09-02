@@ -5,6 +5,7 @@ import datetime as dt
 import logging
 from typing import List, Tuple, Optional, Dict, Union
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum, Q, Max, Count
@@ -12,6 +13,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.views.decorators.http import require_http_methods
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic.list import ListView
 from django.views.generic.detail import DetailView
@@ -28,6 +30,7 @@ from .forms import (
     MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm,
     MaintActionLinkFormSet, ComponentForm)
+from django.db.utils import IntegrityError
 
 
 log = logging.getLogger(__name__)
@@ -490,33 +493,42 @@ class ComponentTypeDelete(BikeLoginRequiredMixin, DeleteView):
             request, *args, **kwargs)
 
 
-class RideCreate(BikeLoginRequiredMixin, CreateView):
-    model = Ride
-    form_class = RideForm
-
-    def get_initial(self):
-        initial = super(RideCreate, self).get_initial()
-        self.bike = Bike.objects.filter(
-            owner=self.request.user).order_by('-rides__date').first()
-        # copy, so we don't accidentally change a mutable dict
-        initial = initial.copy()
-        initial['bike'] = self.bike
-        return initial
-
-    def get_context_data(self, **kwargs):
-        context = super(RideCreate, self).get_context_data(**kwargs)
-        context['bike_id'] = self.bike.id
-        return context
-
-    def form_valid(self, form):
-        obj = form.save(commit=False)
-        obj.rider = self.request.user
-        return super(RideCreate, self).form_valid(form)
-
-    def get_success_url(self):
-        if 'next' in self.request.GET:
-            return self.request.GET['next']
-        return super(RideCreate, self).get_success_url()
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET", "POST"])
+def ride(request, pk: int=None):
+    ride = None
+    if request.method == "GET":
+        if pk is None:
+            bikes = Bike.objects.filter(
+                owner=request.user).order_by('-rides__date').first()
+            initial={"bike": bikes, "date": dt.datetime.now(tz=CURRENT_TIMEZONE)}
+            form = RideForm(initial=initial)
+        else:
+            ride = get_object_or_404(Ride, rider=request.user, pk=pk)
+            form = RideForm(instance=ride)
+    else: # (POST)
+        form = RideForm(request.POST)
+        if form.is_valid():
+            ride = form.save(commit=False)
+            ride.rider = request.user
+            try:
+                # catch duplicate ride exception
+                form.save()
+                success_url = request.GET.get("next") or reverse("bike:home")
+                messages.success(request, "Ride saved.")
+                return HttpResponseRedirect(success_url)
+            except IntegrityError as e:
+                log.error("Failed to save ride: %r", e)
+                if e.args[0].startswith("UNIQUE constraint failed"):
+                    msg = "This ride has already been saved."
+                else:
+                    msg = f"Error saving ride: {e}"
+                form.add_error(None, msg)
+    return render(request, "bike/ride_form.html", context={
+        "form": form,
+        "bike_id": (None if ride is None else ride.bike.id)
+        # bike_id is used for "Add Maint. Action" url 
+        })
 
 
 class RideUpdate(BikeLoginRequiredMixin, UpdateView):
