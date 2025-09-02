@@ -1,5 +1,5 @@
 
-from routes.models import Place, Track, PlaceType, Tag
+from routes.models import Place, Track, PlaceType, Tag, Boundary
 
 from django.contrib.gis import admin
 
@@ -23,6 +23,13 @@ class TrackAdmin(admin.GISModelAdmin):
     fields=('user', 'name', "start_time", "moving_distance", "ascent", "tag")
     #3d multilinestrings not supported, so track display just displays textarea
     # with loads of points
+
+@admin.register(Boundary)
+class BoundaryAdmin(admin.GISModelAdmin):
+    readonly_fields=('user',)
+    list_display=('name', 'category', 'user')
+    list_display_links = ('name',)
+    list_filter=('user', 'category')
 
 
 @admin.register(PlaceType)
