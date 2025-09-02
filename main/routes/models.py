@@ -144,18 +144,9 @@ class Place(models.Model):
         return query
 
 
-class RawGpx(models.Model):
-    """ to store the raw gpx file for a track """
-    # FIXME: should declare a save_to path for saving files
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    content = models.FileField(editable=True)
-
-
 class Track(models.Model):
     """ a (gpx) track """
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    raw_gpx_id = models.ForeignKey(RawGpx, on_delete=models.SET_NULL,
-                                   blank=True, null=True)
     name = models.CharField(unique=True, max_length=40)
     track = models.MultiLineStringField(dim=3)
     # , srid=4326 is the default)
@@ -323,6 +314,14 @@ class Track(models.Model):
         self.moving_time = moving_data.moving_time
         self.moving_distance =  moving_data.moving_distance
         self.ascent = gpx_track.get_uphill_downhill().uphill
+
+
+# class Boundary(models.Model):
+#     """ a perimeter for searching or clipping tracks, e.g. a county """
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     category = models.CharField(max_length=40)
+#     name = models.CharField(max_length=40)
+#     track = models.PolygonField(dim=2)
 
 
 # ------ Settings handling ------
