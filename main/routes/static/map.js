@@ -257,12 +257,26 @@ function replaceMapOverlay(oldOverlay, newOverlay, overlayName) {
 }
 
 
+/* ----- search handling ----- */
 function onRoutesSearch() {
 	// search tracks or places from a form.
 	getMapDialogData("/routes/api/search/");
 	if (popup) {
 		popup.close();
 	}
+}
+
+function onRefreshBoundaryNames() {
+	/* update the boundary names select field in the search dialog, 
+	corresponding to the chosen boundary category */
+	let boundaryCategory = $("#id_boundary_category").find(":selected").text();
+	requestUrl = '/routes/api/boundary/category/' + boundaryCategory + '/names'
+	$.get(requestUrl, null, refreshBoundaryNames, 'html').fail(requestFailMsg);
+}
+
+function refreshBoundaryNames(data) {
+	/* update the boundary names select field with the supplied data */
+	$("#id_boundary_name").html(data);
 }
 
 function onSearchFormSubmit(event) {

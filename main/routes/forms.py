@@ -165,6 +165,14 @@ track_years = [
     dt.year for dt in Track.objects.dates('start_time', 'year', order='DESC')]
 
 
+class SelectBoundaryCategoryWidget(forms.Select):
+    template_name = "select_boundary_category_widget.html"
+
+
+class SelectBoundaryNameWidget(forms.Select):
+    template_name = "select_boundary_name_widget.html"
+
+
 class TrackSearchForm(forms.Form):
     error_css_class = "text-danger"
     start_date = forms.DateField(
@@ -174,6 +182,11 @@ class TrackSearchForm(forms.Form):
     track_tags = forms.CharField(
         max_length=50, required=False,
         help_text="Enter tag names separated by commas")
+    boundary_category = forms.ChoiceField(
+        choices=Boundary.get_category_choices,
+        widget=SelectBoundaryCategoryWidget)
+    boundary_name = forms.ChoiceField(choices=[("", '-press refresh-')],
+                                      widget=SelectBoundaryNameWidget)
 
     def clean(self):
         cleaned_data = super().clean()

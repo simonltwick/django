@@ -2,7 +2,7 @@
 import csv
 import logging
 import os.path
-from typing import List, Dict, Optional, TYPE_CHECKING
+from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
 
 from gpxpy.gpx import GPX, GPXTrack, GPXTrackSegment, GPXTrackPoint
 from django.contrib.auth.models import User
@@ -356,6 +356,14 @@ class Boundary(models.Model):
             points.append(points[0])  # close the LinearRing
         polygon = Polygon(points)
         return polygon
+
+    @classmethod
+    def get_category_choices(cls) -> List[Tuple[int, str]]:
+        """ return the distinct values of boundary categories, enumerated """
+        categories = cls.objects.order_by().values_list('category').distinct()
+        category_list = [(i, cat[0]) for i, cat in enumerate(categories)]
+        log.debug("get_category_choices -> %s", category_list)
+        return category_list
 
 
 # ------ Settings handling ------

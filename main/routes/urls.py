@@ -27,6 +27,7 @@ urlpatterns = [
     path("boundary/<int:pk>", views.BoundaryUpdateView.as_view(), name="boundary"),
     path("boundary/<int:pk>/delete", views.BoundaryDeleteView.as_view(),
          name="boundary_delete"),
+    path("api/boundary/category/<str:category>/names", views.boundary_category_names),
     path("api/place", views.place_json),
     path("place/", views.place, name="place"),
     path("place/<int:pk>", views.place, name="place"),

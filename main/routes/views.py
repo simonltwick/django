@@ -595,6 +595,21 @@ class BoundaryDeleteView(BikeLoginRequiredMixin, DeleteView):
         ctx["feature_collection"] = feature_collection
         return ctx
 
+
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET"])
+def boundary_category_names(request, category:str):
+    """ return boundary names in a given category, formatted as <option>s for
+    a select statement """
+    instances = Boundary.objects.filter(user=request.user, category=category).all()
+    options = ['<option value="" selected>-select name(s)-</option>']
+    options.extend(
+        [f'<option value="{inst.pk}">{inst.name}</option>'
+         for inst in instances.all()])
+    log.debug("boundary_category_names(%s)-> %s", category, options)
+    return HttpResponse('\n'.join(options), status=200)
+
+
 # ------------- place handling ---------------
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET", "POST"])
