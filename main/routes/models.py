@@ -169,7 +169,7 @@ class Track(models.Model):
         ]
 
     @property
-    def ascent_user_units(self) -> float:
+    def ascent_user_units(self) -> Optional[float]:
         """ return the ascent in units of the user's preference """
         if self.ascent is None:
             return None
@@ -177,7 +177,7 @@ class Track(models.Model):
         return self.ascent * conv_factor
 
     @property
-    def moving_distance_user_units(self) -> float:
+    def moving_distance_user_units(self) -> Optional[float]:
         """return moving distance in units of the user's preference """
         if self.moving_distance is None:
             return None

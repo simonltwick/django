@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-Boundary: {{ object }}
+Confirm Delete of Boundary: {{ object }}
 {% endblock %}
 
 {% block head %}
@@ -14,31 +14,26 @@ Boundary: {{ object }}
      crossorigin=""></script>
 
 <script src="{% static 'simple_map.js' %}"></script>
- 
-{{ feature_collection|json_script:"featureCollection" }}
 
+{{ feature_collection|json_script:"featureCollection" }}
 {% endblock %}
 
 {% block content %}
-<h4>Boundary: {{ object }}</h4>
+<h1>Delete Boundary - Are You Sure?</h1>
 
 <form method="post">
 {% csrf_token %}
 
-<table>
-{{ form.as_table }}
-</table>
+{{ object }}
 <br/>
 
 <div id="map" style="height: 400px; width: 600px;"></div>
 
 <br/>
 <p>
-<button type="submit" class="btn btn-outline-primary">Save</button>
+<button type="submit" class="btn btn-outline-danger">Delete</button>
 <a href="{% url 'routes:boundaries' %}" role="button" class="btn btn-outline-secondary">
 Cancel</a>
-<a href="{% url 'routes:boundary_delete' object.pk %}" role="button"
-  class="btn btn-outline-danger">Delete</a>
 </p>
 </form>
 {% endblock %}

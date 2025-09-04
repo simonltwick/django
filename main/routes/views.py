@@ -16,6 +16,7 @@ from django.core.serializers import serialize
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.gis.geos.geometry import GEOSGeometry
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import NumPoints
@@ -30,13 +31,14 @@ from django.urls import reverse_lazy, reverse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.gzip import gzip_page
 from django.views.generic import (
-    TemplateView, ListView, CreateView, UpdateView, DeleteView, DetailView)
+    TemplateView, ListView, CreateView, UpdateView, DeleteView)
 
 from .models import (
     Place, Track, Boundary, PlaceType, get_default_place_type, Tag, Preference)
 from .forms import (
     UploadGpxForm2, PlaceForm, PreferenceForm, TrackDetailForm, TrackSearchForm,
-    PlaceSearchForm, PlaceUploadForm, UploadBoundaryForm,  # TestCSRFForm
+    PlaceSearchForm, PlaceUploadForm, UploadBoundaryForm, # BoundaryForm
+     # TestCSRFForm
     )
 
 
@@ -550,15 +552,48 @@ class BoundaryListView(BikeLoginRequiredMixin, ListView):
     template_name = "boundary_list.html"
 
     def get_queryset(self):
-        return Boundary.objects.filter(user=self.request.user)
+        return Boundary.objects.filter(user=self.request.user
+                                       ).order_by("category", "name")
 
 
-class BoundaryDetailView(BikeLoginRequiredMixin, DetailView):
+class BoundaryUpdateView(BikeLoginRequiredMixin, UpdateView):
     model = Boundary
+    fields = ('category', 'name')
+    # form_class = BoundaryForm
     template_name = "boundary.html"
+    success_url=reverse_lazy("routes:boundaries")
 
     def get_object(self, queryset=None):
-        return get_object_or_404(Boundary, user=self.request.user, pk=self.kwargs["pk"])
+        return get_object_or_404(
+            Boundary, user=self.request.user, pk=self.kwargs["pk"])
+
+    def get_context_data(self):
+        ctx = super().get_context_data()
+        feature_collection = json.loads(
+            serialize("geojson", [self.object]))
+        feature_collection["bbox"] = leaflet_bounds(self.object.polygon)
+        ctx["feature_collection"] = feature_collection
+        return ctx
+
+
+class BoundaryDeleteView(BikeLoginRequiredMixin, DeleteView):
+    model = Boundary
+    template_name = "boundary_confirm_delete.html"
+    success_url=reverse_lazy("routes:boundaries")
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(
+            Boundary, user=self.request.user, pk=self.kwargs["pk"])
+
+    def get_context_data(self, object=None):
+        assert isinstance(object, Boundary), (
+            "expecting a Boundary instance, not {object!r}")
+        ctx = super(DeleteView, self).get_context_data()
+        feature_collection = json.loads(
+            serialize("geojson", [object]))
+        feature_collection["bbox"] = leaflet_bounds(object.polygon)
+        ctx["feature_collection"] = feature_collection
+        return ctx
 
 # ------------- place handling ---------------
 @login_required(login_url=LOGIN_URL)
@@ -941,3 +976,12 @@ def csrf_failure(request, reason=""):
 def do_logout(request):
     logout(request)
     return HttpResponse("Logged out", status=200)
+
+
+def leaflet_bounds(obj: GEOSGeometry) -> List[List[float]]:
+    """ transform a geosGeometry extent (x1, y1, x2, y2) into a Leaflet
+    compatible list [[y1, x1], [y2, x2]]  i.e. lat, lon pairs """
+    assert isinstance(obj, GEOSGeometry), "expecting GEOSGeometry, not {obj!r}"
+    x1, y1, x2, y2 = obj.extent
+    return [[y1, x1], [y2, x2]]
+

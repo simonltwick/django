@@ -4,7 +4,9 @@ import logging
 from django import forms
 from django.template.defaultfilters import filesizeformat
 #from .models import RawGpx
-from .models import Place, PlaceType, Preference, Track
+from .models import Place, PlaceType, Preference, Track, Boundary
+from django.contrib.gis import forms as geoforms
+from django.contrib.gis.forms.widgets import OpenLayersWidget
 
 
 log = logging.getLogger(__name__)
@@ -75,6 +77,13 @@ class UploadBoundaryForm(forms.Form):
                                "English Counties")
     gpx_file = MultipleFileField()
 
+
+# class BoundaryForm(forms.ModelForm):
+#     error_css_class = "text-danger"
+#     polygon = geoforms.PolygonField(widget=geoforms.OSMWidget(attrs={'map_width': 800, 'map_height': 500}))
+#     class Meta:
+#         model = Boundary
+#         fields = ('category', 'name', 'polygon')
 
 
 class PlaceForm(forms.ModelForm):

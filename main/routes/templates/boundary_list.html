@@ -7,9 +7,7 @@ Boundaries
 
 {% block content %}
 <h4>Boundaries</h4>
-<a class="btn btn-outline" href="{% url 'routes:boundary_upload' %}"
-  data-bs-toggle="tooltip" title="Upload boundary GPX file(s)">Upload</a>
-<table>
+<table class="table table-sm">
 <tr><th>Category</th><th>Name</th></tr>
 {% for boundary in object_list %}
 <tr><td>{{ boundary.category }}</td>
@@ -19,4 +17,9 @@ Boundaries
 <p>(No boundaries found.)</p>
 {% endfor %}
 </table>
+<p>
+<a class="btn btn-outline-secondary" role="button"
+  href="{% url 'routes:boundary_upload' %}"
+  data-bs-toggle="tooltip" title="Upload boundary GPX file(s)">Upload</a>
+</p>
 {% endblock %}
