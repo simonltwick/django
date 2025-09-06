@@ -600,7 +600,7 @@ def boundary_upload(request):
 
 class BoundaryListView(BikeLoginRequiredMixin, ListView):
     model = Boundary
-    paginate_by = 50  # if pagination is desired
+    paginate_by = 20  # if pagination is desired
     template_name = "boundary_list.html"
 
     def get_queryset(self):
