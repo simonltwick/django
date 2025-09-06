@@ -135,6 +135,7 @@ layerControl.addOverlay(placesLayer, "Places");
 let tracksLayer = L.geoJSON().addTo(map); 
 layerControl.addOverlay(tracksLayer, "Tracks");
 let tracksHidden = [];
+let boundaries = L.geoJSON().addTo(map);  // for (search) boundaries
 
 
 // show initial tracks, or if none, show welcome dialog
@@ -302,15 +303,22 @@ function searchResults(data) {
 	}
 	// json data was returned, so display it
 	onCloseMapDialog();
-	if (data.hasOwnProperty("tracks"))  {
-		displaySearchResultsInfo(data, "tracks");
+	var result_type = (data.hasOwnProperty("tracks") ? "tracks":
+						(data.hasOwnProperty("places") ? "places": '?'))
+						
+	if (data["result_count"] == 0) {
+		displayMessage("no matching " + result_type, "text-warning");
+		return
+	}
+	displaySearchResultsInfo(data, result_type);
+	showBoundary(data);
+	if (result_type == "tracks")  {
 		showTracks(data["tracks"]);
-	} else if (data.hasOwnProperty("places")) {
-		displaySearchResultsInfo(data, "places");
+	} else if (result_type == "places") {
 		showPlaces(data["places"]);
 	} else {
 		console.error("Unrecognised search results:", data);
-		alert("Unrecognised response to search request");
+		log_error("Unrecognised response to search request");
 	}
 }
 
@@ -321,12 +329,22 @@ function displaySearchResultsInfo(data, result_type) {
 		let msg = ("showing " + data["result_limit"] + " of " +
 			data["result_count"] + " " + result_type);
 		displayMessage(msg, "text-warning");
-		console.warn("searchResults:", msg);
+		console.warn("displaySearchResultsInfo:", msg);
 		return;	
 	}
-	console.info("searchResults: showing " + data["result_count"] + " " + result_type);
-	if (data["result_count"] == 0) {
-		displayMessage("no matching " + result_type, "text-warning");
+	console.info("displaySearchResultsInfo: showing " + data["result_count"]
+		+ " " + result_type);
+}
+
+function showBoundary(data) {
+	boundaries.remove();
+	if (data.hasOwnProperty("boundary") && data["boundary"]) {
+		boundaries = L.geoJSON(data["boundary"], {
+				style: {color: '#ff0000',
+						weight: 1,
+						opacity: 0.5
+						} ,
+		}).addTo(map);
 	}
 }
 
@@ -339,13 +357,12 @@ function requestFailMsg(jqXHR, textStatus, errorThrown) {
 		msg = "Status code " + jqXHR.status + ": " + jqXHR.statusText;
 	}
 	msg = "Server request " + requestUrl + " returned " + msg;
-	displayMessage(msg + ': ' + textStatus, "text-error");
-	// log_error(msg, errMsg);
+	log_error(msg + ": " + textStatus, errMsg);
 }
 
 function log_error(msg) {
 	console.error(msg);
-	displayMessage(msg, text_error);
+	displayMessage(msg, "text-error");
 }
 
 /*

@@ -7,6 +7,7 @@ from django.template.defaultfilters import filesizeformat
 from .models import Place, PlaceType, Preference, Track, Boundary
 from django.contrib.gis import forms as geoforms
 from django.contrib.gis.forms.widgets import OpenLayersWidget
+from django.core.exceptions import ValidationError
 
 
 log = logging.getLogger(__name__)
@@ -173,33 +174,33 @@ class SelectBoundaryNameWidget(forms.Select):
     template_name = "select_boundary_name_widget.html"
 
 
+class DynamicChoiceField(forms.ChoiceField):
+    """ a ChoiceField which can be changed dynamically in javascript,
+    so validation has to be done programmatically in the view """
+    def validate(self, value):
+        if self.required and not value:
+            raise ValidationError(self.error_messages["required"], code="required")
+        # skip the validation that value is in self.choices
+
+
 class TrackSearchForm(forms.Form):
     error_css_class = "text-danger"
     start_date = forms.DateField(
         required=False, widget=forms.SelectDateWidget(years=track_years))
     end_date = forms.DateField(
         required=False, widget=forms.SelectDateWidget(years=track_years))
-    track_tags = forms.CharField(
-        max_length=50, required=False,
-        help_text="Enter tag names separated by commas")
-    boundary_category = forms.ChoiceField(
-        choices=Boundary.get_category_choices,
-        widget=SelectBoundaryCategoryWidget)
-    boundary_name = forms.ChoiceField(choices=[("", '-press refresh-')],
-                                      widget=SelectBoundaryNameWidget)
 
-    def clean(self):
-        cleaned_data = super().clean()
-        if not (cleaned_data["start_date"] or cleaned_data["end_date"]
-                or cleaned_data["track_tags"]):
-            raise forms.ValidationError(
-                "At least one of start date, end date or tags "
-                "must be specified.")
-        return cleaned_data
-
-
-# class TestCSRFForm(forms.Form):
-#     yesno = forms.BooleanField(required=False)
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     if not (cleaned_data["start_date"] or cleaned_data["end_date"]
+    #             or cleaned_data["track_tags"]
+    #             or cleaned_data["boundary_name"]):
+    #         raise forms.ValidationError(
+    #             "At least one of start date, end date, tags or "
+    #             "boundary category+name must be specified.")
+    #     # cannot validate boundary exists because need access to request.user
+    #     # - must be done in view
+    #     return cleaned_data
 
 
 class PlaceSearchForm(forms.Form):
@@ -209,17 +210,28 @@ class PlaceSearchForm(forms.Form):
         queryset=PlaceType.objects,
         widget=forms.CheckboxSelectMultiple,
         required=False)
-    place_tags = forms.CharField(
+
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     if not (cleaned_data["name"] or cleaned_data["type"]
+    #             or cleaned_data["place_tags"]):
+    #         raise forms.ValidationError(
+    #             "At least one of name, type or tags must be specified.")
+    #     return cleaned_data
+
+
+class CommonSearchForm(forms.Form):
+    """ common fields for place and track searches """
+    error_css_class = "text-danger"
+    tags = forms.CharField(
         max_length=50, required=False,
         help_text="Enter tag names separated by commas")
-
-    def clean(self):
-        cleaned_data = super().clean()
-        if not (cleaned_data["name"] or cleaned_data["type"]
-                or cleaned_data["place_tags"]):
-            raise forms.ValidationError(
-                "At least one of name, type or tags must be specified.")
-        return cleaned_data
+    boundary_category = forms.ChoiceField(
+        choices=Boundary.get_category_choices,
+        widget=SelectBoundaryCategoryWidget)
+    boundary_name = DynamicChoiceField(choices=[("", '-press refresh-')],
+                                       widget=SelectBoundaryNameWidget,
+                                       required=False)
 
 
 class PlaceTagSelectForm(forms.ModelForm):
@@ -227,3 +239,7 @@ class PlaceTagSelectForm(forms.ModelForm):
 
     class Meta:
         fields=["tag"]
+
+
+# class TestCSRFForm(forms.Form):
+#     yesno = forms.BooleanField(required=False)

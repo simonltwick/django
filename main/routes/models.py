@@ -359,10 +359,12 @@ class Boundary(models.Model):
 
     @classmethod
     def get_category_choices(cls) -> List[Tuple[int, str]]:
-        """ return the distinct values of boundary categories, enumerated """
+        """ return the distinct values of boundary categories, as 2-tuple.
+        The category name is also the key ([0] as well as the value [1],
+        so that the name is returned in form POST data """
         categories = cls.objects.order_by().values_list('category').distinct()
-        category_list = [(i, cat[0]) for i, cat in enumerate(categories)]
-        log.debug("get_category_choices -> %s", category_list)
+        category_list = [(cat[0], cat[0]) for cat in categories]
+        # log.debug("Boundary.get_category_choices -> %s", category_list)
         return category_list
 
 

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Optional, List, Dict, Tuple,Set
 from gpxpy.parser import GPXParser
 from gpxpy.gpx import GPX
 
+from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
@@ -37,8 +38,8 @@ from .models import (
     Place, Track, Boundary, PlaceType, get_default_place_type, Tag, Preference)
 from .forms import (
     UploadGpxForm2, PlaceForm, PreferenceForm, TrackDetailForm, TrackSearchForm,
-    PlaceSearchForm, PlaceUploadForm, UploadBoundaryForm, # BoundaryForm
-     # TestCSRFForm
+    PlaceSearchForm, CommonSearchForm, PlaceUploadForm, UploadBoundaryForm,
+    # BoundaryForm, TestCSRFForm
     )
 
 
@@ -109,37 +110,53 @@ def search(request) -> JsonResponse|HttpResponse:
     if request.method == "GET":
         track_form = TrackSearchForm()
         place_form = PlaceSearchForm()
+        common_form = CommonSearchForm()
         return render(request, "search.html", context={
-            "track_form": track_form, "place_form": place_form})
+            "track_form": track_form, "place_form": place_form,
+            "common_form": common_form})
 
+    # POST
     search_type = request.GET.get("search_type")
     track_form = TrackSearchForm(request.POST)
     place_form = PlaceSearchForm(request.POST)
+    common_form = CommonSearchForm(request.POST)
     if search_type == "track":
-        if not track_form.is_valid():
-            log.error("search ? track: form errors=%s", track_form.errors)
-            return render(request, "search.html", context={
-                "track_form": track_form, "place_form": place_form})
+        if track_form.is_valid() and common_form.is_valid():
+            try:
+                return _do_track_search(
+                    request, track_form.cleaned_data | common_form.cleaned_data)
+            except ValidationError as e:
+                track_form.add_error(None, e.args[0])
 
-        return _do_track_search(request, track_form)
+        log.error("search ? track: form errors=%s", track_form.errors)
 
-    if search_type != 'place':
+    # search_type == 'place'
+    elif search_type == "place": 
+        if place_form.is_valid() and common_form.is_valid():
+            try:
+                return _do_place_search(
+                    request, place_form.cleaned_data | common_form.cleaned_data)
+            except ValidationError as e:
+                place_form.add_error(None, e.args[0])
+
+        log.error("search ? place: form errors=%s", place_form.errors)
+
+    else:
         log.error("search_type not recognised: POST=%s", request.POST)
         return HttpResponse("Search_type not defined", status=400)
 
-    # search_type == 'place'
-    if not place_form.is_valid():
-        log.error("search ? place: form errors=%s", place_form.errors)
-        return render(request, "search.html", context={
-            "track_form": track_form, "place_form": place_form})
-
-    return _do_place_search(request, place_form)
+    return render(request, "search.html", context={
+        "track_form": track_form, "place_form": place_form,
+        "common_form": common_form})
 
 
-def _do_place_search(request, place_form) -> JsonResponse:
+def _do_place_search(request, cleaned_data) -> JsonResponse:
     """ carry out a place search, returning a Json response.
     Expects a valid place_form """
-    cleaned_data = place_form.cleaned_data
+    required_keys = ("name", "type", "tags", "boundary_name")
+    if not any(cleaned_data.get(key) for key in required_keys):
+        raise ValidationError(
+            f"At least one of {', '.join(required_keys)} must be specified")
     # log.info("place_search: form.cleaned_data=%s", cleaned_data)
     places = Place.objects.filter(user=request.user)
     if "name" in cleaned_data and cleaned_data["name"]:
@@ -154,45 +171,60 @@ def _do_place_search(request, place_form) -> JsonResponse:
             places = places.filter(type__in=cleaned_data["type"])
     tags = cleaned_data.get("place_tags")
     places = filter_by_tags(request, places, tags)
+    boundary = _get_boundary(request, cleaned_data)
+    if boundary:
+        places = places.filter(location__within=boundary.polygon)
+        boundary_polygon = json.loads(serialize("geojson", [boundary]))
     result_count = places.count()
     result_limit = request.user.routes_preference.place_search_result_limit
     places = places[:result_limit]
     places_json = json.loads(serialize("geojson", places))
     log.info("search ? place: %d of %d places returned",
              len(places_json["features"]), result_limit)
-    return JsonResponse({"status": "success", "result_count": result_count,
-                         "result_limit": result_limit, "places": places_json},
-                        status=200)
+    result = {"status": "success", "places": places_json,
+              "result_count": result_count, "result_limit": result_limit,
+              "boundary": None if boundary is None else boundary_polygon}
+    return JsonResponse(result, status=200)
 
 
-def _do_track_search(request, track_form) -> JsonResponse:
+def _do_track_search(request, cleaned_data) -> JsonResponse:
     """ carry out a track search, returning a JSON response.
-    Expects a valid track_form """
+    Expects a valid track_form 
+    Can raise a ValidationError if form errors found (boundary DoesNotExist)"""
+    required_keys = ("start_date", "end_date", "tags", "boundary_name")
+    if not any(cleaned_data.get(key) for key in required_keys):
+        raise ValidationError(
+            f"At least one of {', '.join(required_keys)} must be specified")
     tracks = Track.objects.filter(user=request.user)
-    start_date = track_form.cleaned_data.get("start_date")
+    start_date = cleaned_data.get("start_date")
     if start_date is not None:
         start_datetime = dt.datetime.combine(start_date, dt.time(),
                                              tzinfo=dt.timezone.utc)
         tracks = tracks.filter(start_time__gte=start_datetime)
         log.debug("track search: start_time>=%r", start_datetime)
-    end_date = track_form.cleaned_data["end_date"]
+    end_date = cleaned_data["end_date"]
     if end_date is not None:
         end_datetime = dt.datetime.combine(end_date, dt.time(23, 59, 59),
                                            tzinfo=dt.timezone.utc)
         tracks = tracks.filter(start_time__lte=end_datetime)
         log.debug("track search: start_time<=%r", end_datetime)
-    tags = track_form.cleaned_data.get("track_tags")
+
+    tags = cleaned_data.get("track_tags")
     tracks = filter_by_tags(request, tracks, tags)
+    boundary = _get_boundary(request, cleaned_data)
+    if boundary:
+        tracks = tracks.filter(track__intersects=boundary.polygon)
+        boundary_polygon = json.loads(serialize("geojson", [boundary]))
     result_count = tracks.count()
     result_limit = request.user.routes_preference.track_search_result_limit
     tracks=tracks[:result_limit]
     tracks_json = json.loads(serialize("geojson", tracks))
     log.info("search ? track: %d of %d tracks returned",
              len(tracks_json["features"]), result_count)
-    return JsonResponse(
-        {"status": "success", "count": result_count, 
-         "result_limit": result_limit, "tracks": tracks_json},
-        status=200)
+    result = {"status": "success", "tracks": tracks_json,
+              "result_limit": result_limit, "result_count": result_count,
+              "boundary": None if boundary is None else boundary_polygon}
+    return JsonResponse(result, status=200)
 
 
 def filter_by_tags(request, queryset: QuerySet, tags: str) -> QuerySet:
@@ -206,6 +238,26 @@ def filter_by_tags(request, queryset: QuerySet, tags: str) -> QuerySet:
             log.debug("filter_by_tags: tag names in %s", tag_names)
             return queryset.filter(tag__in=tags).distinct()
     return queryset
+
+
+def _get_boundary(request, cleaned_data) -> Optional[Boundary]:
+    boundary_name = cleaned_data.get("boundary_name")
+    if not boundary_name:
+        return None
+
+    boundary_category = cleaned_data.get("boundary_category")
+    try:
+        boundary = Boundary.objects.get(user=request.user,
+                                        category=boundary_category,
+                                        pk=boundary_name)
+    except Boundary.DoesNotExist as e:
+        log.error("Boundary pk=%s, category=%s not found",
+                  boundary_name, boundary_category)
+        raise ValidationError(
+            "No boundary found with this name and category") from e
+    log.debug("%s search: _get_boundary -> %s:%s",
+              request.GET.get("search_type"), boundary.category, boundary.name)
+    return boundary
 
 # def test_csrf(request):
 #     if request.method == 'GET':
@@ -606,7 +658,6 @@ def boundary_category_names(request, category:str):
     options.extend(
         [f'<option value="{inst.pk}">{inst.name}</option>'
          for inst in instances.all()])
-    log.debug("boundary_category_names(%s)-> %s", category, options)
     return HttpResponse('\n'.join(options), status=200)
 
 

@@ -21,3 +21,7 @@ html, body, #map {height: 100%; width: 100%;}  /* 100vw;} */
 	text-align: center;
 	vertical-align: center;
 }
+
+.errorlist {
+	color: red;
+}
