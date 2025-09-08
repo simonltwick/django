@@ -5,12 +5,11 @@ from io import BytesIO
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, List, Dict, Tuple,Set
+from typing import TYPE_CHECKING, Optional, List, Dict, Tuple, Set, Any
 
 from gpxpy.parser import GPXParser
 from gpxpy.gpx import GPX
 
-from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
@@ -22,7 +21,7 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import NumPoints
 from django.contrib import messages
-from django.db.models import Exists, OuterRef, QuerySet
+from django.db.models import Exists, OuterRef, QuerySet, Q
 from django.db.utils import IntegrityError
 from django.http import (
     HttpResponseRedirect, HttpResponse, JsonResponse, HttpResponseForbidden,
@@ -105,7 +104,8 @@ def map(request, search: bool=False):
 @require_http_methods(["POST", "GET"])
 @gzip_page
 def search(request) -> JsonResponse|HttpResponse:
-    """ handle a search for tracks or places, returning results as Json,
+    """ handle a search for tracks or places, returning results and search query
+     as Json,
     or returning the HTML form if form errors """
     if request.method == "GET":
         track_form = TrackSearchForm()
@@ -113,7 +113,7 @@ def search(request) -> JsonResponse|HttpResponse:
         common_form = CommonSearchForm()
         return render(request, "search.html", context={
             "track_form": track_form, "place_form": place_form,
-            "common_form": common_form})
+            "search_type": "track", "common_form": common_form})
 
     # POST
     search_type = request.GET.get("search_type")
@@ -131,11 +131,11 @@ def search(request) -> JsonResponse|HttpResponse:
         log.error("search ? track: form errors=%s", track_form.errors)
 
     # search_type == 'place'
-    elif search_type == "place": 
+    elif search_type == "place":
         if place_form.is_valid() and common_form.is_valid():
             try:
-                return _do_place_search(
-                    request, place_form.cleaned_data | common_form.cleaned_data)
+                cleaned_data = place_form.cleaned_data | common_form.cleaned_data
+                return _do_place_search(request, cleaned_data)
             except ValidationError as e:
                 place_form.add_error(None, e.args[0])
 
@@ -147,83 +147,127 @@ def search(request) -> JsonResponse|HttpResponse:
 
     return render(request, "search.html", context={
         "track_form": track_form, "place_form": place_form,
-        "common_form": common_form})
+        "search_type": search_type, "common_form": common_form})
+
+
+def _encode_place_search(request, cleaned_data
+                         ) -> Tuple[Optional["SearchQ"], Dict]:
+    q: List["SearchQ"] = []
+    if (name := cleaned_data.get("name")):
+        # __icontains: case insensitive search for *value*
+        q.append(SearchQ(name__icontains=name))
+    if (place_types := cleaned_data.get("type")):
+        place_type_names = [place_type.name for place_type in place_types]
+        q.append(SearchQ(type__name__in=place_type_names))
+    if (tags_str := cleaned_data.get("tags")):
+        if (tag_names := [tag.strip() for tag in tags_str.split(',') if tag]):
+            q.append(SearchQ(tag__name__in=tag_names))
+    if (boundary_name := cleaned_data.get("boundary_name")):
+        boundary_category = cleaned_data.get("boundary_category")
+        boundary_search_q = BoundarySearchQ(request.user, boundary_category,
+                                            location__within=boundary_name)
+        boundary_polygon = json.loads(
+            serialize("geojson", [boundary_search_q.boundary]))
+        q.append(boundary_search_q)
+    else:
+        boundary_polygon = None
+    return AndSearchQ(*q) if len(q)>1 else q[0] if q else None, boundary_polygon
 
 
 def _do_place_search(request, cleaned_data) -> JsonResponse:
     """ carry out a place search, returning a Json response.
     Expects a valid place_form """
-    required_keys = ("name", "type", "tags", "boundary_name")
-    if not any(cleaned_data.get(key) for key in required_keys):
+    # log.info("place_search: form.cleaned_data=%s", cleaned_data)
+    query_json, boundary_polygon = _encode_place_search(request, cleaned_data)
+    if query_json is None:
+        required_keys = ("name", "type", "tags", "boundary_name")
+        # TODO: provide correct info in ValidationError code, params, field
         raise ValidationError(
             f"At least one of {', '.join(required_keys)} must be specified")
-    # log.info("place_search: form.cleaned_data=%s", cleaned_data)
-    places = Place.objects.filter(user=request.user)
-    if "name" in cleaned_data and cleaned_data["name"]:
-        # __icontains: case insensitive search for *value*
-        # log.info("search?place: filtering for name like*%s*", cleaned_data["name"])
-        places = places.filter(name__icontains=cleaned_data["name"])
-    if "type" in cleaned_data:
-        types = cleaned_data["type"]
-        # value is a queryset of selected types
-        if types.count() > 0:
-            # log.info("search?place: filtering for type in %s", cleaned_data["type"])
-            places = places.filter(type__in=cleaned_data["type"])
-    tags = cleaned_data.get("place_tags")
-    places = filter_by_tags(request, places, tags)
-    boundary = _get_boundary(request, cleaned_data)
-    if boundary:
-        places = places.filter(location__within=boundary.polygon)
-        boundary_polygon = json.loads(serialize("geojson", [boundary]))
+
+    log.debug("_do_place_search: query_json=%s, Q=%s, q.json=%s", query_json,
+              query_json.Q(), query_json.json())
+    places = Place.objects.filter(query_json.Q(), user=request.user)
+
     result_count = places.count()
     result_limit = request.user.routes_preference.place_search_result_limit
     places = places[:result_limit]
     places_json = json.loads(serialize("geojson", places))
-    log.info("search ? place: %d of %d places returned",
-             len(places_json["features"]), result_limit)
+    log.info("search ? place: %d %s places returned", result_count,
+             (f"of {result_limit}" if result_count > result_limit else ""))
     result = {"status": "success", "places": places_json,
               "result_count": result_count, "result_limit": result_limit,
-              "boundary": None if boundary is None else boundary_polygon}
+              "boundary": boundary_polygon}
     return JsonResponse(result, status=200)
+
+
+def _encode_track_search(request, cleaned_data
+                         ) -> Tuple[Optional["SearchQ"], Dict]:
+    q: List["SearchQ"] = []
+    if (start_date := cleaned_data.get("start_date")):
+        start_datetime = dt.datetime.combine(start_date, dt.time(0),
+                                             tzinfo=dt.timezone.utc)
+        q.append(SearchQ(start_time__gte=start_datetime))
+    if (end_date := cleaned_data.get("end_date")):
+        end_datetime = dt.datetime.combine(end_date, dt.time(23,59,59),
+                                             tzinfo=dt.timezone.utc)
+        q.append(SearchQ(start_time__lte=end_datetime))
+    if (tags_str := cleaned_data.get("tags")):
+        if (tag_names := [tag.strip() for tag in tags_str.split(',') if tag]):
+            q.append(SearchQ(tag__name__in=tag_names))
+    if (boundary_name := cleaned_data.get("boundary_name")):
+        boundary_category = cleaned_data.get("boundary_category")
+        boundary_search_q = BoundarySearchQ(request.user, boundary_category,
+                                            location__within=boundary_name)
+        boundary_polygon = json.loads(
+            serialize("geojson", [boundary_search_q.boundary]))
+        q.append(boundary_search_q)
+    else:
+        boundary_polygon = None
+    return AndSearchQ(*q) if len(q)>1 else q[0] if q else None, boundary_polygon
 
 
 def _do_track_search(request, cleaned_data) -> JsonResponse:
     """ carry out a track search, returning a JSON response.
     Expects a valid track_form 
     Can raise a ValidationError if form errors found (boundary DoesNotExist)"""
-    required_keys = ("start_date", "end_date", "tags", "boundary_name")
-    if not any(cleaned_data.get(key) for key in required_keys):
+    query_json, boundary_polygon = _encode_track_search(request, cleaned_data)
+    if query_json is None:
+        required_keys = ("start_date", "end_date", "tags", "boundary_name")
+        # TODO: provide correct info in ValidationError code, params, field
         raise ValidationError(
             f"At least one of {', '.join(required_keys)} must be specified")
-    tracks = Track.objects.filter(user=request.user)
-    start_date = cleaned_data.get("start_date")
-    if start_date is not None:
-        start_datetime = dt.datetime.combine(start_date, dt.time(),
-                                             tzinfo=dt.timezone.utc)
-        tracks = tracks.filter(start_time__gte=start_datetime)
-        log.debug("track search: start_time>=%r", start_datetime)
-    end_date = cleaned_data["end_date"]
-    if end_date is not None:
-        end_datetime = dt.datetime.combine(end_date, dt.time(23, 59, 59),
-                                           tzinfo=dt.timezone.utc)
-        tracks = tracks.filter(start_time__lte=end_datetime)
-        log.debug("track search: start_time<=%r", end_datetime)
-
-    tags = cleaned_data.get("track_tags")
-    tracks = filter_by_tags(request, tracks, tags)
-    boundary = _get_boundary(request, cleaned_data)
-    if boundary:
-        tracks = tracks.filter(track__intersects=boundary.polygon)
-        boundary_polygon = json.loads(serialize("geojson", [boundary]))
+    log.debug("_do_track_search: query_json=%s, Q=%s, q.json=%s", query_json,
+              query_json.Q(), query_json.json())
+    tracks = Track.objects.filter(query_json.Q(), user=request.user)
+    # start_date = cleaned_data.get("start_date")
+    # if start_date is not None:
+    #     start_datetime = dt.datetime.combine(start_date, dt.time(),
+    #                                          tzinfo=dt.timezone.utc)
+    #     tracks = tracks.filter(start_time__gte=start_datetime)
+    #     log.debug("track search: start_time>=%r", start_datetime)
+    # end_date = cleaned_data["end_date"]
+    # if end_date is not None:
+    #     end_datetime = dt.datetime.combine(end_date, dt.time(23, 59, 59),
+    #                                        tzinfo=dt.timezone.utc)
+    #     tracks = tracks.filter(start_time__lte=end_datetime)
+    #     log.debug("track search: start_time<=%r", end_datetime)
+    #
+    # tags = cleaned_data.get("track_tags")
+    # tracks = filter_by_tags(request, tracks, tags)
+    # boundary = _get_boundary(request, cleaned_data)
+    # if boundary:
+    #     tracks = tracks.filter(track__intersects=boundary.polygon)
+    #     boundary_polygon = json.loads(serialize("geojson", [boundary]))
     result_count = tracks.count()
     result_limit = request.user.routes_preference.track_search_result_limit
     tracks=tracks[:result_limit]
     tracks_json = json.loads(serialize("geojson", tracks))
-    log.info("search ? track: %d of %d tracks returned",
-             len(tracks_json["features"]), result_count)
+    log.info("search ? track: %d%s tracks returned", result_count,
+             f" of {result_limit}" if result_count > result_limit else "")
     result = {"status": "success", "tracks": tracks_json,
               "result_limit": result_limit, "result_count": result_count,
-              "boundary": None if boundary is None else boundary_polygon}
+              "boundary": boundary_polygon}
     return JsonResponse(result, status=200)
 
 
@@ -233,10 +277,11 @@ def filter_by_tags(request, queryset: QuerySet, tags: str) -> QuerySet:
     if tags is not None:
         tag_names = [tag.strip() for tag in tags.split(',') if tag]
         if tag_names:
-            tags = Tag.objects.filter(user=request.user, name__in=tag_names
-                                      ).distinct()
             log.debug("filter_by_tags: tag names in %s", tag_names)
-            return queryset.filter(tag__in=tags).distinct()
+            return queryset.filter(tag__name__in=tag_names)
+            # tags = Tag.objects.filter(user=request.user, name__in=tag_names
+            #                           ).distinct()
+            # return queryset.filter(tag__in=tags).distinct()
     return queryset
 
 
@@ -1051,3 +1096,100 @@ def leaflet_bounds(obj: GEOSGeometry) -> List[List[float]]:
     x1, y1, x2, y2 = obj.extent
     return [[y1, x1], [y2, x2]]
 
+
+class SearchQ:
+    """ represent a django Q query that can be executed by Django and also
+    serialised to json, for reuse in future queries.
+    Ref:
+    https://docs.djangoproject.com/en/5.2/topics/db/queries/#complex-lookups-with-q-objects
+    """
+    def __init__(self, **kwargs):
+        assert len(kwargs) == 1, f"expecting a single kw arg, not {kwargs}"
+        self._key, self._value = next(iter(kwargs.items()))
+
+    def __repr__(self):
+        return f"SearchQ({self._key}={self._value})"
+
+    def Q(self) -> Q:
+        """ return a Q function """
+        return Q(**{self._key: self._value})
+
+    def json(self) -> Dict[str, Any]:
+        """ return json representation """
+        return {"SearchQ": {self._key: self._value}}
+
+
+
+class AndSearchQ(SearchQ):
+    """ contains a list of SearchQ queries that are logically ANDed together """
+    def __init__(self, *args: List[SearchQ]):
+        not_searchQ = [str(type(arg))
+                       for arg in args
+                       if not isinstance(arg, SearchQ)]
+        if not_searchQ:
+            raise TypeError(
+                f"all args must be type SearchQ, not {','.join(not_searchQ)}")
+        assert len(args) >1 , "expecting at least two arguments"
+        self._args = args
+
+    def __repr__(self):
+        return f"AndSearchQ({' & '.join(str(arg) for arg in self._args)})"
+
+    def Q(self) -> Q:
+        q = self._args[0].Q()
+        for arg in self._args[1:]:
+            q &= arg.Q()
+        return q
+
+    def json(self) -> Dict[str, List[Dict]]:
+        return {"AndSearchQ": [arg.json() for arg in self._args]}
+
+
+class OrSearchQ(AndSearchQ):
+    """ contains a list of SearchQ queries that are logically ORed together""" 
+    # __ init__ as for AndSearchQ
+
+    def __repr__(self):
+        """ parenthesize and or or sub-arguments """
+        str_args = (f"({arg})" if isinstance(arg, (AndSearchQ, OrSearchQ))
+                    else f"{arg}" for arg in self._args)
+        return f"AndSearchQ({' & '.join(str_args)})"
+
+    def Q(self) -> Q:
+        q = self._args[0].Q()
+        for arg in self.args[1:]:
+            q |= arg.Q()
+        return q
+
+    def json(self) -> Dict[str, Any]:
+        return {"OrSearchQ": [arg.json() for arg in self._args]}
+
+
+class BoundarySearchQ(SearchQ):
+    """ contains a search query within a boundary specified by name and category
+    This is validated every time it's used in case boundaries have been renamed.
+    kwargs are e.g. location__within=name or track__intersects=name 
+    """
+    def __init__(self, user, boundary_category, **kwargs):
+        self.boundary_category = boundary_category
+        assert len(kwargs) == 1, f"expecting one keyword arg, not {kwargs}"
+        self._key, self.boundary_name = next(iter(kwargs.items()))
+        try:
+            self.boundary = Boundary.objects.get(
+                user=user, category=boundary_category, pk=self.boundary_name)
+        except Boundary.DoesNotExist as e:
+            log.error("Boundary pk=%s, category=%s not found",
+                      self.boundary_name, boundary_category)
+            raise ValidationError(
+                "No boundary found with this name and category") from e
+
+    def __repr__(self):
+        return (f"BoundarySearchQ("
+                f"{self.boundary_category}, {self._key}={self.boundary_name})")
+
+    def Q(self) -> Q:
+        return Q(**{self._key: self.boundary.polygon})
+
+    def json(self) -> Dict[str, Any]:
+        return {"BoundarySearchQ": {"boundary_category": self.boundary_category,
+                                    self._key: self.boundary_name}}
