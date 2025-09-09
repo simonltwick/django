@@ -8,6 +8,9 @@ let nearbyTracksUrl;  // url for searching tracks
 
 let preference;  // nearby search preference
 
+let prevTrackSearch = '';
+let prevPlaceSearch = '';
+
 
 /* ------ initialisation ------ */
 
@@ -284,6 +287,10 @@ function onSearchFormSubmit(event) {
 	event.preventDefault();
 	searchType = document.getElementById("tracks-search"
 		).classList.contains("active") ? 'track': 'place'
+	searchFormSubmitPost(searchType);
+	}
+
+function searchFormSubmitPost(searchType){
 	requestUrl = '/routes/api/search/?search_type=' + searchType;
 	$.post(requestUrl, $('#searchForm').serialize(), searchResults, null
 		).fail(requestFailMsg); 
@@ -293,6 +300,10 @@ function onSearchFormSubmit(event) {
 		placesLayer.clearLayers();
 	}
 	/* this automatically parses result data to json or html/text */
+}
+
+function searchFormSubmitJson(searchType){
+	/* create and send a Search json object */
 }
 
 function searchResults(data) {
@@ -365,9 +376,8 @@ function log_error(msg) {
 	displayMessage(msg, "text-error");
 }
 
-/*
- ------ Track handling ------
- */
+
+/* ------ Track handling ------ */
 function nearbyTracks(searchType) {
 	/* get tracks nearby popLocation.   depending on the value of searchType,
 	add to tracks already shown, replace tracks already shown, or limit the
@@ -624,7 +634,7 @@ function nearbyPlaces(searchType) {
 					  + searchType);
 		};
 	// console.info("nearbyPlaces: settings=", settings, ", nearbyPlacesUrl=", nearbyPlacesUrl);
-	$.get(nearbyPlacesUrl, null, showPlaces, 'json').fail(
+	$.get(nearbyPlacesUrl, null, searchResults, 'json').fail(
 		function(_, status, jqXHR){
 			log_error("nearbyPlaces request status=" + status +
 				', response=' + jqXHR);

@@ -13,6 +13,7 @@ from gpxpy.gpx import GPX
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.serializers import serialize
+from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -20,7 +21,7 @@ from django.contrib.gis.geos.geometry import GEOSGeometry
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models import Extent
 from django.contrib.gis.db.models.functions import NumPoints
-from django.contrib import messages
+from django.contrib.gis.measure import D  # synonym for Distance
 from django.db.models import Exists, OuterRef, QuerySet, Q
 from django.db.utils import IntegrityError
 from django.http import (
@@ -193,11 +194,12 @@ def _do_place_search(request, cleaned_data) -> JsonResponse:
     result_limit = request.user.routes_preference.place_search_result_limit
     places = places[:result_limit]
     places_json = json.loads(serialize("geojson", places))
+    search_history = query_json.json()
     log.info("search ? place: %d %s places returned", result_count,
              (f"of {result_limit}" if result_count > result_limit else ""))
     result = {"status": "success", "places": places_json,
               "result_count": result_count, "result_limit": result_limit,
-              "boundary": boundary_polygon}
+              "boundary": boundary_polygon, "search_history": search_history}
     return JsonResponse(result, status=200)
 
 
@@ -237,37 +239,21 @@ def _do_track_search(request, cleaned_data) -> JsonResponse:
         # TODO: provide correct info in ValidationError code, params, field
         raise ValidationError(
             f"At least one of {', '.join(required_keys)} must be specified")
+
     log.debug("_do_track_search: query_json=%s, Q=%s, q.json=%s", query_json,
               query_json.Q(), query_json.json())
     tracks = Track.objects.filter(query_json.Q(), user=request.user)
-    # start_date = cleaned_data.get("start_date")
-    # if start_date is not None:
-    #     start_datetime = dt.datetime.combine(start_date, dt.time(),
-    #                                          tzinfo=dt.timezone.utc)
-    #     tracks = tracks.filter(start_time__gte=start_datetime)
-    #     log.debug("track search: start_time>=%r", start_datetime)
-    # end_date = cleaned_data["end_date"]
-    # if end_date is not None:
-    #     end_datetime = dt.datetime.combine(end_date, dt.time(23, 59, 59),
-    #                                        tzinfo=dt.timezone.utc)
-    #     tracks = tracks.filter(start_time__lte=end_datetime)
-    #     log.debug("track search: start_time<=%r", end_datetime)
-    #
-    # tags = cleaned_data.get("track_tags")
-    # tracks = filter_by_tags(request, tracks, tags)
-    # boundary = _get_boundary(request, cleaned_data)
-    # if boundary:
-    #     tracks = tracks.filter(track__intersects=boundary.polygon)
-    #     boundary_polygon = json.loads(serialize("geojson", [boundary]))
+
     result_count = tracks.count()
     result_limit = request.user.routes_preference.track_search_result_limit
     tracks=tracks[:result_limit]
     tracks_json = json.loads(serialize("geojson", tracks))
+    query_as_json = query_json.json()
     log.info("search ? track: %d%s tracks returned", result_count,
              f" of {result_limit}" if result_count > result_limit else "")
     result = {"status": "success", "tracks": tracks_json,
               "result_limit": result_limit, "result_count": result_count,
-              "boundary": boundary_polygon}
+              "boundary": boundary_polygon, "search_history": query_as_json}
     return JsonResponse(result, status=200)
 
 
@@ -381,11 +367,17 @@ def track_json(request):
     &latlon=  &andlatlon=,  &orlatlon=, (name, date - not yet defined) 
     also ?name= to determine whether a track exists or not (returns status 404
     or 200 with the number of points in the track)"""
-    # query = Track.objects
-    log.info("track_json(%s): GET=%s", request.method, request.GET)
+    # log.info("track_json(%s): GET=%s", request.method, request.GET)
     if request.method == "GET":
-        limits, prefs = nearby_search_params(request)
-        nearby_tracks: QuerySet = Track.nearby(limits, prefs)
+        # limits, prefs = nearby_search_params(request)
+        # nearby_tracks_old: QuerySet = Track.nearby(limits, prefs)
+        search_key, lat, lon, prefs = nearby_search_params2(request)
+        if search_key in {"orlatlon", "andlatlon"}:
+            return HttpResponse(f"{search_key} not yet implemented", status=501)
+        query_json = NearbySearchQ(
+            lat=lat, lon=lon,
+            track__distance_lte=prefs.track_nearby_search_distance_metres)
+        nearby_tracks = Track.objects.filter(query_json.Q(), user=request.user)
         result_count = nearby_tracks.count()
         result_limit = prefs.track_search_result_limit
         nearby_tracks = nearby_tracks[:result_limit]
@@ -394,10 +386,13 @@ def track_json(request):
                      result_limit)
         else:
             log.info("track_json returned %d tracks", result_count)
+        # log.info("track_json2 returned %d tracks: query_json=%s, Q=%s",
+        #          nearby_tracks2.count(), query_json, query_json.Q())
         tracks_json = json.loads(serialize(
             "geojson", nearby_tracks, fields=["name", "track", "pk"]))
         return JsonResponse({"status": "success", "result_count": result_count,
-         "result_limit": result_limit, "tracks": tracks_json}, status=200)
+         "result_limit": result_limit, "tracks": tracks_json,
+         "search_history": query_json.json()}, status=200)
 
     # "HEAD": just return num_points if the track is there.  Search by ?name=
     name = request.GET.get("name")
@@ -769,19 +764,56 @@ def nearby_search_params(request) -> Tuple[Dict, Preference]:
     return limits, prefs
 
 
+def nearby_search_params2(request) -> "NearbySearchQ":
+    """ extract parms for a nearby search latlon=|andlatlon=|orlatlon= """
+    allowed_search_parms = set(("latlon", "andlatlon", "orlatlon"),)
+    valid_search_parms = set(request.GET) & allowed_search_parms
+    if not valid_search_parms:
+        return HttpResponse("No search criteria specified", status=400)
+    if len(valid_search_parms) > 1:
+        return HttpResponse("Multiple search criteria not supported",
+                            status=501)
+    search_key = next(iter(valid_search_parms))
+    latlon: str = request.GET[search_key]
+    try:
+        lat, lon = (float(coord) for coord in latlon.split(','))
+    except ValueError as e:
+        log.error("Unable to parse latlon value %s: %r", latlon, e)
+        return HttpResponse("Invalid latlon parameter specified", status=400)
+    prefs = Preference.objects.get_or_create(user=request.user)[0]
+    return search_key, lat, lon, prefs
+
+
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET"])
 def place_json(request):
     """ return a selection of places based on search parameters including
     &latlon=  &andlatlon=,  &orlatlon=, """
-    # query = Place.objects
-    log.info("place_json(%s): GET=%s", request.method, request.GET)
+    # log.info("place_json(%s): GET=%s", request.method, request.GET)
     assert request.method == "GET"
-    limits, prefs = nearby_search_params(request)
-    nearby_places: dict = Place.nearby(limits, prefs)
-    log.info("track_json returned %d places", len(nearby_places))
+    # limits, prefs = nearby_search_params(request)
+    # nearby_places: dict = Place.nearby(limits, prefs)
+    # log.info("place_json (old) returned %d places", len(nearby_places))
+    search_key, lat, lon, prefs = nearby_search_params2(request)
+    if search_key in {"orlatlon", "andlatlon"}:
+        return HttpResponse(f"{search_key} not yet implemented", status=501)
+    query_json = NearbySearchQ(
+        lat=lat, lon=lon,
+        location__distance_lte=prefs.place_nearby_search_distance_metres)
+    nearby_places = Place.objects.filter(query_json.Q(), user=request.user)
+    result_count = nearby_places.count()
+    result_limit = prefs.place_search_result_limit
+    nearby_places = nearby_places[:result_limit]
+    if result_count > result_limit:
+        log.info("place_json returned %d of %d places", result_count,
+                 result_limit)
+    else:
+        log.info("place_json returned %d places", result_count)
     msg = json.loads(serialize("geojson", nearby_places))
-    return JsonResponse(msg, status=200)
+    result = {"status": "success", "places": msg,
+              "result_count": result_count, "result_limit": result_limit,
+              "boundary": None, "search_history": query_json.json()}
+    return JsonResponse(result, status=200)
 
 
 @login_required(login_url=LOGIN_URL)
@@ -1116,13 +1148,15 @@ class SearchQ:
 
     def json(self) -> Dict[str, Any]:
         """ return json representation """
-        return {"SearchQ": {self._key: self._value}}
-
+        if isinstance(self._value, dt.datetime):
+            return {"SearchQ":
+                    {self._key: {"datetime": self._value.isoformat()}}}
+        return {"SearchQ": {"key": self._key, "value": self._value}}
 
 
 class AndSearchQ(SearchQ):
     """ contains a list of SearchQ queries that are logically ANDed together """
-    def __init__(self, *args: List[SearchQ]):
+    def __init__(self, *args: Tuple[SearchQ]):
         not_searchQ = [str(type(arg))
                        for arg in args
                        if not isinstance(arg, SearchQ)]
@@ -1157,7 +1191,7 @@ class OrSearchQ(AndSearchQ):
 
     def Q(self) -> Q:
         q = self._args[0].Q()
-        for arg in self.args[1:]:
+        for arg in self._args[1:]:
             q |= arg.Q()
         return q
 
@@ -1191,5 +1225,28 @@ class BoundarySearchQ(SearchQ):
         return Q(**{self._key: self.boundary.polygon})
 
     def json(self) -> Dict[str, Any]:
-        return {"BoundarySearchQ": {"boundary_category": self.boundary_category,
-                                    self._key: self.boundary_name}}
+        return {"BoundarySearchQ": {
+            "category": self.boundary_category, "key": self._key,
+            "name": self.boundary_name}}
+
+class NearbySearchQ(SearchQ):
+    """ Contains a search query for tracks/places within a set distance of a
+    point.  Distance in metres """
+    def __init__(self, *, lat: float, lon: float, **kwargs):
+        self._lat = lat
+        self._lon = lon
+        assert len(kwargs) == 1, (
+            f"expecting one keyword arg after lat, lon, not {kwargs}")
+        self._key, self._distance = next(iter(kwargs.items()))
+
+    def __repr__(self):
+        return (f"NearbySearchQ(lat={self._lat}, lon={self._lon}, "
+                f"{self._key}={self._distance})")
+
+    def Q(self)-> Q:
+        return Q(**{
+            self._key: (Point(self._lon, self._lat), D(m=self._distance))})
+
+    def json(self) -> Dict[str, Any]:
+        return {"NearbySearchQ": {"lat": self._lat, "lon": self._lon,
+                                  "key": self._key, "distance": self._distance}}

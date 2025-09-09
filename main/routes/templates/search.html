@@ -29,6 +29,8 @@ click the magnifying glass icon.   Otherwise, use this form.</small>
 
 <form id="searchForm" onsubmit="onSearchFormSubmit(event)">
  {% csrf_token %}
+ <input type="hidden" id="previous-search" name="previous-search" value="">
+ <!-- the above field is only used to send info TO the server, not from -->
  <div class="tab-content" id="searchTabContent">
  
   <div class="tab-pane fade {% if search_type == 'track' %}show active{% endif %}"

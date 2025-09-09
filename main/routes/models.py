@@ -124,25 +124,25 @@ class Place(models.Model):
             places.append(place)
         return places
 
-    @classmethod
-    def nearby(cls, limits: Dict, prefs: "Preference"):
-        """ return a queryset of places according to limits such as
-        latlon: latlon (less than preferences.place_search_distance from latlon)
-        """
-        query = Place.objects.filter(user=prefs.user)
-        for key, value in limits.items():
-            # log.debug("Place.nearby: key=%s, value=%s", key, value)
-            if value is None:
-                continue # value can be stored as a list, terminated by None
-            if key in {"latlon", "andlatlon"}:
-                lat, lon = parse_floats(value, 2, f'{key} must be y,x')
-                query = query.filter(location__distance_lte=(Point(lon, lat), D(
-                    m=prefs.place_nearby_search_distance_metres)))
-            else:
-                raise QueryStringError(f"unrecognised query keyword {key!r}")
-        # limit the number of results returned
-        query = query[:prefs.place_search_result_limit]
-        return query
+    # @classmethod
+    # def nearby(cls, limits: Dict, prefs: "Preference"):
+    #     """ return a queryset of places according to limits such as
+    #     latlon: latlon (less than preferences.place_search_distance from latlon)
+    #     """
+    #     query = Place.objects.filter(user=prefs.user)
+    #     for key, value in limits.items():
+    #         # log.debug("Place.nearby: key=%s, value=%s", key, value)
+    #         if value is None:
+    #             continue # value can be stored as a list, terminated by None
+    #         if key in {"latlon", "andlatlon"}:
+    #             lat, lon = parse_floats(value, 2, f'{key} must be y,x')
+    #             query = query.filter(location__distance_lte=(Point(lon, lat), D(
+    #                 m=prefs.place_nearby_search_distance_metres)))
+    #         else:
+    #             raise QueryStringError(f"unrecognised query keyword {key!r}")
+    #     # limit the number of results returned
+    #     query = query[:prefs.place_search_result_limit]
+    #     return query
 
 
 class Track(models.Model):
@@ -288,23 +288,23 @@ class Track(models.Model):
             s += f" ({distance:.0f} {units_display_name})"
         return s
 
-    @classmethod
-    def nearby(cls, limits: Dict, prefs: "Preference"):
-        """ return a queryset of tracks according to limits such as
-        latlon: latlon (less than preferences.track_search_distance from latlon)
-        """
-        query = Track.objects.filter(user=prefs.user)
-        for key, value in limits.items():
-            # log.debug("Track.nearby: key=%s, value=%s", key, value)
-            if value is None:
-                continue # value can be stored as a list, terminated by None
-            if key in {"latlon", "andlatlon"}:
-                lat, lon = parse_floats(value, 2, f'{key} must be y,x')
-                query = query.filter(track__distance_lte=(Point(lon, lat), D(
-                    m=prefs.track_nearby_search_distance_metres)))
-            else:
-                raise QueryStringError(f"unrecognised query keyword {key!r}")
-        return query
+    # @classmethod
+    # def nearby(cls, limits: Dict, prefs: "Preference"):
+    #     """ return a queryset of tracks according to limits such as
+    #     latlon: latlon (less than preferences.track_search_distance from latlon)
+    #     """
+    #     query = Track.objects.filter(user=prefs.user)
+    #     for key, value in limits.items():
+    #         # log.debug("Track.nearby: key=%s, value=%s", key, value)
+    #         if value is None:
+    #             continue # value can be stored as a list, terminated by None
+    #         if key in {"latlon", "andlatlon"}:
+    #             lat, lon = parse_floats(value, 2, f'{key} must be y,x')
+    #             query = query.filter(track__distance_lte=(Point(lon, lat), D(
+    #                 m=prefs.track_nearby_search_distance_metres)))
+    #         else:
+    #             raise QueryStringError(f"unrecognised query keyword {key!r}")
+    #     return query
 
     def add_gpx_stats(self, gpx_track: "GPXTrack"):
         """ add stats calculated from the gpx file """
@@ -395,13 +395,12 @@ class Preference(models.Model):
             self.distance_units, DistanceUnits.KILOMETRES) * 1000.0
 
 
-def parse_floats(arg_string, n_floats, error_msg):
-    # log.debug("parse_floats(%s, ...)", arg_string)
-    args = arg_string.split(',')
-    if len(args) != n_floats:
-        raise QueryStringError(error_msg)
-    try:
-        return [float(a) for a in args]
-    except ValueError as e:
-        raise QueryStringError(f'{error_msg}: {e.args[0]}')
-
+# def parse_floats(arg_string, n_floats, error_msg):
+#     # log.debug("parse_floats(%s, ...)", arg_string)
+#     args = arg_string.split(',')
+#     if len(args) != n_floats:
+#         raise QueryStringError(error_msg)
+#     try:
+#         return [float(a) for a in args]
+#     except ValueError as e:
+#         raise QueryStringError(f'{error_msg}: {e.args[0]}')
