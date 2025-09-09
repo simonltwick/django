@@ -8,8 +8,8 @@ let nearbyTracksUrl;  // url for searching tracks
 
 let preference;  // nearby search preference
 
-let prevTrackSearch = '';
-let prevPlaceSearch = '';
+let trackSearchHistory = '';
+let placeSearchHistory = '';
 
 
 /* ------ initialisation ------ */
@@ -206,40 +206,48 @@ const mapClickPopupContent = `</p>
 	<a class="btn" onClick="onPreference()">
 	  <span class="oi oi-cog" data-toggle="tooltip" title="Preference"/>
 	</a>`
-// these buttons shown when no tracks are visible on the map
-const nearbyButtons1Html = `<p>
-	<button class="btn btn-outline-secondary" onClick="nearbyTracks()">
-	  Nearby Tracks</button>
-	<button class="btn btn-outline-secondary" onClick="nearbyPlaces()">
-	  Nearby Places</button>
-	</p>`;
-// these buttons shown if tracks are already visible on the map
-const nearbyButtons2Html = `<p>
+
+const nearbyButtonsTemplate = 	`<p>
 	<div class="btn-group" role="group">
 	<button onClick="nearbyTracks()" class="btn btn-outline-secondary">
 	  Nearby Tracks</button>
-	  <button type="button" 
-	    class="btn btn-outline-secondary dropdown-toggle"
-		data-toggle="dropdown" aria-expanded="false" aria-haspopup="true"
-		id="nearby-tracks1">
-	    <!-- <span class="invisible">Toggle Dropdown</span> -->
-	  </button>
-	  <div class="dropdown-menu" aria-labelledby="nearby-tracks1">
-	    <a href="#" class="btn btn-outline-secondary dropdown-item"
-			onClick="nearbyTracks('add')">
-		  	Add to tracks already displayed</a>
-	    <a href="#" class="btn btn-outline-secondary dropdown-item" 
-			onClick="nearbyTracks('reduce')">
-		  	Search only tracks already displayed</button></a>
-	  </div>
+	  {{ track_dropdown }}
 	</div>
-	<button class="btn btn-outline-secondary" onClick="nearbyPlaces()">Nearby Places</button>
+	<div class="btn-group" role="group">
+	<button class="btn btn-outline-secondary" onClick="nearbyPlaces()">
+	Nearby Places</button>
+	{{ place_dropdown }}
+	<div>
 	</p>`;
 
+const trackDropdownButtons = `<button type="button" 
+    class="btn btn-outline-secondary dropdown-toggle"
+	data-toggle="dropdown" aria-expanded="false" aria-haspopup="true"
+	id="nearby-tracks1">
+    <!-- <span class="invisible">Toggle Dropdown</span> -->
+  </button>
+  <div class="dropdown-menu" aria-labelledby="nearby-tracks1">
+    <a href="#" class="btn btn-outline-secondary dropdown-item"
+		onClick="nearbyTracks('add')">
+	  	Add to tracks already displayed</a>
+    <a href="#" class="btn btn-outline-secondary dropdown-item" 
+		onClick="nearbyTracks('reduce')">
+	  	Search only tracks already displayed</button></a>
+  </div>`;
+
+const placeDropdownButtons = '';  // not used
+  
+function getNearbyButtons(){
+	const trackButtonDropdown = (trackSearchHistory ? trackDropdownButtons:'');
+	const placeButtonDropdown = (placeSearchHistory ? placeDropdownButtons:'');
+	return nearbyButtonsTemplate.replace(
+		'{{ track_dropdown }}', trackButtonDropdown
+		).replace('{{ place_dropdown }}', placeButtonDropdown);
+}
+	
 function onMapClick(event) {
 	popLocation = event.latlng;
-	let buttonsHtml = ((tracksLayer && map.hasLayer(tracksLayer)) ?
-					   nearbyButtons2Html : nearbyButtons1Html);
+	const buttonsHtml = getNearbyButtons();
 	popup = L.popup()
 		.setLatLng(popLocation)
 		.setContent(
@@ -247,7 +255,6 @@ function onMapClick(event) {
 			+ mapClickPopupContent
 			+ buttonsHtml)
 		.openOn(map);
-	// TODO: if tracks layer is not shown, don't show additional track options      
 }
 
 function replaceMapOverlay(oldOverlay, newOverlay, overlayName) {
@@ -324,8 +331,10 @@ function searchResults(data) {
 	displaySearchResultsInfo(data, result_type);
 	showBoundary(data);
 	if (result_type == "tracks")  {
+		trackSearchHistory = data["search_history"];
 		showTracks(data["tracks"]);
 	} else if (result_type == "places") {
+		placeSearchHistory = data["search_history"];
 		showPlaces(data["places"]);
 	} else {
 		console.error("Unrecognised search results:", data);
@@ -361,14 +370,16 @@ function showBoundary(data) {
 
 // error handling
 function requestFailMsg(jqXHR, textStatus, errorThrown) {
-	console.error("Request failed:",
-		{jqHXR: jqXHR, textStatus: textStatus, errorThrown: errorThrown});
+	console.debug("Request failed:",
+		{jqXHR: jqXHR, textStatus: textStatus, errorThrown: errorThrown,
+		 requestURL: requestUrl
+		});
 	let msg = jqXHR;
 	if (jqXHR.status) {
-		msg = "Status code " + jqXHR.status + ": " + jqXHR.statusText;
+		msg = "Status code " + jqXHR.status + ": " + (jqXHR.responseText ? jqXHR.responseText: jqXHR.statusText);
 	}
-	msg = "Server request " + requestUrl + " returned " + msg;
-	log_error(msg + ": " + textStatus, errMsg);
+	msg = "Error: '" + msg + "' from server request " + requestUrl;
+	log_error(msg);
 }
 
 function log_error(msg) {
@@ -383,16 +394,20 @@ function nearbyTracks(searchType) {
 	add to tracks already shown, replace tracks already shown, or limit the
 	search to those already shown.  This is done by resubmitting the 
 	query with the combined search term */
+	let searchTerm;
 	switch (searchType){
 		case undefined:
+			searchTerm = "latlon";
 			nearbyTracksUrl = (
 				'/routes/api/track?latlon=' + popLocation.lat + ',' + popLocation.lng);
 		    break;
 		case "add":
+			searchTerm = "orlatlon";
 			nearbyTracksUrl += (
 				"&orlatlon=" + popLocation.lat + ',' + popLocation.lng);
 			break;
 		case "reduce":
+			searchTerm = "andlatlon";
 			nearbyTracksUrl += (
 				"&andlatlon=" + popLocation.lat + ',' + popLocation.lng);
 			break;
@@ -400,13 +415,11 @@ function nearbyTracks(searchType) {
 			log_error("nearbyTracks: unexpected value for searchType: "
 					  + searchType);
 		};
-	// console.info("nearbyTracks: settings=", settings, ", nearbyTracksUrl=", nearbyTracksUrl);
-	$.get(nearbyTracksUrl, null, searchResults, 'json').fail(
-		function(_, status, jqXHR){
-			log_error("nearbyTracks request status=" + status +
-				', response=' + jqXHR);
-			console.error('jqXHR=', jqXHR);
-		});
+	let params = {"search_history": trackSearchHistory};
+	params[searchTerm] = popLocation.lat + ',' + popLocation.lng;
+	requestUrl = '/routes/api/track?' + $.param(params);
+	// console.info("nearbyTracks: settings=", settings, ", RequestUrl=", RequestUrl);
+	$.get(requestUrl, null, searchResults, 'json').fail(requestFailMsg);
 	map.closePopup();
 	// add search area to map
 	tracksLayer.clearLayers();
