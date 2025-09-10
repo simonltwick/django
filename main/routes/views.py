@@ -370,18 +370,14 @@ def track_json(request):
     or 200 with the number of points in the track)"""
     # log.info("track_json(%s): GET=%s", request.method, request.GET)
     if request.method == "GET":
-        search_key, lat, lon, prefs = nearby_search_params(request)
+        lat, lon, prefs = nearby_search_params(request)
         query_json = NearbySearchQ(
             lat=lat, lon=lon,
             track__distance_lte=prefs.track_nearby_search_distance_metres)
-        if search_key in {"orlatlon", "andlatlon"}:
-            if (search_history := get_search_history(request)) is None:
-                return HttpResponse(
-                    "Unable to retrieve search_history from url params", status=400)
-            if search_key == "orlatlon":
-                query_json = search_history | query_json
-            elif search_key == "andlatlon":
-                query_json = search_history & query_json
+        try:
+            query_json = get_search_history(request, query_json)
+        except ValueError as e:
+            return HttpResponse(e.args[0], status=400)
         nearby_tracks = Track.objects.filter(query_json.Q(), user=request.user)
         result_count = nearby_tracks.count()
         result_limit = prefs.track_search_result_limit
@@ -753,40 +749,42 @@ def place(request, pk=None):
         "form": form, "pk": pk, "icons": icons, "instance": place_inst})
 
 
-def nearby_search_params(request) -> Tuple[str, float, float, Preference]:
+def nearby_search_params(request) -> Tuple[float, float, Preference]:
     """ extract parms for a nearby search latlon=|andlatlon=|orlatlon= """
-    allowed_search_parms = set(("latlon", "andlatlon", "orlatlon"),)
-    valid_search_parms = set(request.GET) & allowed_search_parms
-    if not valid_search_parms:
-        return HttpResponse("No search criteria specified", status=400)
-    if len(valid_search_parms) > 1:
-        return HttpResponse("Multiple search criteria not supported",
-                            status=501)
-    search_key = next(iter(valid_search_parms))
-    latlon: str = request.GET[search_key]
+    latlon: str = request.GET["latlon"]
     try:
         lat, lon = (float(coord) for coord in latlon.split(','))
     except ValueError as e:
         log.error("Unable to parse latlon value %s: %r", latlon, e)
         return HttpResponse("Invalid latlon parameter specified", status=400)
     prefs = Preference.objects.get_or_create(user=request.user)[0]
-    return search_key, lat, lon, prefs
+    return lat, lon, prefs
 
 
-def get_search_history(request) -> Optional["SearchQ"]:
+def get_search_history(request, query: "SearchQ") -> Optional["SearchQ"]:
     """ extract search history from query string and recreate the SearchQ """
-    if not (history_str := request.GET.get("search_history")):
-        return None
+    if not (join := request.GET.get("join")):
+        return query
+
+    if not (search_history := request.GET.get("search_history")):
+        raise ValueError("Unable to retrieve search_history from url parameter")
     try:
-        searchq_json = json.loads(history_str)
+        searchq_json = json.loads(search_history)
         searchq = SearchQ.from_json(request.user, searchq_json)
-        return searchq
     except json.decoder.JSONDecodeError as e:
-        log.error("Unable to decode search history from url param: %s", e)
+        raise ValueError(f"Unable to decode search history from url param: {e}"
+                         ) from e
     except ValueError as e:
-        log.error("Unable to parse search history from json: %s", e)
-    log.debug("url search_history param=%s", history_str)
-    return None
+        raise ValueError(f"Unable to parse search history from json: {e}"
+                         ) from e
+    log.debug("url search_history param=%s", search_history)
+    if join == "or":
+        query = searchq | query
+    elif join == "and":
+        query = searchq & query
+    else:
+        raise ValueError(f"Invalid url join parameter: {join}")
+    return query
 
 
 @login_required(login_url=LOGIN_URL)
@@ -796,7 +794,7 @@ def place_json(request):
     &latlon=  &andlatlon=,  &orlatlon=, """
     # log.info("place_json(%s): GET=%s", request.method, request.GET)
     assert request.method == "GET"
-    search_key, lat, lon, prefs = nearby_search_params(request)
+    lat, lon, prefs = nearby_search_params(request)
     if search_key in {"orlatlon", "andlatlon"}:
         return HttpResponse(f"{search_key} not yet implemented", status=501)
     query_json = NearbySearchQ(

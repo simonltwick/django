@@ -228,10 +228,10 @@ const trackDropdownButtons = `<button type="button"
   </button>
   <div class="dropdown-menu" aria-labelledby="nearby-tracks1">
     <a href="#" class="btn btn-outline-secondary dropdown-item"
-		onClick="nearbyTracks('add')">
+		onClick="nearbyTracks('or')">
 	  	Add to tracks already displayed</a>
     <a href="#" class="btn btn-outline-secondary dropdown-item" 
-		onClick="nearbyTracks('reduce')">
+		onClick="nearbyTracks('and')">
 	  	Search only tracks already displayed</button></a>
   </div>`;
 
@@ -396,36 +396,17 @@ function log_error(msg) {
 
 
 /* ------ Track handling ------ */
-function nearbyTracks(searchType) {
+function nearbyTracks(joinType) {
 	/* get tracks nearby popLocation.   depending on the value of searchType,
 	add to tracks already shown, replace tracks already shown, or limit the
 	search to those already shown.  This is done by resubmitting the 
 	query with the combined search term */
-	let searchTerm;
-	switch (searchType){
-		case undefined:
-			searchTerm = "latlon";
-			nearbyTracksUrl = (
-				'/routes/api/track?latlon=' + popLocation.lat + ',' + popLocation.lng);
-		    break;
-		case "add":
-			searchTerm = "orlatlon";
-			nearbyTracksUrl += (
-				"&orlatlon=" + popLocation.lat + ',' + popLocation.lng);
-			break;
-		case "reduce":
-			searchTerm = "andlatlon";
-			nearbyTracksUrl += (
-				"&andlatlon=" + popLocation.lat + ',' + popLocation.lng);
-			break;
-		default:
-			log_error("nearbyTracks: unexpected value for searchType: "
-					  + searchType);
-		};
-	let params = {"search_history": JSON.stringify(trackSearchHistory)};
-	params[searchTerm] = popLocation.lat + ',' + popLocation.lng;
+	params = {latlon: popLocation.lat + ',' + popLocation.lng}
+	if (joinType) {
+		params["join"] = joinType;
+		params["search_history"] = JSON.stringify(trackSearchHistory);
+	}
 	requestUrl = '/routes/api/track?' + $.param(params);
-	// console.info("nearbyTracks: settings=", settings, ", RequestUrl=", RequestUrl);
 	$.get(requestUrl, null, searchResults, 'json').fail(requestFailMsg);
 	map.closePopup();
 	// add search area to map
