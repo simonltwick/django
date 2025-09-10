@@ -5,7 +5,8 @@ from io import BytesIO
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, List, Dict, Tuple, Set, Any
+from typing import (
+    TYPE_CHECKING, Optional, List, Dict, Tuple, Set, Any, Sequence)
 
 from gpxpy.parser import GPXParser
 from gpxpy.gpx import GPX
@@ -369,14 +370,18 @@ def track_json(request):
     or 200 with the number of points in the track)"""
     # log.info("track_json(%s): GET=%s", request.method, request.GET)
     if request.method == "GET":
-        # limits, prefs = nearby_search_params(request)
-        # nearby_tracks_old: QuerySet = Track.nearby(limits, prefs)
-        search_key, lat, lon, prefs = nearby_search_params2(request)
-        if search_key in {"orlatlon", "andlatlon"}:
-            return HttpResponse(f"{search_key} not yet implemented", status=501)
+        search_key, lat, lon, prefs = nearby_search_params(request)
         query_json = NearbySearchQ(
             lat=lat, lon=lon,
             track__distance_lte=prefs.track_nearby_search_distance_metres)
+        if search_key in {"orlatlon", "andlatlon"}:
+            if (search_history := get_search_history(request)) is None:
+                return HttpResponse(
+                    "Unable to retrieve search_history from url params", status=400)
+            if search_key == "orlatlon":
+                query_json = search_history | query_json
+            elif search_key == "andlatlon":
+                query_json = search_history & query_json
         nearby_tracks = Track.objects.filter(query_json.Q(), user=request.user)
         result_count = nearby_tracks.count()
         result_limit = prefs.track_search_result_limit
@@ -386,8 +391,6 @@ def track_json(request):
                      result_limit)
         else:
             log.info("track_json returned %d tracks", result_count)
-        # log.info("track_json2 returned %d tracks: query_json=%s, Q=%s",
-        #          nearby_tracks2.count(), query_json, query_json.Q())
         tracks_json = json.loads(serialize(
             "geojson", nearby_tracks, fields=["name", "track", "pk"]))
         return JsonResponse({"status": "success", "result_count": result_count,
@@ -750,21 +753,7 @@ def place(request, pk=None):
         "form": form, "pk": pk, "icons": icons, "instance": place_inst})
 
 
-def nearby_search_params(request) -> Tuple[Dict, Preference]:
-    """ extract and format parameters for a "nearby" search request """
-    if not set(request.GET) & set(("latlon", "andlatlon"),):
-        return HttpResponse("No search criteria specified", status=400)
-    params = request.GET
-    defaults = {'latlon': None,  # float, float,
-                'andlatlon': None,  # float, float
-                }
-    limits = {key: params.get(key, default_value)
-              for key, default_value in defaults.items()}
-    prefs = Preference.objects.get_or_create(user=request.user)[0]
-    return limits, prefs
-
-
-def nearby_search_params2(request) -> "NearbySearchQ":
+def nearby_search_params(request) -> Tuple[str, float, float, Preference]:
     """ extract parms for a nearby search latlon=|andlatlon=|orlatlon= """
     allowed_search_parms = set(("latlon", "andlatlon", "orlatlon"),)
     valid_search_parms = set(request.GET) & allowed_search_parms
@@ -784,6 +773,22 @@ def nearby_search_params2(request) -> "NearbySearchQ":
     return search_key, lat, lon, prefs
 
 
+def get_search_history(request) -> Optional["SearchQ"]:
+    """ extract search history from query string and recreate the SearchQ """
+    if not (history_str := request.GET.get("search_history")):
+        return None
+    try:
+        searchq_json = json.loads(history_str)
+        searchq = SearchQ.from_json(request.user, searchq_json)
+        return searchq
+    except json.decoder.JSONDecodeError as e:
+        log.error("Unable to decode search history from url param: %s", e)
+    except ValueError as e:
+        log.error("Unable to parse search history from json: %s", e)
+    log.debug("url search_history param=%s", history_str)
+    return None
+
+
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET"])
 def place_json(request):
@@ -791,10 +796,7 @@ def place_json(request):
     &latlon=  &andlatlon=,  &orlatlon=, """
     # log.info("place_json(%s): GET=%s", request.method, request.GET)
     assert request.method == "GET"
-    # limits, prefs = nearby_search_params(request)
-    # nearby_places: dict = Place.nearby(limits, prefs)
-    # log.info("place_json (old) returned %d places", len(nearby_places))
-    search_key, lat, lon, prefs = nearby_search_params2(request)
+    search_key, lat, lon, prefs = nearby_search_params(request)
     if search_key in {"orlatlon", "andlatlon"}:
         return HttpResponse(f"{search_key} not yet implemented", status=501)
     query_json = NearbySearchQ(
@@ -1129,6 +1131,10 @@ def leaflet_bounds(obj: GEOSGeometry) -> List[List[float]]:
     return [[y1, x1], [y2, x2]]
 
 
+class SearchQDecodeError(ValueError):
+    pass
+
+
 class SearchQ:
     """ represent a django Q query that can be executed by Django and also
     serialised to json, for reuse in future queries.
@@ -1142,6 +1148,20 @@ class SearchQ:
     def __repr__(self):
         return f"SearchQ({self._key}={self._value})"
 
+    def __eq__(self, other):  # for unit testing
+        return (self.__class__ == other.__class__ and self._key == other._key
+                and self._value == other._value)
+
+    def __and__(self, other: "SearchQ"):
+        if not isinstance(other, SearchQ):
+            raise TypeError(f"expecting SearchQ, not {other!r}")
+        return AndSearchQ(self, other)
+
+    def __or__(self, other: "SearchQ"):
+        if not isinstance(other, SearchQ):
+            raise TypeError(f"expecting SearchQ, not {other!r}")
+        return OrSearchQ(self, other)
+
     def Q(self) -> Q:
         """ return a Q function """
         return Q(**{self._key: self._value})
@@ -1150,13 +1170,50 @@ class SearchQ:
         """ return json representation """
         if isinstance(self._value, dt.datetime):
             return {"SearchQ":
-                    {self._key: {"datetime": self._value.isoformat()}}}
+                    {"key": self._key, "datetime": self._value.isoformat()}}
         return {"SearchQ": {"key": self._key, "value": self._value}}
+
+
+    @classmethod
+    def from_json(cls, user, source: Dict[str, Any]):
+        match source:
+            case {"SearchQ": {"key": key, "value": value}}:
+                return SearchQ(**{key: value})
+            case {"SearchQ": {"key": key, "datetime": datetime_str}}:
+                return SearchQ(**{key: dt.datetime.fromisoformat(datetime_str)})
+            case {"AndSearchQ": [*searchq_list_source]}:
+                searchq_list = SearchQ.list_from_json(user, searchq_list_source)
+                return AndSearchQ(*searchq_list)
+            case {"OrSearchQ": [*searchq_list_source]}:
+                searchq_list = SearchQ.list_from_json(user, searchq_list_source)
+                return OrSearchQ(*searchq_list)
+            case {"BoundarySearchQ": {"category": category, "key": key,
+                                      "name": name}}:
+                return BoundarySearchQ(user, category, **{key: name})
+            case {"NearbySearchQ": {"lat": lat, "lon": lon, "key": key,
+                                    "distance": distance}}:
+                return NearbySearchQ(lat=lat, lon=lon, **{key: distance})
+            case _:
+                raise SearchQDecodeError(
+                    f"Unable to parse SearchQ from '{source}'")
+
+    @classmethod
+    def list_from_json(cls, user, source_list: List[Dict[str, Any]]
+                       ) -> List["SearchQ"]:
+        searchq_list: List["SearchQ"] = []
+        for i, item in enumerate(source_list):
+            try:
+                searchq = SearchQ.from_json(user, item)
+            except SearchQDecodeError as e:
+                raise SearchQDecodeError(f"{e.args[0]} (in list item {i})"
+                                         ) from e
+            searchq_list.append(searchq)
+        return searchq_list
 
 
 class AndSearchQ(SearchQ):
     """ contains a list of SearchQ queries that are logically ANDed together """
-    def __init__(self, *args: Tuple[SearchQ]):
+    def __init__(self, *args: Sequence[SearchQ]):
         not_searchQ = [str(type(arg))
                        for arg in args
                        if not isinstance(arg, SearchQ)]
@@ -1168,6 +1225,9 @@ class AndSearchQ(SearchQ):
 
     def __repr__(self):
         return f"AndSearchQ({' & '.join(str(arg) for arg in self._args)})"
+
+    def __eq__(self, other):
+        return self.__class__ == other.__class__ and self._args == other._args
 
     def Q(self) -> Q:
         q = self._args[0].Q()
@@ -1181,13 +1241,13 @@ class AndSearchQ(SearchQ):
 
 class OrSearchQ(AndSearchQ):
     """ contains a list of SearchQ queries that are logically ORed together""" 
-    # __ init__ as for AndSearchQ
+    # __ init__ and __eq__ as for AndSearchQ
 
     def __repr__(self):
         """ parenthesize and or or sub-arguments """
         str_args = (f"({arg})" if isinstance(arg, (AndSearchQ, OrSearchQ))
                     else f"{arg}" for arg in self._args)
-        return f"AndSearchQ({' & '.join(str_args)})"
+        return f"OrSearchQ({' | '.join(str_args)})"
 
     def Q(self) -> Q:
         q = self._args[0].Q()
@@ -1221,6 +1281,10 @@ class BoundarySearchQ(SearchQ):
         return (f"BoundarySearchQ("
                 f"{self.boundary_category}, {self._key}={self.boundary_name})")
 
+    def __eq__(self, other):
+        return (self.__class__ == other.__class__ and self.user == other.user
+                and self.boundary == other.boundary)
+
     def Q(self) -> Q:
         return Q(**{self._key: self.boundary.polygon})
 
@@ -1242,6 +1306,11 @@ class NearbySearchQ(SearchQ):
     def __repr__(self):
         return (f"NearbySearchQ(lat={self._lat}, lon={self._lon}, "
                 f"{self._key}={self._distance})")
+
+    def __eq__(self, other):
+        return (self.__class__ == other.__class__ and self._lat == other._lat
+                and self._lon == other._lon and self._key == other._key
+                and self._distance == other._distance)
 
     def Q(self)-> Q:
         return Q(**{

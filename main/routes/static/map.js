@@ -374,17 +374,24 @@ function requestFailMsg(jqXHR, textStatus, errorThrown) {
 		{jqXHR: jqXHR, textStatus: textStatus, errorThrown: errorThrown,
 		 requestURL: requestUrl
 		});
+	if (jqXHR.responseText.startsWith("<!DOCTYPE html>")) {
+		// it's an unexpected html failure message, could be django debug info
+		document.open()
+		document.write(jqXHR.responseText);
+		document.close()
+		return
+	}
 	let msg = jqXHR;
 	if (jqXHR.status) {
 		msg = "Status code " + jqXHR.status + ": " + (jqXHR.responseText ? jqXHR.responseText: jqXHR.statusText);
 	}
-	msg = "Error: '" + msg + "' from server request " + requestUrl;
 	log_error(msg);
 }
 
 function log_error(msg) {
-	console.error(msg);
-	displayMessage(msg, "text-error");
+	console.error(msg, "; from server request=", requestUrl);
+	console.info("trackSearchHistory=", trackSearchHistory);
+	displayMessage("Error: " + msg, "text-error");
 }
 
 
@@ -415,7 +422,7 @@ function nearbyTracks(searchType) {
 			log_error("nearbyTracks: unexpected value for searchType: "
 					  + searchType);
 		};
-	let params = {"search_history": trackSearchHistory};
+	let params = {"search_history": JSON.stringify(trackSearchHistory)};
 	params[searchTerm] = popLocation.lat + ',' + popLocation.lng;
 	requestUrl = '/routes/api/track?' + $.param(params);
 	// console.info("nearbyTracks: settings=", settings, ", RequestUrl=", RequestUrl);
