@@ -795,11 +795,13 @@ def place_json(request):
     # log.info("place_json(%s): GET=%s", request.method, request.GET)
     assert request.method == "GET"
     lat, lon, prefs = nearby_search_params(request)
-    if search_key in {"orlatlon", "andlatlon"}:
-        return HttpResponse(f"{search_key} not yet implemented", status=501)
     query_json = NearbySearchQ(
         lat=lat, lon=lon,
         location__distance_lte=prefs.place_nearby_search_distance_metres)
+    try:
+        query_json = get_search_history(request, query_json)
+    except ValueError as e:
+        return HttpResponse(e.args[0], status=400)
     nearby_places = Place.objects.filter(query_json.Q(), user=request.user)
     result_count = nearby_places.count()
     result_limit = prefs.place_search_result_limit

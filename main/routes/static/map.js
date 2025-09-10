@@ -235,7 +235,20 @@ const trackDropdownButtons = `<button type="button"
 	  	Search only tracks already displayed</button></a>
   </div>`;
 
-const placeDropdownButtons = '';  // not used
+const placeDropdownButtons =   `<button type="button" 
+      class="btn btn-outline-secondary dropdown-toggle"
+  	data-toggle="dropdown" aria-expanded="false" aria-haspopup="true"
+  	id="nearby-places1">
+      <!-- <span class="invisible">Toggle Dropdown</span> -->
+    </button>
+    <div class="dropdown-menu" aria-labelledby="nearby-places1">
+      <a href="#" class="btn btn-outline-secondary dropdown-item"
+  		onClick="nearbyPlaces('or')">
+  	  	Add to places already displayed</a>
+      <a href="#" class="btn btn-outline-secondary dropdown-item" 
+  		onClick="nearbyPlaces('and')">
+  	  	Search only places already displayed</button></a>
+    </div>`;
   
 function getNearbyButtons(){
 	const trackButtonDropdown = (trackSearchHistory ? trackDropdownButtons:'');
@@ -411,7 +424,6 @@ function nearbyTracks(joinType) {
 	map.closePopup();
 	// add search area to map
 	tracksLayer.clearLayers();
-	// console.info("nearbyTracks: preference=", preference);
 	L.circle(popLocation, {
 			radius: preference.track_nearby_search_distance_metres,
 			color: "blue",
@@ -612,39 +624,22 @@ function onTrackDeleted(data) {
 /*
 // ------ place handling ------
 */
-function nearbyPlaces(searchType) {
+function nearbyPlaces(joinType) {
 	/* get places nearby popLocation.   depending on the value of searchType,
 	add to places already shown, replace places already shown, or limit the
 	search to those already shown.  This is done by resubmitting the 
 	query with the combined search term */
-	switch (searchType){
-		case undefined:
-			nearbyPlacesUrl = (
-				'/routes/api/place?latlon=' + popLocation.lat + ',' + popLocation.lng);
-		    break;
-		case "add":
-			nearbyPlacesUrl += (
-				"&orlatlon=" + popLocation.lat + ',' + popLocation.lng);
-			break;
-		case "reduce":
-			nearbyPlacesUrl += (
-				"&andlatlon=" + popLocation.lat + ',' + popLocation.lng);
-			break;
-		default:
-			log_error("nearbyPlaces: unexpected value for searchType: "
-					  + searchType);
-		};
-	// console.info("nearbyPlaces: settings=", settings, ", nearbyPlacesUrl=", nearbyPlacesUrl);
-	$.get(nearbyPlacesUrl, null, searchResults, 'json').fail(
-		function(_, status, jqXHR){
-			log_error("nearbyPlaces request status=" + status +
-				', response=' + jqXHR);
-			console.error('jqXHR=', jqXHR);
-		});
+	params = {latlon: popLocation.lat + ',' + popLocation.lng}
+		if (joinType) {
+			params["join"] = joinType;
+			params["search_history"] = JSON.stringify(placeSearchHistory);
+		}
+		requestUrl = '/routes/api/place?' + $.param(params);
+	// console.info("nearbyPlaces: requestUrl=", requestUrl);
+	$.get(requestUrl, null, searchResults, 'json').fail(requestFailMsg);
 	map.closePopup();
 	// add search area to map
-	if (placesLayer) {placesLayer.clearLayers();}
-	// console.info("nearbyPlaces: preference=", preference);
+	placesLayer.clearLayers();
 	L.circle(popLocation, {
 			radius: preference.place_nearby_search_distance_metres,
 			color: "blue",
