@@ -109,13 +109,16 @@ def search(request) -> JsonResponse|HttpResponse:
     """ handle a search for tracks or places, returning results and search query
      as Json,
     or returning the HTML form if form errors """
+    url_params = {key: request.GET.get(key) for key in
+                 ("track_search_history", "place_search_history")}
     if request.method == "GET":
         track_form = TrackSearchForm()
         place_form = PlaceSearchForm()
         common_form = CommonSearchForm()
         return render(request, "search.html", context={
             "track_form": track_form, "place_form": place_form,
-            "search_type": "track", "common_form": common_form})
+            "search_type": "track", "common_form": common_form,
+            "url_params": url_params})
 
     # POST
     search_type = request.GET.get("search_type")
@@ -149,7 +152,8 @@ def search(request) -> JsonResponse|HttpResponse:
 
     return render(request, "search.html", context={
         "track_form": track_form, "place_form": place_form,
-        "search_type": search_type, "common_form": common_form})
+        "search_type": search_type, "common_form": common_form,
+        "url_params": url_params})
 
 
 def _encode_place_search(request, cleaned_data
@@ -187,6 +191,10 @@ def _do_place_search(request, cleaned_data) -> JsonResponse:
         raise ValidationError(
             f"At least one of {', '.join(required_keys)} must be specified")
 
+    try:
+        query_json = get_search_history(request, query_json)
+    except ValueError as e:
+        return HttpResponse(e.args[0], status=400)
     log.debug("_do_place_search: query_json=%s, Q=%s, q.json=%s", query_json,
               query_json.Q(), query_json.json())
     places = Place.objects.filter(query_json.Q(), user=request.user)
@@ -241,6 +249,10 @@ def _do_track_search(request, cleaned_data) -> JsonResponse:
         raise ValidationError(
             f"At least one of {', '.join(required_keys)} must be specified")
 
+    try:
+        query_json = get_search_history(request, query_json)
+    except ValueError as e:
+        return HttpResponse(e.args[0], status=400)
     log.debug("_do_track_search: query_json=%s, Q=%s, q.json=%s", query_json,
               query_json.Q(), query_json.json())
     tracks = Track.objects.filter(query_json.Q(), user=request.user)
@@ -761,7 +773,7 @@ def nearby_search_params(request) -> Tuple[float, float, Preference]:
     return lat, lon, prefs
 
 
-def get_search_history(request, query: "SearchQ") -> Optional["SearchQ"]:
+def get_search_history(request, query: "SearchQ") -> "SearchQ":
     """ extract search history from query string and recreate the SearchQ """
     if not (join := request.GET.get("join")):
         return query

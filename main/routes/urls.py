@@ -17,7 +17,7 @@ urlpatterns = [
     # path("track/<trackids>", views.TracksView.as_view(), name="tracks_view"),
     # path("csrf/", views.test_csrf),
     path("test", views.test),
-    path("api/search/", views.search, name="search"),
+    path("api/search", views.search, name="search"),
     # path("api/search/<search_type>", views.search, name="search"),
     path("api/track", views.track_json),
     path("api/track/<int:pk>/delete", views.TrackDeleteView.as_view()),

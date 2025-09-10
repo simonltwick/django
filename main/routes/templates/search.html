@@ -29,21 +29,58 @@ click the magnifying glass icon.   Otherwise, use this form.</small>
 
 <form id="searchForm" onsubmit="onSearchFormSubmit(event)">
  {% csrf_token %}
- <input type="hidden" id="previous-search" name="previous-search" value="">
+ <input type="hidden" id="search-history" name="search-history" value="">
  <!-- the above field is only used to send info TO the server, not from -->
+ <table class="table table-sm">{{ common_form.as_table }}</table>
  <div class="tab-content" id="searchTabContent">
  
   <div class="tab-pane fade {% if search_type == 'track' %}show active{% endif %}"
     id="tracks-search" role="tabpanel" aria-labelledby="tracks-tab">
     <table class="table table-sm">{{ track_form.as_table }}</table>
+    <div class="btn-group" role="group">
+    <button onClick="onSearchFormSubmit(event)" class="btn btn-outline-primary"
+      type="button">Search Tracks</button>
+	  {% if url_params.track_search_history %}
+	  <button type="button" class="btn btn-outline-primary dropdown-toggle"
+	  	data-toggle="dropdown" aria-expanded="false" aria-haspopup="true"
+	  	id="nearby-tracks1">
+	      <!-- <span class="invisible">Toggle Dropdown</span> -->
+	    </button>
+	    <div class="dropdown-menu" aria-labelledby="nearby-tracks1">
+	      <a href="#" class="btn btn-outline-primary dropdown-item"
+	  		onClick="onSearchFormSubmit(event, 'or')">
+	  	  	Add to tracks already found</a>
+	      <a href="#" class="btn btn-outline-primary dropdown-item" 
+	  		onClick="onSearchFormSubmit(event, 'and')">
+	  	  	Search only tracks already found</button></a>
+	    </div>
+	  {% endif %}
+	</div>
   </div>
 
   <div class="tab-pane fade  {% if search_type == 'place' %}show active{% endif %}"
     id="places-search" role="tabpanel" aria-labelledby="places-search-tab">
     <table class="table table-sm">{{ place_form.as_table }}</table>
+    <div class="btn-group" role="group">
+    <button onClick="onSearchFormSubmit(event)" class="btn btn-outline-primary"
+      type="button">Search Places</button>
+      {% if url_params.place_search_history %}
+		<button type="button" class="btn btn-outline-primary dropdown-toggle"
+	  	data-toggle="dropdown" aria-expanded="false" aria-haspopup="true"
+	  	id="nearby-places1">
+	      <!-- <span class="invisible">Toggle Dropdown</span> -->
+	    </button>
+	    <div class="dropdown-menu" aria-labelledby="nearby-places1">
+	      <a href="#" class="btn btn-outline-primary dropdown-item"
+	  		onClick="onSearchFormSubmit(event, 'or')">
+	  	  	Add to places already found</a>
+	      <a href="#" class="btn btn-outline-primary dropdown-item" 
+	  		onClick="onSearchFormSubmit(event, 'and')">
+	  	  	Search only places already found</button></a>
+	    </div>
+	{% endif %}
+    </div>
   </div>
 
  </div>
- <table class="table table-sm">{{ common_form.as_table }}</table>
- <button type="submit" class="btn btn-outline-primary">Search</button>
 </form>

@@ -229,10 +229,10 @@ const trackDropdownButtons = `<button type="button"
   <div class="dropdown-menu" aria-labelledby="nearby-tracks1">
     <a href="#" class="btn btn-outline-secondary dropdown-item"
 		onClick="nearbyTracks('or')">
-	  	Add to tracks already displayed</a>
+	  	Add to tracks already found</a>
     <a href="#" class="btn btn-outline-secondary dropdown-item" 
 		onClick="nearbyTracks('and')">
-	  	Search only tracks already displayed</button></a>
+	  	Search only tracks already found</button></a>
   </div>`;
 
 const placeDropdownButtons =   `<button type="button" 
@@ -244,10 +244,10 @@ const placeDropdownButtons =   `<button type="button"
     <div class="dropdown-menu" aria-labelledby="nearby-places1">
       <a href="#" class="btn btn-outline-secondary dropdown-item"
   		onClick="nearbyPlaces('or')">
-  	  	Add to places already displayed</a>
+  	  	Add to places already found</a>
       <a href="#" class="btn btn-outline-secondary dropdown-item" 
   		onClick="nearbyPlaces('and')">
-  	  	Search only places already displayed</button></a>
+  	  	Search only places already found</button></a>
     </div>`;
   
 function getNearbyButtons(){
@@ -284,7 +284,10 @@ function replaceMapOverlay(oldOverlay, newOverlay, overlayName) {
 /* ----- search handling ----- */
 function onRoutesSearch() {
 	// search tracks or places from a form.
-	getMapDialogData("/routes/api/search/");
+	const params = {track_search_history: trackSearchHistory? "1":"",
+					place_search_history: placeSearchHistory? "1":""
+	}
+	getMapDialogData("/routes/api/search?" + $.param(params));
 	if (popup) {
 		popup.close();
 	}
@@ -303,15 +306,17 @@ function refreshBoundaryNames(data) {
 	$("#id_boundary_name").html(data);
 }
 
-function onSearchFormSubmit(event) {
+function onSearchFormSubmit(event, joinType) {
 	event.preventDefault();
-	searchType = document.getElementById("tracks-search"
+	let searchType = document.getElementById("tracks-search"
 		).classList.contains("active") ? 'track': 'place'
-	searchFormSubmitPost(searchType);
+	let params = {search_type: searchType, join: joinType};
+	if (joinType) {
+		params["search_history"] = JSON.stringify((searchType == "track") ?
+			trackSearchHistory:placeSearchHistory);
 	}
-
-function searchFormSubmitPost(searchType){
-	requestUrl = '/routes/api/search/?search_type=' + searchType;
+	
+	requestUrl = '/routes/api/search?' + $.param(params);
 	$.post(requestUrl, $('#searchForm').serialize(), searchResults, null
 		).fail(requestFailMsg); 
 	if (searchType == "track") {
