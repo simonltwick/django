@@ -33,7 +33,7 @@ urlpatterns = [
     path("place/<int:pk>", views.place, name="place"),
     path("place/<int:pk>/delete", views.place_delete),
     path("place/<int:pk>/move", views.place_move),
-    path("place/upload", views.upload_csv, name="upload_csv"),
+    path("place/upload", views.upload_csv, name="csv_upload"),
     path("place/types", views.PlaceTypeListView.as_view(),
          name="place_types"),
     path("place/type/", views.PlaceTypeCreateView.as_view(),

@@ -131,9 +131,11 @@
     	  data-toggle="tooltip" title="Search places or tracks. To search
     	  by location, click the map"></span></a>
     	  <a class="dropdown-item" href="{% url 'routes:gpx_upload' %}">
-    	  GPX Upload</a>
+    	  Track Upload (gpx)</a>
     	  <a class="dropdown-item" href="{% url 'routes:gpx_view' %}">
-    	  GPX View</a>
+    	  Track View (gpx)</a>
+    	  <a class="dropdown-item" href="{% url 'routes:csv_upload' %}">
+    	  Place Upload (csv)</a>
     	  <a class="dropdown-item"
     	    onclick="getMapDialogData('{{ place_types_url }}')">
     	  Place Types</a>

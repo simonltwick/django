@@ -99,12 +99,11 @@ class Place(models.Model):
         default_type_pk = default_place_type.pk
         encoding = file.charset or 'utf-8'
         csv_contents = file.read().decode(encoding=encoding)
-        log.debug("csv_contents=%r", csv_contents)
         csv_reader = csv.DictReader(
             csv_contents.splitlines(),
             fieldnames=["name", "latitude", "longitude", "type"])
         header = next(csv_reader)  # ignore header row
-        log.debug("header row has values:", header)
+        log.debug("ignoring header row values: %s", header)
         places: List["Place"] = []
         for row_num, row in enumerate(csv_reader):
             log.debug("processing row %s ", row)

@@ -23,6 +23,7 @@
 
 <script defer src="{% static 'map.js' %}"></script>
 {{ tracks|json_script:"initialTracks" }}
+{{ places|json_script:"initialPlaces" }}
 {{ bounds|json_script:"initBounds" }}
 {{ ocm_api_key|json_script:"ocmApiKey" }}
 {{ search|json_script:"initSearch" }}

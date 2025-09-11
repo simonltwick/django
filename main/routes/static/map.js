@@ -58,13 +58,6 @@ const map = L.map("map", { layers: [layerOsm] })
 	// allow user to click anywhere & show popup with lat/lon
 	.on('click', onMapClick);
 
-try {
-	const initBounds = JSON.parse(document.getElementById('initBounds').textContent);
-	map.fitBounds(initBounds);
-} catch {
-	map.fitWorld();
-}
-
 
 // map controls - scale, overlays
 L.control.scale({ position: "bottomright" }).addTo(map);
@@ -141,15 +134,26 @@ let tracksHidden = [];
 let boundaries = L.geoJSON().addTo(map);  // for (search) boundaries
 
 
-// show initial tracks, or if none, show welcome dialog
+// show initial tracks/places, or if none, show welcome dialog
 let dialog = document.getElementById("map-dialog");
 const initialTracks = JSON.parse(document.getElementById('initialTracks'
+	).textContent);
+const initialPlaces = JSON.parse(document.getElementById('initialPlaces'
 	).textContent);
 
 if (initialTracks) {
 	showTracks(initialTracks);
+} else if (initialPlaces) {
+	// do nothing - they are shown in buildPlaceIconDict later.
 } else {
 	/* show map dialog, pre-populated with a help/info message */
+	try {
+		const initBounds = JSON.parse(document.getElementById('initBounds'
+			).textContent);
+		map.fitBounds(initBounds);
+	} catch {
+		map.fitWorld();
+	}
 	dialog.showModal();
 }
 
@@ -174,6 +178,9 @@ function buildPlaceIcons() {
 function buildPlaceIconDict(data) {
 	refreshPlaceIconDict(data);
 	// console.info("buildPlaceIconDict:", data, placeIcons);
+	if (initialPlaces) {
+		showPlaces(initialPlaces);
+	}
 }
 
 
@@ -181,15 +188,16 @@ function buildPlaceIconDict(data) {
 
 function setMapBounds() {
 	// resize the map to fit placesBounds and tracksBounds
-	let trackBounds = tracksLayer ? tracksLayer.getBounds(): null;
-	let placesBounds = placesLayer ? placesLayer.getBounds(): null;
+	let trackBounds = tracksLayer.getLayers().length ? tracksLayer.getBounds(): null;
+	let placeBounds = placesLayer.getLayers().length ? placesLayer.getBounds(): null;
 	let combinedBounds = (trackBounds? (
-		placesBounds? placesBounds.extend(trackBounds) : trackBounds
-		) : placesBounds); 
+		placeBounds? placeBounds.extend(trackBounds) : trackBounds
+		) : placeBounds); 
 	if (combinedBounds) {
 		map.fitBounds(combinedBounds);
 	} else {
-		console.error("map bounds not defined:", trackBounds, placesBounds);
+		console.error("map bounds not defined:", trackBounds, placeBounds);
+		map.fitWorld();
 	}
 }
 
@@ -454,7 +462,6 @@ function showTracks(trackList) {
 	tracksHidden = [];
 	// showSidebarSection(true, 'track');
 	tracksLayer = replaceMapOverlay(oldTracksLayer, tracksLayer, "Tracks");
-	tracksBounds = tracksLayer.getBounds();
 	setMapBounds();
 }
 
@@ -663,7 +670,6 @@ function showPlaces(data) {
 	oldPlacesLayer.eachLayer((layer) => placesLayer.addLayer(layer));
 	// showSidebarSection(true, 'place');
 	placesLayer = replaceMapOverlay(oldPlacesLayer, placesLayer, "Places");
-	placesBounds = placesLayer.getBounds();
 	setMapBounds();
 }
 

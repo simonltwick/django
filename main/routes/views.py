@@ -443,6 +443,8 @@ def _show_tracks(request, tracks: List[Track]):
     return render(request, "map.html", context=ctx)
 
 
+
+
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET"])
 @gzip_page
@@ -566,26 +568,6 @@ def parse_uploaded_gpx(request, file: "UploadedFile") -> GPX:
         raise TypeError(f"Failed to parse {file.name}" )
     log.info("gpx file %s parsed ok, creator=%s", file.name, gpx.creator)
     return gpx
-
-
-def test_save_gpx(_request):
-    """ test saving a specific file from disk to the database """
-    raise NotImplementedError("Track now requires a User field")
-    # fname = ("/home/simon/Documents/Travel/CoastalAdventure/2025-South/Actual/"
-    #         "2025-05-25-08-32-09.gpx")
-    # with open(fname, 'rt', encoding='utf-8') as infile:
-    #     xml_string = infile.read()
-    # gpx = GPXParser(xml_string).parse()
-    # if not gpx:
-    #     return HttpResponse("Failed to parse file", status=400)
-    # log.info("gpx file %s parsed ok", gpx)
-    # try:
-    #     tracks = Track.new_from_gpx(gpx, fname)# , user=1 for simon
-    # except IntegrityError as e:
-    #     return HttpResponse(status=400, content=e.args)
-    # trackids = ','.join(str(track.id) for track in tracks)
-    # return HttpResponseRedirect(
-    #     reverse("routes:tracks_view", kwargs={"trackids": trackids}))
 
 
 class TrackDeleteView(BikeLoginRequiredMixin, DeleteView):
@@ -823,11 +805,28 @@ def place_json(request):
                  result_limit)
     else:
         log.info("place_json returned %d places", result_count)
-    msg = json.loads(serialize("geojson", nearby_places))
-    result = {"status": "success", "places": msg,
+    places = json.loads(serialize("geojson", nearby_places,
+                               fields=["name", "type", "id", "pk"]))
+    result = {"status": "success", "places": places,
               "result_count": result_count, "result_limit": result_limit,
               "boundary": None, "search_history": query_json.json()}
     return JsonResponse(result, status=200)
+
+
+
+
+def _show_places(request, places: List[Place]):
+    """ INTERNAL METHOD: no url.  show the given places on a map.
+    Used by upload_csv. """
+    ctx = get_map_context(request)
+    # geojson serialiser has to be defined in settings.py
+    # don't serialise tag field because it requires track to have an id
+    # - if using view gpx the track is not saved
+    ctx["places"] = json.loads(
+        serialize("geojson", places, fields=["name", "type", "id", "pk"],
+                  geometry_field="location")
+        )
+    return render(request, "map.html", context=ctx)
 
 
 @login_required(login_url=LOGIN_URL)
@@ -859,6 +858,7 @@ def upload_csv(request):
                 for place in places:
                     place.save()
                 log.debug("request.GET=%s", request.GET)
+                messages.success(request, f"{len(places)} places uploaded.")
                 if request.GET.get("map") == "False":
                     return HttpResponse(status=204)  # ok, no content
                 return _show_places(request, places)
