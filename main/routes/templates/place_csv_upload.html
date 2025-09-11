@@ -29,7 +29,7 @@ Upload Places - CSV file
   The first row of the CSV file will be ignored, and is usually used for
   column titles.</p>
   <form method="POST" enctype="multipart/form-data"
-    action="{% url 'routes:upload_csv' %}">
+    action="{% url 'routes:csv_upload' %}">
   {% csrf_token %} 
   {{ form }}
   <p class="invalid-feedback">{{ form.non_field_errors }}</p>
