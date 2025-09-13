@@ -647,7 +647,6 @@ function nearbyPlaces(joinType) {
 			params["search_history"] = JSON.stringify(placeSearchHistory);
 		}
 		requestUrl = '/routes/api/place?' + $.param(params);
-	// console.info("nearbyPlaces: requestUrl=", requestUrl);
 	$.get(requestUrl, null, searchResults, 'json').fail(requestFailMsg);
 	map.closePopup();
 	// add search area to map
@@ -756,7 +755,6 @@ function getPlaceMarker(feature, latlng) {
 	})
 		.on('dragstart', placeDragStart)
 		.on('dragend', placeDragEnd);
-	// console.info("getPlaceMarker", feature.properties, sel_icon, marker.options);
 	return marker;
 }
 

@@ -806,13 +806,12 @@ def place_json(request):
     else:
         log.info("place_json returned %d places", result_count)
     places = json.loads(serialize("geojson", nearby_places,
-                               fields=["name", "type", "id", "pk"]))
+                               fields=["name", "type", "id", "pk"],
+                               geometry_field="location"))
     result = {"status": "success", "places": places,
               "result_count": result_count, "result_limit": result_limit,
               "boundary": None, "search_history": query_json.json()}
     return JsonResponse(result, status=200)
-
-
 
 
 def _show_places(request, places: List[Place]):
