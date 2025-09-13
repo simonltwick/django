@@ -5,6 +5,11 @@
 from django.db import migrations
 
 
+""" these two manual migration functions converted all old-style
+completed MaintenanceActions to new MaintenanceActionHistory objects.
+All the old-style actions have now been converted so these functions are
+not required in using the squashed migration 0001-squashed-0047 """  
+
 def migrate_completed_maint(apps, schema_editor):
     # can't just import them because they may change in the migration sequence
     MaintenanceAction = apps.get_model('bike', 'MaintenanceAction')
