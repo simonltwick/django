@@ -19,25 +19,26 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 """ Migration to common stored distance unit:
-Target: All distances to be stored as metres.
-Input and output in user units to be converted using helper methods
 Pilot using Ride.Ascent.  Steps:
-  1.  Define Ride.ascent_metres field (& make migration)
-  2.  Define manual migration (0049) to copy & convert .ascent to .ascent_metres
-       (doing the correct conversion to metres according to .ascent_units)
-  3.  Replace Ride.ascent_units with a property retrieving 
-          .rider.preferences.ascent_units 
-  4.  Add an ascent_units_label property retrieving the AscentUnits.label
-  4b. Alter forms & views that refer to ascent_units to use ascent_units_label
-  --- got to here ---
-  5.  Replace Ride.ascent with getter & setter methods doing auto conversion
-          (& make migration)
-        -> problem: forms don't recognise getter/setter as valid form fields
-  6.  Test that these work.
-  7.  Update views & forms, especially those doing sums of ascent
-  8.  Remove ascent_units property from model and fix any breakage?
-  99.  Remove auto-conversion in Preferences.save method which tries to convert
-      ride distance units if Preferences.distance_units are changed.
+      Standardise on Preferences.distance_units and .ascent_units: remove them
+      from ride, odometer & ensure forms display distance units from prefs.
+      (Done)
+      The field in the Db has to be the same as what's in the form, so we cannot
+      simply have the DB field in metres and the form field in a different unit.
+      Try to define simpler ways of presenting distances with units
+      - widget class for distance, with Widget.__init__ copying the instance or
+        the distance_units_label (example:
+        https://stackoverflow.com/questions/1226590/django-how-can-i-access-the-form-field-from-inside-a-custom-widget/2135739#2135739
+        )
+     Remove complicated summing & conversion of ride totals in different units
+     from the view & the form, simply sum in regular units.
+     Test that these work.
+     Merge the Routes preferences properties (in a separate form tab) into
+     the same Preferences model.   Distances have to be in a separate form tab
+     from the distance units, in case units are changed.   And preferences
+     distances will have to be auto-converted if distance units are changed,
+     and the form redisplayed.
+     Optimise DB calls to get preferences & pass to templates
 """
 
 
@@ -989,7 +990,7 @@ class MaintenanceActionHistory(models.Model):
     component = models.ForeignKey(
         Component, on_delete=models.CASCADE, null=True, blank=True,
         help_text='you only need to specify one of bike or component.')
-    # action field will be removed after data migration
+    # TODO: action field will be removed after data migration
     action = models.ForeignKey(MaintenanceAction, on_delete=models.PROTECT,
                                related_name="maintenance_action")
     description = models.CharField(max_length=200, blank=True, null=True)
@@ -1006,13 +1007,13 @@ class MaintenanceActionHistory(models.Model):
 
     def __str__(self):
         when = (f" on {self.completed_date}" if self.completed_date else None,
-                f"at {self.distance} {self.distance_units_display}"
+                f"at {self.distance} {self.distance_units_label.lower()}"
                 if self.distance else None)
         when = ' '.join(item for item in when
                         if item is not None)
         return f"{self.action} on {when}"
 
-    def get_distance_units_label(self) -> str:
+    def distance_units_label(self) -> str:
         if self.bike:
             return DistanceUnits(self.bike.rider.preferences.distance_units
                                  ).label
