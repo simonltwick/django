@@ -12,7 +12,7 @@ Confirm Delete for {{ maintenanceactionhistory }}
 	  on {{ maintenanceactionhistory.completed_date }}{% endif %}
     {% if maintenanceactionhistory.distance %}
 	  at {{ maintenanceactionhistory.distance }}
-	  {{ maintenanceactionhistory.get_distance_units_display }}
+	  {{ maintenanceactionhistory.distance_units_label.lower }}
     {% endif %}
 	<p class="errormsg">This maintenance history item will be deleted.</p>
 <h2>Are you sure?</h2>

@@ -36,7 +36,7 @@ Bikes
 	  {{ entry.distance|floatformat|default:"" }}<br />
       {% endfor %}</td>
   <td>{% for entry in bike.mileage %}
-	  {{ entry.distance_units|default:"" }}<br />
+	  {{ bike.distance_units_label|default:"" }}<br />
       {% endfor %}</td>
     {% else %}
     <td></td><td></td><td></td><td></td>

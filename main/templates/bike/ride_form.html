@@ -23,14 +23,11 @@ Ride details: {{ ride }}
     <tr><th>{{ field.label_tag }}</th>
     <td>{{ field.errors }}
     {{ field }}
-    {% if field.name == 'distance' %}
-      {{ form.distance_units.errors }}
-      {{ form.distance_units }}
+    {% if field.name == 'distance' %} {{ ride.distance_units_label.lower }}
     {% elif field.name == 'ascent' %}
-      {{ form.ascent_units.errors }}
-      {{ form.ascent_units }}
-    </td></tr>
+      {{ form.ascent_units.errors }} {{ ride.ascent_units_label.lower }}
     {% endif %}
+    </td></tr>
   </div>
   {% endif %}
 {% endfor %}

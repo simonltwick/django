@@ -2,7 +2,6 @@
 
 from collections import defaultdict
 import datetime as dt
-from enum import IntEnum
 from functools import cache
 import logging
 from typing import Optional, List, Dict, Union
@@ -18,6 +17,28 @@ from django.utils import timezone
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
+
+""" Migration to common stored distance unit:
+Target: All distances to be stored as metres.
+Input and output in user units to be converted using helper methods
+Pilot using Ride.Ascent.  Steps:
+  1.  Define Ride.ascent_metres field (& make migration)
+  2.  Define manual migration (0049) to copy & convert .ascent to .ascent_metres
+       (doing the correct conversion to metres according to .ascent_units)
+  3.  Replace Ride.ascent_units with a property retrieving 
+          .rider.preferences.ascent_units 
+  4.  Add an ascent_units_label property retrieving the AscentUnits.label
+  4b. Alter forms & views that refer to ascent_units to use ascent_units_label
+  --- got to here ---
+  5.  Replace Ride.ascent with getter & setter methods doing auto conversion
+          (& make migration)
+        -> problem: forms don't recognise getter/setter as valid form fields
+  6.  Test that these work.
+  7.  Update views & forms, especially those doing sums of ascent
+  8.  Remove ascent_units property from model and fix any breakage?
+  99.  Remove auto-conversion in Preferences.save method which tries to convert
+      ride distance units if Preferences.distance_units are changed.
+"""
 
 
 class Bike(models.Model):
@@ -60,14 +81,18 @@ class Bike(models.Model):
         bikes = cls.objects.filter(owner=user, current_odo__isnull=False)
         bikes.update(current_odo=F('current_odo') * factor)
 
+    @property
+    def distance_units_label(self) -> str:
+        return DistanceUnits(self.owner.preferences.distance_units).label
+
 
 class DistanceUnits(models.IntegerChoices):
     MILES = 10
     KILOMETRES = 20
 
-    @classmethod
-    def Xchoices(cls):
-        return [(key.value, key.name.lower()) for key in cls]
+    # @classmethod
+    # def Xchoices(cls):
+    #     return [(key.value, key.name.lower()) for key in cls]
 
     @classmethod
     def sum(cls, distances_list, target_units):
@@ -90,7 +115,7 @@ class DistanceUnits(models.IntegerChoices):
     def conversion_factor(cls, from_units, to_units):
         factors = {DistanceUnits.MILES: {DistanceUnits.MILES: 1,
                                          DistanceUnits.KILOMETRES: 1.60934},
-                   DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 1/1.60934,
+                   DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 0.621371,
                                               DistanceUnits.KILOMETRES: 1}}
         return factors[from_units][to_units]
 
@@ -106,11 +131,11 @@ class DistanceUnits(models.IntegerChoices):
     def display_name(cls, value: int) -> str:
         return cls(value).name.lower()
 
-
+# TODO: remove DistanceMixin.distance_units_display
 class DistanceMixin(models.Model):
-    distance = models.FloatField(null=True, blank=True)
-    distance_units = models.PositiveSmallIntegerField(
-        choices=DistanceUnits, default=DistanceUnits.MILES)
+    # distance = models.FloatField(null=True, blank=True)
+    # distance_units = models.PositiveSmallIntegerField(
+    #     choices=DistanceUnits, default=DistanceUnits.MILES)
 
     class Meta:
         abstract = True
@@ -118,6 +143,9 @@ class DistanceMixin(models.Model):
     @property
     def distance_units_display(self):
         return self.get_distance_units_display().lower()
+
+    def distance_units_label(self) -> str:
+        return DistanceUnits(self.user.preferences.distance_units).label
 
 
 class DistanceRequiredMixin(DistanceMixin):
@@ -127,19 +155,52 @@ class DistanceRequiredMixin(DistanceMixin):
         abstract = True
 
 
-class AscentUnits:
+class AscentUnits0:
     METRES = 1
     FEET = 2
     CHOICES = ((METRES, 'm'), (FEET, 'Ft'))
 
     @classmethod
     def conversion_factor(cls, from_units, to_units):
-        factors = {AscentUnits.METRES: {AscentUnits.METRES: 1.0,
-                                        AscentUnits.FEET: 3.28084},
-                   AscentUnits.FEET: {AscentUnits.FEET: 1.0,
-                                      AscentUnits.METRES: 1.0/3.28084}
+        factors = {AscentUnits0.METRES: {AscentUnits0.METRES: 1.0,
+                                        AscentUnits0.FEET: 3.28084},
+                   AscentUnits0.FEET: {AscentUnits0.FEET: 1.0,
+                                      AscentUnits0.METRES: 1.0/3.28084}
                    }
         return factors[from_units][to_units]
+
+    @classmethod
+    def to_metres(cls, former_unit: "AscentUnits0", value: float) -> float:
+        if value is None:
+            return None
+        factor = cls.conversion_factor(former_unit, AscentUnits0.METRES)
+        return value * factor
+
+
+class AscentUnits2(models.IntegerChoices):
+    METRES = 1
+    FEET = 2
+
+    @classmethod
+    def conversion_factor(cls, from_units, to_units):
+        factors = {AscentUnits2.METRES: {AscentUnits2.METRES: 1.0,
+                                        AscentUnits2.FEET: 3.28084},
+                   AscentUnits2.FEET: {AscentUnits2.FEET: 1.0,
+                                      AscentUnits2.METRES: 1.0/3.28084}
+                   }
+        return factors[from_units][to_units]
+
+    def to_metres(self, value: float) -> float:
+        if value is None:
+            return None
+        factor = self.conversion_factor(self, AscentUnits2.METRES)
+        return value * factor
+
+    def from_metres(self, value: float) -> float:
+        if value is None:
+            return None
+        factor = self.conversion_factor(AscentUnits2.METRES, self)
+        return value * factor
 
 
 class Preferences(models.Model):
@@ -149,7 +210,7 @@ class Preferences(models.Model):
     distance_units = models.PositiveSmallIntegerField(
         choices=DistanceUnits, default=DistanceUnits.MILES)
     ascent_units = models.PositiveSmallIntegerField(
-        choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
+        choices=AscentUnits2, default=AscentUnits2.METRES)
     maint_distance_limit = models.PositiveSmallIntegerField(
         default=100, blank=True, null=True,
         verbose_name='Upcoming maintenance distance limit')
@@ -163,6 +224,10 @@ class Preferences(models.Model):
     def __init__(self, *args, **kwargs):
         super(Preferences, self).__init__(*args, **kwargs)
         self.__original_distance_units = self.distance_units
+
+    @property
+    def distance_units_label(self) -> str:
+        return DistanceUnits(self.distance_units).label
 
     def get_absolute_url(self):
         return reverse('bike:preferences', kwargs={'pk': self.pk})
@@ -194,14 +259,14 @@ class Preferences(models.Model):
             from_units=DistanceUnits.KILOMETRES, to_units=pref_distance_unit
             ) / 1000.0
         return conv_factor
-        
+
     @staticmethod
     def conversion_factor_ascent(user: User) -> float:
         """ return the conversion factor from metres to user's chosen ascent
         unit """
         pref_ascent_unit = user.preferences.ascent_units
-        conv_factor = AscentUnits.conversion_factor(
-            from_units=AscentUnits.METRES, to_units=pref_ascent_unit)
+        conv_factor = AscentUnits0.conversion_factor(
+            from_units=AscentUnits0.METRES, to_units=pref_ascent_unit)
         return conv_factor
 
 
@@ -215,7 +280,7 @@ class Link(models.Model):
         abstract = True
 
 
-class Ride(DistanceMixin):
+class Ride(models.Model):
     rider = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='rides')
     date = models.DateTimeField(default=timezone.now)
@@ -223,14 +288,43 @@ class Ride(DistanceMixin):
         default=False, help_text="If true, signifies this is not a real ride"
         " but a ride distance adjustment between odometer readings.")
     description = models.TextField(max_length=400, null=False, blank=False)
+    distance = models.FloatField(null=True, blank=True)  # units as prefs
     ascent = models.FloatField(null=True, blank=True)
-    ascent_units = models.PositiveSmallIntegerField(
-        choices=AscentUnits.CHOICES, default=AscentUnits.METRES)
+    # ascent_units = models.PositiveSmallIntegerField(
+    #     choices=AscentUnits0.CHOICES, default=AscentUnits0.METRES)
+    ascent_metres = models.FloatField(null=True, blank=True)
     bike = models.ForeignKey(Bike, on_delete=models.SET_NULL, null=True,
                              blank=True, related_name='rides')
 
+    # @property
+    # def ascent(self) -> Optional[float]:
+    #     """ take a value in user's preference units and store as ascent_metres
+    #     """
+    #     return  self.ascent_units.from_metres(self.ascent_metres)
+    #
+    # @ascent.setter
+    # def ascent(self, value: Optional[float]):
+    #     self.ascent_metres = self.ascent_units.to_metres(value)
+
     class Meta:
         unique_together = ('rider', 'date', 'bike', 'description')
+
+    @property
+    def ascent_units(self):
+        return self.rider.preferences.ascent_units
+
+    @property
+    def ascent_units_label(self):
+        return AscentUnits2(self.rider.preferences.ascent_units).label
+
+    # TODO: is this ever used?
+    @property
+    def distance_units(self):
+        return self.rider.preferences.distance_units
+
+    @property
+    def distance_units_label(self):
+        return DistanceUnits(self.rider.preferences.distance_units).label
 
     def __str__(self):
         return f"{self.date.date()}: {self.description}"
@@ -397,8 +491,9 @@ class Ride(DistanceMixin):
         instance.bike.update_current_odo()
 
 
-class Odometer(DistanceRequiredMixin):
+class Odometer(models.Model):
     rider = models.ForeignKey(User, on_delete=models.CASCADE)
+    distance = models.FloatField()  # distance units as prefs
     initial_value = models.BooleanField(default=False)
     # , help_text="Only tick this for the initial value of new "
     #    "odometer or after resetting the odometer reading.")
@@ -409,13 +504,17 @@ class Odometer(DistanceRequiredMixin):
     adjustment_ride = models.OneToOneField(Ride, on_delete=models.CASCADE,
                                            null=True, blank=True)
 
+    @property
+    def distance_units_label(self) -> str:
+        return DistanceUnits(self.rider.preferences.distance_units).label
+
     class Meta:
         verbose_name = 'Odometer reading'
 
     def __str__(self):
         reset = "reset to " if self.initial_value else ""
         return (f"{self.bike} odometer {reset}"
-                f"{self.distance:0.1f} {self.distance_units_display}"
+                f"{self.distance:0.1f} {self.distance_units_label.lower()}"
                 f" on {self.date.date()}")
 
     def save(self, *args, **kwargs):
@@ -667,6 +766,10 @@ class MaintIntervalMixin(models.Model):
     class Meta:
         abstract = True
 
+    @property
+    def distance_units_label(self) -> str:
+        return DistanceUnits(self.user.preferences.distance_units).label
+
 
 class MaintenanceType(MaintIntervalMixin):
     # maintenance_interval_distance, maint_interval_days - MaintIntervalMixin
@@ -705,7 +808,6 @@ class MaintenanceType(MaintIntervalMixin):
 
 
 class MaintenanceAction(MaintIntervalMixin):
-    # distance, distance_units - DistanceMixin
     # maintenance_interval_distance, maint_interval_days - MaintIntervalMixin
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_actions')
@@ -881,8 +983,7 @@ class MaintActionLink(Link):
         MaintenanceAction, on_delete=models.CASCADE, related_name='links')
 
 
-class MaintenanceActionHistory(DistanceMixin):
-    # distance, distance_units - DistanceMixin
+class MaintenanceActionHistory(models.Model):
     bike = models.ForeignKey(Bike, related_name='maint_history',
                              on_delete=models.SET_NULL, null=True, blank=True)
     component = models.ForeignKey(
@@ -892,6 +993,7 @@ class MaintenanceActionHistory(DistanceMixin):
     action = models.ForeignKey(MaintenanceAction, on_delete=models.PROTECT,
                                related_name="maintenance_action")
     description = models.CharField(max_length=200, blank=True, null=True)
+    distance = models.FloatField(null=True, blank=True)
     completed_date = models.DateField(null=True, blank=True)
 
     def clean(self):
@@ -910,11 +1012,84 @@ class MaintenanceActionHistory(DistanceMixin):
                         if item is not None)
         return f"{self.action} on {when}"
 
+    def get_distance_units_label(self) -> str:
+        if self.bike:
+            return DistanceUnits(self.bike.rider.preferences.distance_units
+                                 ).label
+        if self.component:
+            return DistanceUnits(self.component.owner.preferences.distance_units
+                                 ).label
+        return ''  # can't determine user for distance_units
 
-class ComponentChange(DistanceMixin):
+
+class ComponentChange(models.Model):
     date = models.DateField(default=dt.date.today, null=True, blank=True)
     changed_component = models.ForeignKey(Component, on_delete=models.CASCADE,
                                           related_name='component_history')
     parent_component = models.ForeignKey(Component, on_delete=models.CASCADE,
                                          related_name='subcomponent_history')
     description = models.CharField(max_length=200)
+    distance = models.FloatField(null=True, blank=True)
+
+
+# ------ new version of preferences, under development ------
+#
+#
+#
+#
+# UNIT_CONVERSION_FACTOR = {
+#     AscentUnits2.METRES: {AscentUnits2.METRES: 1.0,
+#                           AscentUnits2.FEET: 3.28084,
+#                           DistanceUnits.KILOMETRES: .001,
+#                           DistanceUnits.MILES: 0.000621371},
+#     AscentUnits2.FEET: {AscentUnits2.FEET: 1.0,
+#                         AscentUnits2.METRES: 1.0/3.28084},
+#     DistanceUnits.MILES: {DistanceUnits.MILES: 1,
+#                           DistanceUnits.KILOMETRES: 1.60934,
+#                           AscentUnits2.METRES: 1609.34},
+#     DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 0.621371,
+#                               DistanceUnits.KILOMETRES: 1,
+#                               AscentUnits2.METRES: 1000}
+#     }
+#
+#
+# def from_metres(value: float, unit_type) -> float:
+#     """ convert a value from metres to the chosen unit """
+#     factor = UNIT_CONVERSION_FACTOR[AscentUnits2.METRES][unit_type]
+#     return value * factor
+#
+# def to_metres(value: float, unit_type) -> float:
+#     """ convert a value in the chosen unit to metres """
+#     factor = UNIT_CONVERSION_FACTOR[unit_type][AscentUnits2.METRES]
+#     return value * factor
+
+
+# class Prefs2(models.Model):
+#     distance_unit = models.SmallIntegerField(
+#         choices=DistanceUnits, default=DistanceUnits.MILES)
+#     # distance_unit.label gives a str representation
+#     distance_metres = models.FloatField() # always stored in metres
+#
+#     # TODO: can these conversions be done as a DB function?
+#     # https://stackoverflow.com/questions/17682567/how-to-add-a-calculated-field-to-a-django-model
+#     @property
+#     def distance(self) -> float:
+#         """ return distance in preferred units """
+#         return from_metres(self.distance_metres, self.distance_unit)
+#
+#     @distance.setter
+#     def distance(self, value: float):
+#         """ set distance from a value in preferred units """
+#         self.distance_metres = to_metres(value, self.distance_unit)
+#
+#     @property
+#     def distance_unit_label(self)-> str:
+#         return DistanceUnits(self.distance_unit).label
+
+
+# class Prefs3(models.Model):
+#     distance_unit = models.SmallIntegerField(
+#         choices=DistanceUnits, default=DistanceUnits.MILES)
+#     distance = models.FloatField()  # in units of distance_unit
+#     distance_metres = models.Expression(
+#         to_metres(F('distance_unit'), F('distance')))

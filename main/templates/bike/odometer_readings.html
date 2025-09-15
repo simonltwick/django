@@ -31,7 +31,7 @@ Odometer readings:
   </div><td>
 {% endfor %}
 </tr></table>
-<br><p>Selected readings:</p>
+<br><p>Selected readings: (in {{ user.preferences.distance_units_label.lower|default:"?units?" }})</p>
 </form>
 
 
@@ -47,7 +47,8 @@ Odometer readings:
   <td>{{ reading.bike }}</td>
   <td>
     <a href="{% url 'bike:odometer_adjustment' odo_reading_id=reading.id %}">
-	{{ reading.distance|floatformat }}</a></td>
+	{{ reading.distance|floatformat }}</a>
+  </td>
   <td>{{ reading.date }}</td>
   <td>{% if reading.initial_value %}<b>Reset</b>{% endif %}</td>
   <td>{{ reading.comment|default_if_none:"" }}</td>

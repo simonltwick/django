@@ -7,6 +7,8 @@ Odometer_reading: {{ odo_reading }}
 {% block content %}
 
 <h1>Edit odometer reading</h1>
+<small class="text-muted">
+  Distance in {{ odo_reading.rider.preferences.distance_units_label.lower }}</small>
 <form method='POST' action="{% url 'bike:odometer_adjustment' odo_reading_id=odo_reading.id %}?success={{ success_url }}">
   {% csrf_token %}
 <h3>{{ odo_reading }}</h3>

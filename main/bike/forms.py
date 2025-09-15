@@ -68,10 +68,11 @@ class PreferencesForm(forms.ModelForm):
 
 class RideForm(forms.ModelForm):
     error_css_class = "text-danger"
+
     class Meta:
         model = Ride
-        fields = ['bike', 'date', 'distance', 'distance_units',
-                  'ascent', 'ascent_units', 'description', ]
+        fields = ['bike', 'date', 'distance',
+                  'ascent', 'description', ]
         widgets = {
             'distance': forms.TextInput(attrs={"size": 6}),
             'ascent': forms.TextInput(attrs={"size": 6}),
@@ -80,12 +81,13 @@ class RideForm(forms.ModelForm):
 
 class OdometerAdjustmentForm(forms.ModelForm):
     error_css_class = "text-danger"
+
     class Meta:
         model = Odometer
         fields = ['distance', 'initial_value', 'comment']
         widgets = {
             "distance": forms.TextInput(attrs={"class": 'odometer'}),
-            } 
+            }
 
 
 class OdometerForm(forms.ModelForm):
@@ -141,8 +143,7 @@ OdometerFormSet = modelformset_factory(
     formset=BaseOdometerFormSet,
     form=OdometerForm,
     fields=[  # 'rider',
-            'bike', 'distance', 'distance_units', 'initial_value',
-            'comment', ],
+            'bike', 'distance', 'initial_value', 'comment', ],
     #       'date'],
     widgets={"distance": forms.TextInput(attrs={"size": 8})},
     extra=1  # overridden in view

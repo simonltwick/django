@@ -38,7 +38,7 @@ Maintenance Actions: {{ maintenanceaction }}
   {{ field.errors }}
   {{ field }}
   {% if field.name == 'maintenance_interval_distance' or field.name == 'due_distance' %}
-  {{ distance_units }}
+  {{ maintenanceaction.distance_units_label.lower }}
   {% endif %}
   {{ field.help_text }}
   </td>
@@ -53,7 +53,7 @@ Maintenance Actions: {{ maintenanceaction }}
 	on {{ maintenanceaction.completed_date }}
   {% endif %}
   {% if maintenanceaction.completed_distance %}
-    at {{ maintenanceaction.completed_distance }} {{ distance_units }}
+    at {{ maintenanceaction.completed_distance }} {{ maintenanceaction.distance_units_label.lower }}
   {% endif %}</p>
 {% endif %}
 

@@ -10,6 +10,8 @@ Enter Odometer Readings: {{ bike }}
 {% csrf_token %}
 <p>{{ dt_form }}</p>
 <input type="hidden" name="user" value="{{ user }}">
+<small class="text-muted">
+  Distances in {{ user.preferences.distance_units_label.lower|default:"?units?" }}</small>
 {{ formset.management_form }}
 <table class="table">
 {% for form in formset %}

@@ -71,8 +71,7 @@ def bikes(request):
              .all())
     bikes = Bike.objects.filter(owner=request.user)
     mileage = (bikes
-               .filter(rides__distance_units__isnull=False)
-               .values('id', 'rides__distance_units')
+               .filter(rides__distance__isnull=False)
                .annotate(
                    distance=Sum('rides__distance'),
                    distance_year=sum_year,
@@ -83,19 +82,12 @@ def bikes(request):
         last_ridden=Max('rides__date', filter=Q(rides__is_adjustment=False))
         ).order_by('-last_ridden').all()
     # bikes is a queryset of dicts, one for each bike/distance_unit combo
-    for entry in mileage:
-        entry['distance_units'] = DistanceUnits(  # km or miles
-            entry['rides__distance_units']).name.lower()
     # log.info("mileage=%s", mileage)
     # log.info("maint=%s", maint)
     # add maint details to bike entries
     bikes_by_id = {bike.id: bike for bike in bikes}
     for entry in mileage:
-        bike = bikes_by_id[entry['id']]
-        try:
-            bike.mileage.append(entry)
-        except AttributeError:
-            bike.mileage = [entry]
+        bike = bikes_by_id[entry.id].mileage = [entry]
     for entry in maint:
         bike = bikes_by_id[entry.bike_id]
         # log.info("maint %s for bike %s", maint, bike)
@@ -647,8 +639,8 @@ class RidesList(BikeLoginRequiredMixin):
                     return HttpResponse(
                         "CSV download not supported for {plural_name}",
                         status=501)
-                fields = ['date', 'bike', 'distance', 'distance_units_display',
-                          'ascent', 'ascent_units_display', 'description']
+                fields = ['date', 'bike', 'distance', 'distance_units_label',
+                          'ascent', 'ascent_units_label', 'description']
                 return csv_data_response(
                     self.request, 'rides.csv', entries, fields)
         else:
@@ -656,7 +648,7 @@ class RidesList(BikeLoginRequiredMixin):
         totals = self.get_ride_totals()
         return render(self.request, self.template_name,
                       context={'form': self.form, 'entries': self.entries,
-                               'totals': totals})
+                               'totals': totals, 'user': self.request.user})
 
     def GET(self):
         if self.bike_id is not None:
@@ -678,7 +670,7 @@ class RidesList(BikeLoginRequiredMixin):
         totals = self.get_ride_totals()
         return render(self.request, self.template_name,
                       context={'form': self.form, 'entries': self.entries,
-                               'totals': totals})
+                               'totals': totals, 'user': self.request.user})
 
 
     def get_ride_totals(self) -> Dict[str, Union[str,int]]:
@@ -689,13 +681,13 @@ class RidesList(BikeLoginRequiredMixin):
         for ride in self.entries:
             if isinstance(ride, Ride):
                 if ride.distance is not None:
-                    if ride.distance_units_display not in total_distance:
-                        total_distance[ride.distance_units_display] = 0.0
-                    total_distance[ride.distance_units_display] += ride.distance
+                    if ride.distance_units_label not in total_distance:
+                        total_distance[ride.distance_units_label] = 0.0
+                    total_distance[ride.distance_units_label] += ride.distance
                 if ride.ascent is not None:
-                    if ride.ascent_units_display not in total_ascent:
-                        total_ascent[ride.ascent_units_display] = 0.0
-                    total_ascent[ride.ascent_units_display] += ride.ascent
+                    if ride.ascent_units_label not in total_ascent:
+                        total_ascent[ride.ascent_units_label] = 0.0
+                    total_ascent[ride.ascent_units_label] += ride.ascent
         if not (total_distance or total_ascent):
             return {}
         distance_str = ', '.join(f"{distance:.1f} {units}"
@@ -907,7 +899,7 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
         # Call the base implementation first to get a context
         context = super().get_context_data(**kwargs)
         context['distance_units'] = (self.request.user.preferences
-                                     .get_distance_units_display())
+                                     .distance_units_label.lower())
         # context['link_formset'] = MaintActionLinkFormSet(
         #     instance=MaintenanceAction.objects.none())
         return context
@@ -939,7 +931,7 @@ def maint_action_update(request, pk: int):
     completion_form = MaintCompletionDetailsForm(initial={
         'completed_date': timezone.now().date(),
         'distance': maintenanceaction.current_bike_odo()})
-    distance_units = request.user.preferences.get_distance_units_display()
+    distance_units = self.request.user.preferences.distance_units_label.lower()
     return render(
         request, 'bike/maintenanceaction_form.html',
         context={'form': form, 'maintenanceaction': maintenanceaction,
@@ -957,7 +949,7 @@ def maint_action_complete(request, pk: int):
     maint_action = get_object_or_404(
         MaintenanceAction, pk=pk, user=request.user)
     completion_form = MaintCompletionDetailsForm(request.POST)
-    distance_units = request.user.preferences.get_distance_units_display()
+    distance_units = self.request.user.preferences.distance_units_label.lower()
     if "mark-complete-from-maint-details" not in request.POST:
         # a MaintenanceActionUpdateForm was submitted: validate that first
         maint_action_form = MaintenanceActionUpdateForm(
@@ -1031,20 +1023,19 @@ class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
 
 
 def get_maint_action_detail_queryset(user, pk):
-    return MaintenanceAction.objects.filter(user=user, pk=pk
-                ).annotate(
-                due_in_distance=MaintenanceAction.due_in_distance,
-                due_in_duration=MaintenanceAction.due_in_duration
-                ).select_related("bike", "component", "component__type",
-                                 "maint_type", "user__preferences")
+    return MaintenanceAction.objects.filter(
+        user=user, pk=pk
+        ).annotate(
+            due_in_distance=MaintenanceAction.due_in_distance,
+            due_in_duration=MaintenanceAction.due_in_duration
+            ).select_related("bike", "component", "component__type",
+                             "maint_type", "user__preferences")
 
 def add_maint_action_detail_context_data(context, instance):
-        distance_units = (
-            instance.user.preferences.get_distance_units_display())
-        context['distance_units'] = distance_units
-        context["due_in"] = instance.due_in(distance_units)
-        return context
-    
+    context['distance_units'] = instance.distance_units_label.lower()
+    context["due_in"] = instance.due_in(instance.distance_units_label.lower())
+    return context
+
 
 class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
     model = MaintenanceAction
@@ -1132,7 +1123,7 @@ class MaintTypeCreate(BikeLoginRequiredMixin, CreateView):
         context = super().get_context_data(**kwargs)
         # Add in a QuerySet of all the books
         context['distance_units'] = (
-            self.request.user.preferences.get_distance_units_display())
+            self.request.user.preferences.distance_units_label.lower())
         return context
 
     def form_valid(self, form):
@@ -1167,7 +1158,7 @@ class MaintTypeUpdate(BikeLoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         # Add in a QuerySet of all the books
         context['distance_units'] = (
-            self.request.user.preferences.get_distance_units_display())
+            self.request.user.preferences.distance_units_label.lower())
         return context
 
 
