@@ -197,8 +197,7 @@
 
   </div>
 </header>
-
-<!-- <div style="position: relative;">  -->
+<div id="map">
 
 <ul id="messages" class="d-none">
 {% if messages %}
@@ -210,9 +209,10 @@
     {% endfor %}
 {% endif %}
 </ul>
-<!-- </div>  -->
 
 {% block map %}{% endblock %}  <!-- can't be in a responsive container or in <main> -->
+</div>
+
 <main>
 <div class="container">
 {% block content %}

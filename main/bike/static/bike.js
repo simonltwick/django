@@ -40,21 +40,21 @@ function displayMessage(message, msgClass) {
 }
 
 function showMessages() {
-	/* show pre-set messages 
+	/* show pre-set messages for 3.5 seconds
 	If the header is not shown, we have to show it or messages are invisible
 	*/
 	let element = document.getElementById("messages");
-	let baseHeaderElement = document.getElementById("base-header")
-	let navIsHidden = baseHeaderElement.classList.contains("d-none");
-	if (navIsHidden) {
-		baseHeaderElement.classList.remove("d-none");
-	}
+	//let baseHeaderElement = document.getElementById("base-header")
+	//let navIsHidden = baseHeaderElement.classList.contains("d-none");
+	//if (navIsHidden) {
+	//	baseHeaderElement.classList.remove("d-none");
+	//}
 	element.classList.remove("d-none") ;
 
 	setTimeout(function() {
 		element.classList.add("d-none");
-		if (navIsHidden) {
-			baseHeaderElement.classList.add("d-none");
-		}
+	//	if (navIsHidden) {
+	//		baseHeaderElement.classList.add("d-none");
+	//	}
 	}, 3500);
 }
