@@ -190,10 +190,11 @@ class AscentUnits2(models.IntegerChoices):
                    }
         return factors[from_units][to_units]
 
-    def to_metres(self, value: float) -> float:
+    @classmethod
+    def to_metres(cls, ascent_units, value: float) -> float:
         if value is None:
             return None
-        factor = self.conversion_factor(self, AscentUnits2.METRES)
+        factor = cls.conversion_factor(ascent_units, AscentUnits2.METRES)
         return value * factor
 
     def from_metres(self, value: float) -> float:
