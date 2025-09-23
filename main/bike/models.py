@@ -192,6 +192,7 @@ class AscentUnits2(models.IntegerChoices):
 
     @classmethod
     def to_metres(cls, ascent_units, value: float) -> float:
+        """ must stay as a class method until migration 0049 has been completed """
         if value is None:
             return None
         factor = cls.conversion_factor(ascent_units, AscentUnits2.METRES)
