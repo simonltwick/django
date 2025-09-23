@@ -36,9 +36,10 @@ from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView)
 
 from .models import (
-    Place, Track, Boundary, PlaceType, get_default_place_type, Tag, Preference)
+    Place, Track, Boundary, PlaceType, get_default_place_type, Tag)
+from bike.models import Preferences
 from .forms import (
-    UploadGpxForm2, PlaceForm, PreferenceForm, TrackDetailForm, TrackSearchForm,
+    UploadGpxForm2, PlaceForm, TrackDetailForm, TrackSearchForm,
     PlaceSearchForm, CommonSearchForm, PlaceUploadForm, UploadBoundaryForm,
     # BoundaryForm, TestCSRFForm
     )
@@ -200,7 +201,7 @@ def _do_place_search(request, cleaned_data) -> JsonResponse:
     places = Place.objects.filter(query_json.Q(), user=request.user)
 
     result_count = places.count()
-    result_limit = request.user.routes_preference.place_search_result_limit
+    result_limit = request.user.routes_preferences.place_search_result_limit
     places = places[:result_limit]
     places_json = json.loads(serialize("geojson", places))
     search_history = query_json.json()
@@ -258,7 +259,7 @@ def _do_track_search(request, cleaned_data) -> JsonResponse:
     tracks = Track.objects.filter(query_json.Q(), user=request.user)
 
     result_count = tracks.count()
-    result_limit = request.user.routes_preference.track_search_result_limit
+    result_limit = request.user.routes_preferences.track_search_result_limit
     tracks=tracks[:result_limit]
     tracks_json = json.loads(serialize("geojson", tracks))
     query_as_json = query_json.json()
@@ -743,7 +744,7 @@ def place(request, pk=None):
         "form": form, "pk": pk, "icons": icons, "instance": place_inst})
 
 
-def nearby_search_params(request) -> Tuple[float, float, Preference]:
+def nearby_search_params(request) -> Tuple[float, float, Preferences]:
     """ extract parms for a nearby search latlon=|andlatlon=|orlatlon= """
     latlon: str = request.GET["latlon"]
     try:
@@ -751,7 +752,7 @@ def nearby_search_params(request) -> Tuple[float, float, Preference]:
     except ValueError as e:
         log.error("Unable to parse latlon value %s: %r", latlon, e)
         return HttpResponse("Invalid latlon parameter specified", status=400)
-    prefs = Preference.objects.get_or_create(user=request.user)[0]
+    prefs = Preferences.objects.get_or_create(user=request.user)[0]
     return lat, lon, prefs
 
 
@@ -1088,39 +1089,6 @@ def test(request):
     messages.error(request, "Failed.")
     messages.warning(request, "Watch out!")
     return render(request, 'test.html')
-
-# ------ preferences handling ------
-@login_required(login_url=LOGIN_URL)
-def preference(request):
-    """ Preferences is a 1:1 object for each user.  Create it or get it """
-    preference = Preference.objects.get_or_create(user=request.user)[0]
-    if request.method == "GET":
-        form = PreferenceForm(instance=preference)
-    else:
-        form = PreferenceForm(request.POST, instance=preference)
-        if form.is_valid():
-            form.save()
-            return HttpResponseRedirect(reverse_lazy("routes:api_preference"))
-
-    return render(request, 'preference_form.html', context={"form": form})
-
-
-@login_required(login_url=LOGIN_URL)
-def preference_as_json(request):
-    """ this returns a list of a single preferences object,
-    with search distances converted to metres """
-    preference = Preference.objects.get_or_create(user=request.user)[0]
-    # it has to be a list or queryset in order to serialise it
-    # add search distances in metres
-    data = serialize("json", [preference])
-    json_data = json.loads(data)
-    fields = json_data[0]["fields"]
-    fields["track_nearby_search_distance_metres"] = (
-        preference.track_nearby_search_distance_metres)
-    fields["place_nearby_search_distance_metres"] = (
-        preference.place_nearby_search_distance_metres)
-    # log.info("preference_as_json: data=%s", data)
-    return JsonResponse(json_data, safe=False, status=200)
 
 
 def csrf_failure(request, reason=""):

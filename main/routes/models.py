@@ -327,30 +327,3 @@ class Boundary(models.Model):
         category_list = [(cat[0], cat[0]) for cat in categories]
         # log.debug("Boundary.get_category_choices -> %s", category_list)
         return category_list
-
-
-# ------ Settings handling ------
-class Preference(models.Model):
-    """ store user preference for distance units, and for search """
-    user = models.OneToOneField(User, on_delete=models.CASCADE,
-                                primary_key=True, related_name='routes_preference')
-    distance_units = models.IntegerField(default=DistanceUnits.KILOMETRES,
-                                         choices=DistanceUnits)
-    # units for the settings below are yards or metres (dep. on distance_units)
-    track_nearby_search_distance = models.FloatField(default=5)
-    track_search_result_limit = models.IntegerField(default=100)
-    place_nearby_search_distance = models.FloatField(default=20)
-    place_search_result_limit = models.IntegerField(default=1000)
-
-    @property
-    def track_nearby_search_distance_metres(self):
-        """ for use in Leaflet - distances are in metres """
-        return DistanceUnits.convert(
-            self.track_nearby_search_distance,
-            self.distance_units, DistanceUnits.KILOMETRES) * 1000.0
-
-    @property
-    def place_nearby_search_distance_metres(self):
-        return DistanceUnits.convert(
-            self.place_nearby_search_distance,
-            self.distance_units, DistanceUnits.KILOMETRES) * 1000.0

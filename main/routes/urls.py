@@ -46,7 +46,5 @@ urlpatterns = [
          name="api_place_types"),
     path("tags/place/<int:pk>", views.place_tags),
     path("tags/track/<int:pk>", views.track_tags),
-    path("preference", views.preference),
-    path("api/preference", views.preference_as_json, name="api_preference"),
     path("logout/", views.do_logout, name="logout"),
 ]

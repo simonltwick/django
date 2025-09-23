@@ -4,7 +4,7 @@ import logging
 from django import forms
 from django.template.defaultfilters import filesizeformat
 #from .models import RawGpx
-from .models import Place, PlaceType, Preference, Track, Boundary
+from .models import Place, PlaceType, Track, Boundary
 from django.contrib.gis import forms as geoforms
 from django.contrib.gis.forms.widgets import OpenLayersWidget
 from django.core.exceptions import ValidationError
@@ -124,15 +124,6 @@ class PlaceUploadForm(forms.Form):
 
 class CustomSelectWidget(forms.widgets.Select):
     option_template_class = "routes/place_type_icon_option.html"
-
-
-class PreferenceForm(forms.ModelForm):
-    error_css_class = "text-danger"
-    required_css_class = "required"
-    class Meta:
-        model = Preference
-        exclude = ["pk", "user"]
-
 
 
 class PlaceTypeForm(forms.ModelForm):

@@ -6,8 +6,6 @@ let dragStartLatLng;  // start of drag action for place
 
 let nearbyTracksUrl;  // url for searching tracks
 
-let preference;  // nearby search preference
-
 let trackSearchHistory = '';
 let placeSearchHistory = '';
 
@@ -163,17 +161,9 @@ if (initSearch) {
 	onRoutesSearch();
 }
 
-// init preferences & place icons
-// get preference & buildPlaceIcons cannot be run in parallel
-$.get("/routes/api/preference", "json", function(data){
-	updatePreference(data);
-	buildPlaceIcons();
-});
-
-function buildPlaceIcons() {
-	$.get('/routes/api/place/types/icons', null, buildPlaceIconDict, 'json');
-	// nb. placeIcons is not initialised until response received
-}
+// init place icons
+// nb. placeIcons is not initialised until response received
+$.get('/routes/api/place/types/icons', null, buildPlaceIconDict, 'json');
 
 function buildPlaceIconDict(data) {
 	refreshPlaceIconDict(data);
@@ -211,8 +201,8 @@ const mapClickPopupContent = `</p>
 	<button type="button" class="btn btn-outline-secondary"
 	  onClick="createPlace()">
 	  New Place</button>
-	<a class="btn" onClick="onPreference()">
-	  <span class="oi oi-cog" data-toggle="tooltip" title="Preference"/>
+	<a class="btn" href="/bike/preferences?prefs_page=3&next=/routes/map">
+	  <span class="oi oi-cog" data-toggle="tooltip" title="Preferences"/>
 	</a>`
 
 const nearbyButtonsTemplate = 	`<p>
@@ -356,12 +346,14 @@ function searchResults(data) {
 	}
 	displaySearchResultsInfo(data, result_type);
 	showBoundary(data);
-	if (result_type == "tracks")  {
+	const nearbyMarkers = getNearbyMarkers(data["search_history"]);
+	console.info("searchResults: nearby_markers=", nearbyMarkers);
+	if (result_type == "tracks") {
 		trackSearchHistory = data["search_history"];
-		showTracks(data["tracks"]);
+		showTracks(data["tracks"], nearbyMarkers);
 	} else if (result_type == "places") {
 		placeSearchHistory = data["search_history"];
-		showPlaces(data["places"]);
+		showPlaces(data["places"], nearbyMarkers);
 	} else {
 		console.error("Unrecognised search results:", data);
 		log_error("Unrecognised response to search request");
@@ -393,6 +385,38 @@ function showBoundary(data) {
 		}).addTo(map);
 	}
 }
+
+function getNearbyMarkers(search_history) {
+	/* return a list of circle markers for nearby searches in search_history */
+	if ("AndSearchQ" in search_history) {
+		return getNearbyMarkersList(search_history.AndSearchQ);
+	} else if ("OrSearchQ" in search_history) {
+		return getNearbyMarkersList(search_history.OrSearchQ);
+	} else if ("NearbySearchQ" in search_history) {
+		let nearbySearchQ = search_history.NearbySearchQ;
+		return [L.circle(L.latLng(nearbySearchQ.lat, nearbySearchQ.lon), {
+					radius: nearbySearchQ.distance,
+					color: "blue",
+					weight: 1,
+					opacity: 0.5,
+					fill: false})];
+	} else if ("BoundarySearchQ" in search_history) {
+		console.warning("BoundarySearchQ marker not yet implemented");
+	}
+	return null;
+}
+
+function getNearbyMarkersList(searchq_list) {
+	let markers = [];
+	searchq_list.forEach(function(searchq) {
+		let marker = getNearbyMarkers(searchq);
+		if (marker) {  // ignore null elements
+			markers = markers.concat(marker);
+		}
+	});
+	return markers;
+}
+
 
 // error handling
 function requestFailMsg(jqXHR, textStatus, errorThrown) {
@@ -437,32 +461,25 @@ function nearbyTracks(joinType) {
 	map.closePopup();
 	// add search area to map
 	tracksLayer.clearLayers();
-	L.circle(popLocation, {
-			radius: preference.track_nearby_search_distance_metres,
-			color: "blue",
-			weight: 1,
-			opacity: 0.5,
-			fill: false}).addTo(tracksLayer);
 }
 
-function showTracks(trackList) {
+function showTracks(trackList, nearbyMarkers) {
 	// add tracks to the map
-	if (trackList.length < 1) {
-		displayMessage("No matching tracks found");
-		return
-	}
 	// console.info('showTracks(): trackList=', trackList)
 	const oldTracksLayer = tracksLayer;
 	tracksLayer = L.geoJSON(trackList, {
 		style: trackStyle,
 		onEachFeature: onTrackShow
 	});
-	// copy the search circle to the new tracksLayer
-	oldTracksLayer.eachLayer((layer) => tracksLayer.addLayer(layer));
+	nearbyMarkers.forEach(function(marker) {marker.addTo(tracksLayer)});
 	tracksHidden = [];
 	// showSidebarSection(true, 'track');
 	tracksLayer = replaceMapOverlay(oldTracksLayer, tracksLayer, "Tracks");
 	setMapBounds();
+	if (trackList.length < 1) {
+		displayMessage("No matching tracks found");
+		return
+	}
 }
 
 function onTrackShow(feature, layer) {
@@ -651,22 +668,15 @@ function nearbyPlaces(joinType) {
 	map.closePopup();
 	// add search area to map
 	placesLayer.clearLayers();
-	L.circle(popLocation, {
-			radius: preference.place_nearby_search_distance_metres,
-			color: "blue",
-			weight: 1,
-			opacity: 0.5,
-			fill: false}).addTo(placesLayer);
 }
 
-function showPlaces(data) {
+function showPlaces(data, nearbyMarkers) {
 	const oldPlacesLayer = placesLayer;
 	placesLayer = L.geoJSON(data, {
 		pointToLayer: getPlaceMarker,
 		onEachFeature: onPlaceShow
 	});
-	// copy the search circle to the new placesLayer
-	oldPlacesLayer.eachLayer((layer) => placesLayer.addLayer(layer));
+	nearbyMarkers.forEach(function(marker) {marker.addTo(placesLayer)});
 	// showSidebarSection(true, 'place');
 	placesLayer = replaceMapOverlay(oldPlacesLayer, placesLayer, "Places");
 	setMapBounds();
