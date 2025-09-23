@@ -93,12 +93,11 @@ urlpatterns = [
     path(r'component_type/<int:pk>/delete',
          views.ComponentTypeDelete.as_view(), name='component_type_delete'),
 
-    path('preferences/new', views.PreferencesCreate.as_view(),
-         name='preferences_new'),
-    path('preferences', views.PreferencesUpdate.as_view(),
-         name='preferences'),
-    path('preferences/<int:pk>', views.PreferencesUpdate.as_view(),
-         name='preferences'),
+    # path('preferences/new', views.PreferencesCreate.as_view(),
+    #      name='preferences_new'),
+    path('preferences', views.preferences, name='preferences'),
+    # path('preferences/<int:pk>', views.PreferencesUpdate.as_view(),
+    #      name='preferences'),
 
     path('login', auth_views.LoginView.as_view(
         template_name='bike/login.html'), name='login'),

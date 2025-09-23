@@ -1,0 +1,71 @@
+{% extends 'bike/base.html' %}
+
+{% block title %}
+Preferences for {{ request.user.username }} 
+{% endblock %}
+
+{% block content %}
+<h1>Preferences for {{ request.user.username }}</h1>
+<form method='POST'	id="preferences-form" 
+  formAction="{% url 'bike:preferences' %}?next={{ next }}">
+<nav>
+  <div class="nav nav-tabs" id="nav-tab" role="tablist">
+    <button class="nav-link{% if prefs_page == '1' %} active{% endif %}"
+      id="nav-units-tab" data-toggle="tab"
+      data-target="#nav-units" type="button" role="tab"
+      aria-controls="nav-units"
+      aria-selected="{% if prefs_page == '1' %}true{% else %}false{% endif %}">
+      Units</button>
+    <button class="nav-link{% if prefs_page == '2' %} active{% endif %}"
+      id="nav-maintenance-tab" data-toggle="tab"
+      data-target="#nav-maintenance" type="button" role="tab"
+      aria-controls="nav-profile"
+      aria-selected="{% if prefs_page == '2' %}true{% else %}false{% endif %}">
+      Maintenance</button>
+    <button class="nav-link{% if prefs_page == '3' %} active{% endif %}"
+      id="nav-search-tab" data-toggle="tab"
+      data-target="#nav-search" type="button" role="tab"
+      aria-controls="nav-contact"
+      aria-selected="{% if prefs_page == '3' %}true{% else %}false{% endif %}">
+      Search</button>
+  </div>
+</nav>
+<br>
+<div class="tab-content" id="nav-tabContent">
+  <div class="tab-pane fade{% if prefs_page == '1' %} show active{% endif %}"
+    id="nav-units" role="tabpanel" aria-labelledby="nav-units-tab">
+    <h4>Distance units</h4>
+    <table class="table table-sm">
+    {{ form1.as_table }}
+    </table>
+  </div>
+  <div class="tab-pane fade{% if prefs_page == '2' %} show active{% endif %}"
+    id="nav-maintenance" role="tabpanel" aria-labelledby="nav-maintenance-tab">
+    <h4>Maintenance preferences</h4>
+    <p><small class='form-text text-muted'>Maintenance time and distance limits
+    are used to decide whether to show upcoming maintenance.
+	If they are left blank, all upcoming maintenance is shown.
+	Enter the time limit in days, followed by the word "days"
+	(hh:mm:ss is optional), and the distance limit using the chosen distance units.
+	</small></p>
+	<table class="table table-sm">
+    {{ form2.as_table }}
+    </table>
+  </div>
+  <div class="tab-pane fade{% if prefs_page == '3' %} show active{% endif %}"
+    id="nav-search" role="tabpanel" aria-labelledby="nav-search-tab">
+    <h4>Routes Search</h4>
+    <table class="table table-sm">
+    {{ form3.as_table }}
+    </table>
+  </div>
+</div>
+
+{% csrf_token %}
+
+<input type="button" class="btn btn-secondary" value="Apply"
+  onclick="onPreferencesFormSubmit(event, 'apply')">
+<input type="button" class="btn btn-primary" value="OK"
+  onclick="onPreferencesFormSubmit(event, '')">
+</form>
+{% endblock %}

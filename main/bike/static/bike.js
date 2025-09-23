@@ -58,3 +58,60 @@ function showMessages() {
 	//	}
 	}, 3500);
 }
+
+const preferencesFormTabs = {
+	"nav-units-tab": 1,
+	"nav-maintenance-tab": 2,
+	"nav-search-tab": 3
+}
+
+function onPreferencesFormSubmit(event, action) {
+	/* calculate and add the prefs_page param to the form's url.
+	The form is submitted using default browser handling for a submit event */
+	event.preventDefault();
+	let prefs_page = undefined;
+	console.info("event.target=", event.target, "action=", action);
+	let form = document.getElementById("preferences-form");
+	Object.keys(preferencesFormTabs).forEach(
+		function(id){
+			if (document.getElementById(id).classList.contains("active")) {
+				prefs_page = preferencesFormTabs[id];
+				let url = form.action;
+				let newUrl = setQSValue(url, "prefs_page=", prefs_page);
+				newUrl = setQSValue(newUrl, "action=", action);
+				form.action = newUrl;
+				console.info("new url =", newUrl, "new action=", form.action);
+				if (newUrl != form.action) {
+					alert("failed to set Preferences form.action - see console");
+				}
+				form.submit();
+				return;
+		}
+	});
+	if (prefs_page === undefined) {
+		console.error("No active Preferences form tab found", event);
+		displayMessage("Submit failed", "text-error");
+		event.preventDefault();
+	}
+}
+
+function setQSValue(url, key, value)
+/* set a query string value within a url.  The key should contain an = sign */ 
+{
+    let query_string = url.split('?');
+	let string_values = query_string.length == 1 ? [] : query_string[1].split('&');
+	let req_value = undefined;
+    for(i=0;  i < string_values.length; i++)
+    {
+        if( string_values[i].match(key)) {
+            req_value = string_values[i].split('=');
+			string_values[i] = key + value
+		}    
+    }
+	if (req_value === undefined) {
+		string_values.push(key+value);
+	}
+	// recreate url params
+    query_string[1] = string_values.join('&')
+	return query_string.join('?')
+}

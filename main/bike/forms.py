@@ -3,6 +3,7 @@ from django.forms import modelformset_factory, inlineformset_factory
 from django.utils.dateparse import parse_duration
 import datetime as dt
 import logging
+from typing import Dict
 
 from .models import (
     Component, Ride, Odometer, MaintenanceAction, MaintenanceActionHistory,
@@ -56,14 +57,62 @@ class ComponentForm(forms.ModelForm):
             "notes": forms.Textarea(attrs={"cols": 40, "rows": 2})}
 
 
+class DistanceInputWidget(forms.NumberInput):
+    """ expects & renders a variable {{ distance_units }} after the input field
+    self.distance_units has to be initialised by the form's __init__ """
+    template_name = "distance_input_widget.html"
+    distance_units = "(distance_units unset)"
+
+    def get_context(self, name, value, attrs) -> Dict:
+        ctx = super().get_context(name, value, attrs)
+        ctx["distance_units"] = self.distance_units
+        return ctx
+
+
 class PreferencesForm(forms.ModelForm):
     error_css_class = "text-danger"
+
     class Meta:
         model = Preferences
-        fields = ('distance_units', 'ascent_units',
-                  'maint_distance_limit', 'maint_time_limit')
+        fields = ('distance_units', 'ascent_units')
+
+
+
+class PreferencesForm2(forms.ModelForm):
+    error_css_class = "text-danger"
+
+    class Meta:
+        model = Preferences
+        fields = ('maint_distance_limit', 'maint_time_limit')
         widgets = {
+            "maint_distance_limit": DistanceInputWidget(attrs={"size": 6}),
             'maint_time_limit': DaysDurationInput(attrs={"size": 4})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['maint_distance_limit'].widget.distance_units = (
+            self.instance.distance_units_label.lower())
+
+
+class PreferencesForm3(forms.ModelForm):
+    error_css_class = "text-danger"
+
+    class Meta:
+        model = Preferences
+        fields = ('track_nearby_search_distance', 'track_search_result_limit',
+                  'place_nearby_search_distance', 'place_search_result_limit')
+        widgets = {'track_nearby_search_distance':
+                   DistanceInputWidget(attrs={"size": 6}),
+                   'place_nearby_search_distance':
+                   DistanceInputWidget(attrs={"size": 6})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ('track_nearby_search_distance',
+                           'place_nearby_search_distance'):
+            self.fields[field_name].widget.distance_units = (
+                self.instance.distance_units_label.lower())
+
 
 
 class RideForm(forms.ModelForm):

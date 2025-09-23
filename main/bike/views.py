@@ -26,7 +26,8 @@ from .models import (
     # MaintActionLink
     )
 from .forms import (
-    RideSelectionForm, RideForm, PreferencesForm,
+    RideSelectionForm, RideForm,
+    PreferencesForm, PreferencesForm2, PreferencesForm3,
     MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm,
     MaintActionLinkFormSet, ComponentForm)
@@ -101,40 +102,94 @@ def bikes(request):
                            'monthname': monthname})
 
 
-class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
-    form_class = PreferencesForm
-    model = Preferences
-    # fields = ['distance_units', 'ascent_units',
-    #           'maint_distance_limit', 'maint_time_limit']
+# class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
+#     form_class = PreferencesForm
+#     model = Preferences
+#     # fields = ['distance_units', 'ascent_units',
+#     #           'maint_distance_limit', 'maint_time_limit']
+#
+#     def form_valid(self, form):
+#         obj = form.save(commit=False)
+#         obj.user = self.request.user
+#         return super(PreferencesCreate, self).form_valid(form)
+#
+#
+# class PreferencesUpdate(BikeLoginRequiredMixin, UpdateView):
+#     form_class = PreferencesForm
+#     model = Preferences
+#     # fields = PreferencesCreate.fields
+#
+#     def dispatch(self, request, *args, **kwargs):
+#         if 'pk' not in self.kwargs:
+#             try:
+#                 prefs_pk = Preferences.objects.get(user=request.user).pk
+#                 self.kwargs['pk'] = prefs_pk
+#             except Preferences.DoesNotExist:
+#                 return HttpResponseRedirect(reverse('bike:preferences_new'))
+#         elif not Preferences.objects.filter(pk=self.kwargs['pk'],
+#                                             user=request.user).exists():
+#             return HttpResponse("Unauthorised preferences", status=401)
+#         return super(PreferencesUpdate, self).dispatch(request, *args,
+#                                                        **kwargs)
+#
+#     def get_success_url(self):
+#         if 'next' in self.request.GET:
+#             return self.request.GET['next']
+#         return super(PreferencesUpdate, self).get_success_url()
 
-    def form_valid(self, form):
-        obj = form.save(commit=False)
-        obj.user = self.request.user
-        return super(PreferencesCreate, self).form_valid(form)
+
+@login_required(login_url=LOGIN_URL)
+@require_http_methods(["GET", "POST"])
+def preferences(request):
+    """ allow creation & editing of the user's preferences instance,
+    using three forms to separate distance units, bike settings and 
+    route settings """
+    prefs = Preferences.objects.get_or_create(user=request.user)[0]
+    if request.method == "GET":
+        prefs_form1 = PreferencesForm(instance=prefs)
+        prefs_form2 = PreferencesForm2(instance=prefs)
+        prefs_form3 = PreferencesForm3(instance=prefs)
+
+    else:  # POST
+        prefs_form1 = PreferencesForm(request.POST, instance=prefs)
+        prefs_form2 = PreferencesForm2(request.POST, instance=prefs)
+        prefs_form3 = PreferencesForm3(request.POST, instance=prefs)
+        try:
+            submitted_form = get_submitted_prefs_form(
+                request, prefs_form1, prefs_form2, prefs_form3)
+        except ValueError as e:
+            return HttpResponse(e.args[0], status=400)
+        if submitted_form.is_valid():
+            instance = submitted_form.save()
+            prefs_page = request.GET["prefs_page"]
+            if prefs_page == '1':  # in case units have changed
+                prefs_form2 = PreferencesForm2(instance=prefs)
+                prefs_form3 = PreferencesForm3(instance=prefs)
+            messages.success(request, "Preferences updated.")
+            if request.GET.get("action") != "apply":
+                if (next_url := request.GET.get("next")):
+                    return HttpResponseRedirect(next_url)
+
+    return render(request, 'bike/preferences.html', context={
+        "form1": prefs_form1, "form2": prefs_form2, "form3": prefs_form3,
+        "instance": prefs, "prefs_page": request.GET.get("prefs_page", "1"),
+        "next": request.GET.get("next") or reverse_lazy("bike:home")})
 
 
-class PreferencesUpdate(BikeLoginRequiredMixin, UpdateView):
-    form_class = PreferencesForm
-    model = Preferences
-    # fields = PreferencesCreate.fields
-
-    def dispatch(self, request, *args, **kwargs):
-        if 'pk' not in self.kwargs:
-            try:
-                prefs_pk = Preferences.objects.get(user=request.user).pk
-                self.kwargs['pk'] = prefs_pk
-            except Preferences.DoesNotExist:
-                return HttpResponseRedirect(reverse('bike:preferences_new'))
-        elif not Preferences.objects.filter(pk=self.kwargs['pk'],
-                                            user=request.user).exists():
-            return HttpResponse("Unauthorised preferences", status=401)
-        return super(PreferencesUpdate, self).dispatch(request, *args,
-                                                       **kwargs)
-
-    def get_success_url(self):
-        if 'next' in self.request.GET:
-            return self.request.GET['next']
-        return super(PreferencesUpdate, self).get_success_url()
+def get_submitted_prefs_form(request, prefs_form1, prefs_form2, prefs_form3):
+    try:
+        prefs_page = request.GET["prefs_page"]
+    except KeyError as e:
+        log.error("preferences POST request with missing prefs_page:"
+                  " request.GET=%s", request.GET)
+        raise ValueError("Missing prefs_page parameter") from e
+    if prefs_page not in {'1', '2', '3'}:
+        log.error("preferences POST request has invalid prefs_page=%s",
+                  prefs_page)
+        raise ValueError("Invalid prefs_page parameter") from e
+    return (prefs_form1 if prefs_page == '1'
+            else prefs_form2 if prefs_page == '2'
+            else prefs_form3)  # if prefs_page == '3'
 
 
 class BikeDetail(BikeLoginRequiredMixin, DetailView):

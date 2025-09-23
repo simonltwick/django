@@ -2,7 +2,6 @@
 
 from collections import defaultdict
 import datetime as dt
-from functools import cache
 import logging
 from typing import Optional, List, Dict, Union
 
@@ -132,50 +131,50 @@ class DistanceUnits(models.IntegerChoices):
     def display_name(cls, value: int) -> str:
         return cls(value).name.lower()
 
-# TODO: remove DistanceMixin.distance_units_display
-class DistanceMixin(models.Model):
-    # distance = models.FloatField(null=True, blank=True)
-    # distance_units = models.PositiveSmallIntegerField(
-    #     choices=DistanceUnits, default=DistanceUnits.MILES)
-
-    class Meta:
-        abstract = True
-
-    @property
-    def distance_units_display(self):
-        return self.get_distance_units_display().lower()
-
-    def distance_units_label(self) -> str:
-        return DistanceUnits(self.user.preferences.distance_units).label
-
-
-class DistanceRequiredMixin(DistanceMixin):
-    distance = models.FloatField()
-
-    class Meta:
-        abstract = True
+# # TODO: remove DistanceMixin.distance_units_display
+# class DistanceMixin(models.Model):
+#     # distance = models.FloatField(null=True, blank=True)
+#     # distance_units = models.PositiveSmallIntegerField(
+#     #     choices=DistanceUnits, default=DistanceUnits.MILES)
+#
+#     class Meta:
+#         abstract = True
+#
+#     @property
+#     def distance_units_display(self):
+#         return self.get_distance_units_display().lower()
+#
+#     def distance_units_label(self) -> str:
+#         return DistanceUnits(self.user.preferences.distance_units).label
 
 
-class AscentUnits0:
-    METRES = 1
-    FEET = 2
-    CHOICES = ((METRES, 'm'), (FEET, 'Ft'))
+# class DistanceRequiredMixin(DistanceMixin):
+#     distance = models.FloatField()
+#
+#     class Meta:
+#         abstract = True
 
-    @classmethod
-    def conversion_factor(cls, from_units, to_units):
-        factors = {AscentUnits0.METRES: {AscentUnits0.METRES: 1.0,
-                                        AscentUnits0.FEET: 3.28084},
-                   AscentUnits0.FEET: {AscentUnits0.FEET: 1.0,
-                                      AscentUnits0.METRES: 1.0/3.28084}
-                   }
-        return factors[from_units][to_units]
 
-    @classmethod
-    def to_metres(cls, former_unit: "AscentUnits0", value: float) -> float:
-        if value is None:
-            return None
-        factor = cls.conversion_factor(former_unit, AscentUnits0.METRES)
-        return value * factor
+# class AscentUnits0:
+#     METRES = 1
+#     FEET = 2
+#     CHOICES = ((METRES, 'm'), (FEET, 'Ft'))
+#
+#     @classmethod
+#     def conversion_factor(cls, from_units, to_units):
+#         factors = {AscentUnits0.METRES: {AscentUnits0.METRES: 1.0,
+#                                         AscentUnits0.FEET: 3.28084},
+#                    AscentUnits0.FEET: {AscentUnits0.FEET: 1.0,
+#                                       AscentUnits0.METRES: 1.0/3.28084}
+#                    }
+#         return factors[from_units][to_units]
+#
+#     @classmethod
+#     def to_metres(cls, former_unit: "AscentUnits0", value: float) -> float:
+#         if value is None:
+#             return None
+#         factor = cls.conversion_factor(former_unit, AscentUnits0.METRES)
+#         return value * factor
 
 
 class AscentUnits2(models.IntegerChoices):
@@ -218,6 +217,11 @@ class Preferences(models.Model):
     maint_time_limit = models.DurationField(
         default=dt.timedelta(days=10), blank=True, null=True,
         verbose_name='Upcoming maintenance time limit')
+    # following settings are for routes app... not yet in use
+    track_nearby_search_distance = models.FloatField(default=5)
+    track_search_result_limit = models.IntegerField(default=50)
+    place_nearby_search_distance = models.FloatField(default=20)
+    place_search_result_limit = models.IntegerField(default=1000)
 
     class Meta:
         verbose_name_plural = 'preferences'
@@ -230,26 +234,42 @@ class Preferences(models.Model):
     def distance_units_label(self) -> str:
         return DistanceUnits(self.distance_units).label
 
+    @property
+    def track_nearby_search_distance_metres(self):
+        """ for use in Leaflet - distances are in metres """
+        return DistanceUnits.convert(
+            self.track_nearby_search_distance,
+            self.distance_units, DistanceUnits.KILOMETRES) * 1000.0
+
+    @property
+    def place_nearby_search_distance_metres(self):
+        return DistanceUnits.convert(
+            self.place_nearby_search_distance,
+            self.distance_units, DistanceUnits.KILOMETRES) * 1000.0
+
     def get_absolute_url(self):
         return reverse('bike:preferences', kwargs={'pk': self.pk})
 
     def __str__(self):
         return f"Preferences for {self.user.username}"
 
-    def save(self, force_insert=False, force_update=False, *args, **kwargs):
+    def save(self, *args, force_insert=False, force_update=False, **kwargs):
         if self.distance_units != self.__original_distance_units:
             factor = DistanceUnits.conversion_factor(
                 self.__original_distance_units, self.distance_units)
             log.warning(
                 "Preferences.distance_units changed from %s to %s: applying "
-                "conversion factor=%s", self.__original_distance_units,
-                self.distance_units, factor)
+                "conversion factor=%s",
+                DistanceUnits(self.__original_distance_units).label,
+                self.distance_units_label, factor)
             Bike.update_distance_units(self.user, factor)
             MaintenanceType.update_distance_units(self.user, factor)
             MaintenanceAction.update_distance_units(self.user, factor)
-        super(Preferences, self).save(
-            force_insert=force_insert, force_update=force_update,
-            *args, **kwargs)
+            self.maint_distance_limit *= factor
+            self.place_nearby_search_distance *= factor
+            self.track_nearby_search_distance *= factor
+        super().save(*args, force_insert=force_insert,
+                     force_update=force_update, **kwargs)
 
     @staticmethod
     def conversion_factor_distance(user: User) -> float:
@@ -266,8 +286,8 @@ class Preferences(models.Model):
         """ return the conversion factor from metres to user's chosen ascent
         unit """
         pref_ascent_unit = user.preferences.ascent_units
-        conv_factor = AscentUnits0.conversion_factor(
-            from_units=AscentUnits0.METRES, to_units=pref_ascent_unit)
+        conv_factor = AscentUnits2.conversion_factor(
+            from_units=AscentUnits2.METRES, to_units=pref_ascent_unit)
         return conv_factor
 
 
