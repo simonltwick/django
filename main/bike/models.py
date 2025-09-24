@@ -61,16 +61,16 @@ class Bike(models.Model):
         based on last odo reading plus any subsequent rides.  It's updated by
         Odometer.save, and by Ride.save, through update_current_odo which
         recalculates based on last odometer reading plus subsequent rides. """
+
     def update_current_odo(self):
         last_odo = Odometer.previous_odo(self.id, timezone.now())
         date_after = last_odo.date if last_odo else None
-        distance_since = Ride.distance_after(date_after, self)
-        distances = list(distance_since)  # also contains bike_id, but ignored
+        distance_since = list(
+            Ride.distance_after(date_after, self))[0]["distance"]
+        # also contains bike_id, but ignored
         if last_odo:
-            distances.append({'distance': last_odo.distance,
-                              'distance_units': last_odo.distance_units})
-        target_units = self.owner.preferences.distance_units
-        self.current_odo = DistanceUnits.sum(distances, target_units)
+            distance_since += last_odo.distance
+        self.current_odo = distance_since
         # log.info("update_current_odo: new value=%s", self.current_odo)
 
     @classmethod
@@ -147,13 +147,11 @@ class DistanceUnits(models.IntegerChoices):
 #     def distance_units_label(self) -> str:
 #         return DistanceUnits(self.user.preferences.distance_units).label
 
-
 # class DistanceRequiredMixin(DistanceMixin):
 #     distance = models.FloatField()
 #
 #     class Meta:
 #         abstract = True
-
 
 # class AscentUnits0:
 #     METRES = 1
@@ -186,7 +184,7 @@ class AscentUnits2(models.IntegerChoices):
         factors = {AscentUnits2.METRES: {AscentUnits2.METRES: 1.0,
                                         AscentUnits2.FEET: 3.28084},
                    AscentUnits2.FEET: {AscentUnits2.FEET: 1.0,
-                                      AscentUnits2.METRES: 1.0/3.28084}
+                                      AscentUnits2.METRES: 1.0 / 3.28084}
                    }
         return factors[from_units][to_units]
 
@@ -379,20 +377,11 @@ class Ride(models.Model):
     def ascent_units_display(self):
         return self.get_ascent_units_display()
 
-    def clean(self):
-        validation_errors = {}
-        if self.distance and not self.distance_units:
-            validation_errors['distance_units'] = "You must specify units."
-        if self.ascent and not self.ascent_units:
-            validation_errors['ascent_units'] = "You must specify units."
-        if validation_errors:
-            raise ValidationError(validation_errors)
-
     @classmethod
     def distance_after(cls, when: Optional[dt.datetime], bike=None):
-        """ return ride distance after a datetime, in mixed distance_units, on
-        bike=bike if given, else for all bikes
-        Result is a list of dicts with bike_id, distance_units, distance """
+        """ return ride distance after a datetime,
+        on bike=bike if given, else for all bikes
+        Result is a list of dicts with {bike_id:, distance:} """
         # log.info("Ride.distance_after(when=%s, bike=%s", when, bike)
         query = Ride.objects
         # log.info("distance_after(1). query=%s", query)
@@ -403,8 +392,8 @@ class Ride(models.Model):
             query = query.filter(date__gt=when)
             # log.info("distance_after(3). query=%s", query)
         return (query
-                .order_by('bike_id', 'distance_units')
-                .values('bike_id', 'distance_units')
+                .order_by('bike_id')
+                .values('bike_id')
                 .annotate(distance=Sum('distance'))
                 )
 
@@ -442,12 +431,12 @@ class Ride(models.Model):
         return monthly_mileage
 
     @classmethod
-    def mileage_ytd(cls, user, years: Union[int, List[int]], bike_id=None, 
-                    date_now: Optional[dt.datetime] = None  # for testing
+    def mileage_ytd(cls, user, years: Union[int, List[int]], bike_id=None,
+                    date_now: Optional[dt.datetime]=None  # for testing
                     ) -> Dict[int, Dict[str, float]]:
         rides = cls.rides_for_years(user, years, bike_id)
         now = date_now or dt.datetime.utcnow()
-        ytd_filter = Q(date__month__lt=now.month)| Q(
+        ytd_filter = Q(date__month__lt=now.month) | Q(
             date__month=now.month, date__day__lte=now.day)
         rides = rides.filter(ytd_filter)
         mileage_ytd: Dict[int, Dict[str, float]] = {}
@@ -478,7 +467,6 @@ class Ride(models.Model):
                 rides = rides.filter(bike_id=bike_id)
         return rides
 
-
     @classmethod
     def cumulative_mileage(cls, user, years: Union[int, List[int]]
                            ) -> List["Ride"]:
@@ -503,7 +491,6 @@ class Ride(models.Model):
         if len(cum_total) > 1:
             log.warning("cumulative mileage for rides with mixed distance units")
         return rides
-
 
     @staticmethod
     def on_post_delete(_sender, instance, **_kwargs):
@@ -602,7 +589,7 @@ class Odometer(models.Model):
         distances.append({'distance_units': prev_odo.distance_units,
                           'distance': prev_odo.distance})
         distances.append({'distance_units': current_odo.distance_units,
-                          'distance': -current_odo.distance})
+                          'distance':-current_odo.distance})
         # distances is now prev_odo + rides - current_odo, maybe in mixed units
         # which is the NEGATIVE of what we need for the adjustment ride
         total_distance = -DistanceUnits.sum(
@@ -731,7 +718,7 @@ class Component(models.Model):
         if depth > self.HIERARCHY_LIMIT:
             raise RecursionError("Suspected circular component hierarchy "
                                  f"for {self}, id={self.id}")
-        return parent_component.current_bike(depth+1)
+        return parent_component.current_bike(depth + 1)
 
     def update_bike_info(self, old_self):
         old_bike = old_self.current_bike()
@@ -768,7 +755,7 @@ class Component(models.Model):
                 raise RecursionError("Suspected circular component hierarchy "
                                      f"for {self}, id={self.id}")
             subcomponent.update_subcomponent_distances(
-                old_bike_odo, current_bike_odo, depth+1)
+                old_bike_odo, current_bike_odo, depth + 1)
 
     def save(self, *args, **kwargs):
         """ update start_odo if creating new instance """
@@ -1054,7 +1041,6 @@ class ComponentChange(models.Model):
     description = models.CharField(max_length=200)
     distance = models.FloatField(null=True, blank=True)
 
-
 # ------ new version of preferences, under development ------
 #
 #
@@ -1086,7 +1072,6 @@ class ComponentChange(models.Model):
 #     factor = UNIT_CONVERSION_FACTOR[unit_type][AscentUnits2.METRES]
 #     return value * factor
 
-
 # class Prefs2(models.Model):
 #     distance_unit = models.SmallIntegerField(
 #         choices=DistanceUnits, default=DistanceUnits.MILES)
@@ -1108,7 +1093,6 @@ class ComponentChange(models.Model):
 #     @property
 #     def distance_unit_label(self)-> str:
 #         return DistanceUnits(self.distance_unit).label
-
 
 # class Prefs3(models.Model):
 #     distance_unit = models.SmallIntegerField(
