@@ -1,3 +1,4 @@
+/* global variables */
 let popup;  		//displayed popup
 let popMarker;		//marker of last popup
 let popLocation;	//location of last popup
@@ -9,161 +10,205 @@ let nearbyTracksUrl;  // url for searching tracks
 let trackSearchHistory = '';
 let placeSearchHistory = '';
 
+let layerControl;  // add/remove layers from map, initialised in makeMap
+let placeIcons;  // initialised in initPlaceIcons / refreshPlaceIconDict
+let placesLayer; // initialised in makeMapLayers
+let tracksLayer; // initialised in makeMapLayers
+let boundariesLayer; // initialised in makeMapLayers
 
 /* ------ initialisation ------ */
+let tracksHidden = [];
+let dialog = document.getElementById("map-dialog");
 
-// make the osm layer
-const hrefOsm = "https://www.openstreetmap.org/copyright";
-const attrOsm = `© <a href='${hrefOsm}'>OpenStreetMap</a>`;
-const tilesOsm = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-const layerOsm = L.tileLayer(tilesOsm, { attribution: attrOsm });
+const map = makeMap();
+makeMapLayers();
+const styles = initStyles();	// for tracks
+showInitialMapContent();
+initPlaceIcons();  // & show initial places, if any
 
-const linkOsm = '<a href="http://openstreetmap.org">OpenStreetMap</a>';
+/* ------ end of initialisation, start of initialisation routines ------ */
 
-// OpenCycleMap layer - requires an API key from thunderforest.com
-const ocmApiKey = JSON.parse(document.getElementById('ocmApiKey').textContent);
-const hrefOcm = '<a href="http://thunderforest.com/">Thunderforest</a>';
-const attrOcm = '&copy; ' + linkOsm + ' Contributors & ' + hrefOcm;
-const tilesOcm = 'http://{s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey='
-	+ ocmApiKey;
-const layerOcm = L.tileLayer(tilesOcm, { attribution: attrOcm, maxZoom: 18 });
+function makeOsmLayer(){
+	// make the osm layer
+	const hrefOsm = "https://www.openstreetmap.org/copyright";
+	const attrOsm = `© <a href='${hrefOsm}'>OpenStreetMap</a>`;
+	const tilesOsm = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+	return L.tileLayer(tilesOsm, { attribution: attrOsm });
+}
 
-// Google Maps / Google Satellite maps
-const googleMapsUrl = 'http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
-const googleSatMapUrl = 'http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
+function makeOcmLayer() {
+	// OpenCycleMap layer - requires an API key from thunderforest.com
+	const ocmApiKey = JSON.parse(document.getElementById('ocmApiKey').textContent);
+	const linkOsm = '<a href="http://openstreetmap.org">OpenStreetMap</a>';
+	const hrefOcm = '<a href="http://thunderforest.com/">Thunderforest</a>';
+	const attrOcm = '&copy; ' + linkOsm + ' Contributors & ' + hrefOcm;
+	const tilesOcm = 'http://{s}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey='
+		+ ocmApiKey;
+	return L.tileLayer(tilesOcm, { attribution: attrOcm, maxZoom: 18 });
+}
+
+function makeGoogleLayer() {
+	// Google Maps / Google Satellite maps
+	const googleMapsUrl = 'http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+	return 	L.tileLayer(googleMapsUrl, {
+		maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+	});
+}
+
+function makeGoogleSatLayer() {
+	const googleSatMapUrl = 'http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
+	return L.tileLayer(googleSatMapUrl, {
+		maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+	});
+}
 // terrain, traffic, biking overlays also available
-const layerGoogle = L.tileLayer(googleMapsUrl, {
-	maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-});
-const layerGoogleSat = L.tileLayer(googleSatMapUrl, {
-	maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-});
 
 // Others copied from example using the folium package at
 // https://towardsdatascience.com/build-interactive-gps-activity-maps-from-gpx-files-using-folium-cf9eebba1fe7
 
-// national geographic
-const natGeoUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}';
-const natGeoAttr = 'Tiles &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, NOAA, iPC';
-const layerNatGeo = L.tileLayer(natGeoUrl, natGeoAttr);
-
-// terrain map
-const terrainUrl = 'http://tile.stamen.com/terrain/{z}/{x}/{y}.jpg';
-const layerTerrain = L.tileLayer(terrainUrl, attr = 'terrain-bcg');
-
-
-const map = L.map("map", { layers: [layerOsm] })
-	// allow user to click anywhere & show popup with lat/lon
-	.on('click', onMapClick);
-
-
-// map controls - scale, overlays
-L.control.scale({ position: "bottomright" }).addTo(map);
-
-const baseLayers = {
-	OpenStreetMap: layerOsm,
-	OpenCycleMap: layerOcm,
-	Google: layerGoogle,
-	GoogleSatellite: layerGoogleSat,
-	Terrain: layerTerrain,
-	NatGeographic: layerNatGeo,
-};
-
-const overlays = {};
-const layerControl = L.control.layers(
-	baseLayers, overlays, { position: "bottomleft" }
-).addTo(map);
-
-class NavControl extends L.Control {
-	constructor (options) {
-		super(options);
-		this.container = document.createElement("div");
-		this.container.classList.add("leaflet-control");
-		this.container.classList.add("nav-control");
-	}
-	onAdd(map) {
-		document.getElementById("base-header").classList.toggle("d-none")
-		this.container.innerHTML = `<span class='oi oi-menu'
-			data-toggle='tooltip' title='Show/hide Menu'></span>`;
-		// connect event listeners
-		this.container.addEventListener("click", this.onClick);
-		return this.container;
-	}
-	onClick(event) {
-		// toggle the navbar visibility
-		L.DomEvent.stopPropagation(event);
-		// hiding/unhiding of base-header is also done by showMessages
-		// in bike.js
-		document.getElementById("base-header").classList.toggle("d-none");
-	}
+function makeNatGeoLayer() {
+	// national geographic
+	const natGeoUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}';
+	const natGeoAttr = 'Tiles &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, NOAA, iPC';
+	return L.tileLayer(natGeoUrl, natGeoAttr);
 }
 
-const navControl = new NavControl({position: "topright"}).addTo(map);
+function makeTerrainLayer() {
+	// terrain map
+	const terrainUrl = 'http://tile.stamen.com/terrain/{z}/{x}/{y}.jpg';
+	return L.tileLayer(terrainUrl, attr = 'terrain-bcg');
+}
 
-const trackStyle = {color: '#ff00ff',
-    weight: 3,
-    opacity: 0.5
-};
-const startMarkerStyle = {
-	radius: 2,  // should be bigger than the track style
-	weight: 1,  // line around circumference
-	opacity: 0.5,
-	color: "#00ff00",
-	fill: true,
-	fillOpacity: 0.5
+function makeNavControl() {
+	// make a map control to show/hide the main page nav bar
+	class NavControl extends L.Control {
+		constructor (options) {
+			super(options);
+			this.container = document.createElement("div");
+			this.container.classList.add("leaflet-control");
+			this.container.classList.add("nav-control");
+		}
+		onAdd(map) {
+			document.getElementById("base-header").classList.toggle("d-none")
+			this.container.innerHTML = `<span class='oi oi-menu'
+				data-toggle='tooltip' title='Show/hide Menu'></span>`;
+			// connect event listeners
+			this.container.addEventListener("click", this.onClick);
+			return this.container;
+		}
+		onClick(event) {
+			// toggle the navbar visibility
+			L.DomEvent.stopPropagation(event);
+			// hiding/unhiding of base-header is also done by showMessages
+			// in bike.js
+			document.getElementById("base-header").classList.toggle("d-none");
+		}
+	}
+	return new NavControl({position: "topright"})
+}
+
+function makeMap(){
+	// make the map and all the map controls
+	// layerControl is a global variable
+	const layerOsm = makeOsmLayer();
+	
+	const map = L.map("map", { layers: [layerOsm] })
+		// allow user to click anywhere & show popup with lat/lon
+		.on('click', onMapClick);
+	
+	// map controls - scale, overlays
+	L.control.scale({ position: "bottomright" }).addTo(map);
+	
+	const baseLayers = {
+		OpenStreetMap: layerOsm,
+		OpenCycleMap: makeOcmLayer(),
+		Google: makeGoogleLayer(),
+		GoogleSatellite: makeGoogleSatLayer(),
+		Terrain: makeNatGeoLayer(),
+		NatGeographic: makeNatGeoLayer(),
 	};
-const stopMarkerStyle = {
-	radius: 2,  // should be bigger than the track style
-	weight: 1,  // line around circumference
-	opacity: 0.5,
-	color: "#ff0000",  // for fill and circumference
-	fill: true,
-	fillOpacity: 0.5
+	
+	const overlays = {};
+	layerControl = L.control.layers(
+		baseLayers, overlays, { position: "bottomleft" }
+	).addTo(map);
+
+	const navControl = makeNavControl().addTo(map);
+
+	return map;
+}
+
+function initStyles() {
+	const trackStyle = {color: '#ff00ff',
+	    weight: 3,
+	    opacity: 0.5
 	};
+	const startMarkerStyle = {
+		radius: 2,  // should be bigger than the track style
+		weight: 1,  // line around circumference
+		opacity: 0.5,
+		color: "#00ff00",
+		fill: true,
+		fillOpacity: 0.5
+		};
+	const stopMarkerStyle = {
+		radius: 2,  // should be bigger than the track style
+		weight: 1,  // line around circumference
+		opacity: 0.5,
+		color: "#ff0000",  // for fill and circumference
+		fill: true,
+		fillOpacity: 0.5
+		};
+	return {
+		track: trackStyle,
+		startMarker: startMarkerStyle,
+		stopMarker: stopMarkerStyle
+		}
+}
 
-// add layers for tracks & places
-
-let placeIcons;
-let placesLayer = L.geoJSON().addTo(map);   // map layer for places
-layerControl.addOverlay(placesLayer, "Places");
-let tracksLayer = L.geoJSON().addTo(map); 
-layerControl.addOverlay(tracksLayer, "Tracks");
-let tracksHidden = [];
-let boundaries = L.geoJSON().addTo(map);  // for (search) boundaries
-
-
+function showInitialMapContent() {
 // show initial tracks/places, or if none, show welcome dialog
-let dialog = document.getElementById("map-dialog");
-const initialTracks = JSON.parse(document.getElementById('initialTracks'
-	).textContent);
-const initialPlaces = JSON.parse(document.getElementById('initialPlaces'
-	).textContent);
-
-if (initialTracks) {
-	showTracks(initialTracks);
-} else if (initialPlaces) {
-	// do nothing - they are shown in buildPlaceIconDict later.
-} else {
-	/* show map dialog, pre-populated with a help/info message */
-	try {
-		const initBounds = JSON.parse(document.getElementById('initBounds'
-			).textContent);
-		map.fitBounds(initBounds);
-	} catch {
-		map.fitWorld();
+	const initialTracks = JSON.parse(document.getElementById('initialTracks'
+		).textContent);
+	const initialPlaces = JSON.parse(document.getElementById('initialPlaces'
+		).textContent);
+	
+	if (initialTracks) {
+		showTracks(initialTracks);
+	} else if (initialPlaces) {
+		// do nothing - they are shown in buildPlaceIconDict later.
+	} else {
+		/* show map dialog, pre-populated with a help/info message */
+		try {
+			const initBounds = JSON.parse(document.getElementById('initBounds'
+				).textContent);
+			map.fitBounds(initBounds);
+		} catch {
+			map.fitWorld();
+		}
+		dialog.showModal();
 	}
-	dialog.showModal();
+	// was the map initialised for a search?  if so, show the search dialog
+	const initSearch = JSON.parse(document.getElementById('initSearch').textContent);
+	if (initSearch) {
+		onRoutesSearch();
+	}
 }
 
-// was the map initialised for a search?  if so, show the search dialog
-const initSearch = JSON.parse(document.getElementById('initSearch').textContent);
-if (initSearch) {
-	onRoutesSearch();
+function makeMapLayers() {
+	// add layers for tracks & places
+	placesLayer = L.geoJSON().addTo(map);   // map layer for places
+	layerControl.addOverlay(placesLayer, "Places");
+	tracksLayer = L.geoJSON().addTo(map); 
+	layerControl.addOverlay(tracksLayer, "Tracks");
+	boundariesLayer = L.geoJSON().addTo(map);  // for (search) boundaries
 }
-
-// init place icons
-// nb. placeIcons is not initialised until response received
-$.get('/routes/api/place/types/icons', null, buildPlaceIconDict, 'json');
+		
+function initPlaceIcons() {
+	// init place icons
+	// nb. placeIcons is not initialised until response received
+	$.get('/routes/api/place/types/icons', null, buildPlaceIconDict, 'json');
+}
 
 function buildPlaceIconDict(data) {
 	refreshPlaceIconDict(data);
@@ -174,7 +219,7 @@ function buildPlaceIconDict(data) {
 }
 
 
-/* ----- end of initialisation ------ */
+/* ----- end of initialisation routines ------ */
 
 function setMapBounds() {
 	// resize the map to fit placesBounds and tracksBounds
@@ -375,9 +420,9 @@ function displaySearchResultsInfo(data, result_type) {
 }
 
 function showBoundary(data) {
-	boundaries.remove();
+	boundariesLayer.remove();
 	if (data.hasOwnProperty("boundary") && data["boundary"]) {
-		boundaries = L.geoJSON(data["boundary"], {
+		boundariesLayer = L.geoJSON(data["boundary"], {
 				style: {color: '#ff0000',
 						weight: 1,
 						opacity: 0.5
@@ -468,7 +513,7 @@ function showTracks(trackList, nearbyMarkers) {
 	// console.info('showTracks(): trackList=', trackList)
 	const oldTracksLayer = tracksLayer;
 	tracksLayer = L.geoJSON(trackList, {
-		style: trackStyle,
+		style: styles.track,
 		onEachFeature: onTrackShow
 	});
 	nearbyMarkers.forEach(function(marker) {marker.addTo(tracksLayer)});
@@ -502,11 +547,11 @@ function addTrackStartStopMarkers(feature, _layer) {
 	feature.geometry.coordinates.forEach(function(trackSegCoords) {
 		if (trackSegCoords.length) {
 			let startLatLng = [trackSegCoords[0][1], trackSegCoords[0][0]];
-			let startMarker = L.circleMarker(startLatLng, startMarkerStyle)
+			let startMarker = L.circleMarker(startLatLng, styles.startMarker)
 				.addTo(tracksLayer);
 			let end = trackSegCoords.length -1;
 			let stopLatLng = [trackSegCoords[end][1], trackSegCoords[end][0]];
-			let stopMarker = L.circleMarker(stopLatLng, stopMarkerStyle)
+			let stopMarker = L.circleMarker(stopLatLng, styles.stopMarker)
 				.addTo(tracksLayer);
 			startStopMarkers.push([startMarker, stopMarker]);
 		}
