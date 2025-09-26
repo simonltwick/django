@@ -1024,7 +1024,7 @@ class MaintenanceActionHistory(models.Model):
 
     def distance_units_label(self) -> str:
         if self.bike:
-            return DistanceUnits(self.bike.rider.preferences.distance_units
+            return DistanceUnits(self.bike.owner.preferences.distance_units
                                  ).label
         if self.component:
             return DistanceUnits(self.component.owner.preferences.distance_units
