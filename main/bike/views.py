@@ -986,7 +986,7 @@ def maint_action_update(request, pk: int):
     completion_form = MaintCompletionDetailsForm(initial={
         'completed_date': timezone.now().date(),
         'distance': maintenanceaction.current_bike_odo()})
-    distance_units = self.request.user.preferences.distance_units_label.lower()
+    distance_units = request.user.preferences.distance_units_label.lower()
     return render(
         request, 'bike/maintenanceaction_form.html',
         context={'form': form, 'maintenanceaction': maintenanceaction,
@@ -1004,7 +1004,7 @@ def maint_action_complete(request, pk: int):
     maint_action = get_object_or_404(
         MaintenanceAction, pk=pk, user=request.user)
     completion_form = MaintCompletionDetailsForm(request.POST)
-    distance_units = self.request.user.preferences.distance_units_label.lower()
+    distance_units = request.user.preferences.distance_units_label.lower()
     if "mark-complete-from-maint-details" not in request.POST:
         # a MaintenanceActionUpdateForm was submitted: validate that first
         maint_action_form = MaintenanceActionUpdateForm(
@@ -1019,13 +1019,13 @@ def maint_action_complete(request, pk: int):
                          'completion_form': completion_form,
                          'distance_units': distance_units,
                          'link_formset': link_formset})
-        else:  # MaintenanceActionUpdateForm is valid
-            maint_action = maint_action_form.save()
-            if link_formset.is_valid():
-                link_formset.save(commit=False)
-                for link_form in link_formset:
-                    link_form.instance.maint_action = maint_action
-                link_formset.save()
+        # else:  # MaintenanceActionUpdateForm is valid
+        maint_action = maint_action_form.save()
+        if link_formset.is_valid():
+            link_formset.save(commit=False)
+            for link_form in link_formset:
+                link_form.instance.maint_action = maint_action
+            link_formset.save()
     # now, we are going to validate the completion form and mark complete,
     # returning a maint details instance
     # get augmented maint action details plus context for detail template

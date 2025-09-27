@@ -904,8 +904,7 @@ class MaintenanceAction(MaintIntervalMixin):
             bike_id=self.bike_id, component_id=self.component_id, action=self,
             description=self.description or self.maint_type,
             completed_date=comp_date,
-            distance=comp_distance,
-            distance_units=self.user.preferences.distance_units)
+            distance=comp_distance)
         if not self.recurring:
             self.completed = True
         else:
@@ -1022,6 +1021,7 @@ class MaintenanceActionHistory(models.Model):
                         if item is not None)
         return f"{self.action} on {when}"
 
+    @property
     def distance_units_label(self) -> str:
         if self.bike:
             return DistanceUnits(self.bike.owner.preferences.distance_units
