@@ -31,15 +31,17 @@ Odometer readings:
   </div><td>
 {% endfor %}
 </tr></table>
-<br><p>Selected readings: (in {{ user.preferences.distance_units_label.lower|default:"?units?" }})</p>
+<br><p>Selected readings:</p>
 </form>
 
 
 {% for reading in entries %}
 
 {% if forloop.first %}
-  <table class="table">
-  <tr><th>Bike</th><th>Reading</th><th>Date</th><th>reset?</th><th>Comment</th>
+  <table class="table table-sm table-hover">
+  <tr><th>Bike</th>
+  <th>Reading<br><small class="text-muted">{{ user.preferences.distance_units_label.lower|default:"?units?" }}</small></th>
+  <th>Date</th><th>reset?</th><th>Comment</th>
   </tr>
 {% endif %}
 

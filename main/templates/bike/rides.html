@@ -38,8 +38,10 @@ Rides
 {% for ride in entries %}
 
 {% if forloop.first %}
-  <table class="table table-sm">
-  <tr><th>date</th><th>bike</th><th>ride</th><th>distance</th><th>ascent</th>
+  <table class="table table-sm table-hover">
+  <tr><th>date</th><th>bike</th><th>ride</th>
+  <th>distance<br><small class="text-muted">{{ user.preferences.distance_units_label.lower }}</small></th>
+  <th>ascent<br><small class="text-muted">{{ user.preferences.ascent_units_label.lower }}</small></th>
   </tr>
 {% endif %}
 
@@ -52,15 +54,17 @@ Rides
 	  <a href="{% url 'bike:ride' ride.id %}">
     {% endif %}
     {{ ride.description|truncatechars:40 }}</a></td>
-  <td>{{ ride.distance|floatformat|default:"-" }} {{ ride.distance_units_label.lower }}</td>
+  <td>{{ ride.distance|floatformat|default:"-" }}</td>
   {% if ride.ascent %}
-  <td>{{ ride.ascent|floatformat }} {{ ride.ascent_units_label.lower }}</td>
+  <td>{{ ride.ascent|floatformat }}</td>
   {% endif %}
 </tr>
 
 {% if forloop.last %}
-	{% if totals %}<tr><th>Totals</th><td>{{ totals.count }} rides</td><td></td>
-	<td>{{ totals.total_distance }}</td><td>{{ totals.total_ascent }}</td>
+  {% if totals %}<tr class="table-info"><th>Totals</th>
+	<td>{{ totals.count }} rides</td><td></td>
+	<td>{{ totals.total_distance|floatformat }}</td>
+	<td>{{ totals.total_ascent|floatformat }}</td>
 	</tr>{% endif %}
   </table>
 {% endif %}

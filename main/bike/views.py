@@ -632,7 +632,7 @@ class RidesList(BikeLoginRequiredMixin):
                 end_date = dt.datetime.combine(end_date, dt.time(23, 59, 59),
                                                tzinfo=CURRENT_TIMEZONE)
                 entries = entries.filter(date__lte=end_date)
-            entries = entries.order_by('-date').all()
+            entries = entries.order_by('-date')
             num_entries = form.cleaned_data['max_entries']
             if num_entries:
                 # log.info("Applying filter num_rides=%d", num_rides)
@@ -655,20 +655,23 @@ class RidesList(BikeLoginRequiredMixin):
                 return csv_data_response(
                     self.request, 'rides.csv', entries, fields)
         else:
-            self.entries = self.entries.order_by('-date').all()[:20]
+            self.entries = self.entries.filter(
+                rider=self.request.user).order_by('-date')[:20]
         totals = self.get_ride_totals()
         return render(self.request, self.template_name,
                       context={'form': self.form, 'entries': self.entries,
                                'totals': totals, 'user': self.request.user})
 
     def GET(self):
+        self.entries = self.entries.filter(rider=self.request.user)
         if self.bike_id is not None:
             self.entries = self.entries.filter(bike_id=self.bike_id)
         entries = self.entries = self.entries.order_by('-date')[:20]
 
-        if entries:
-            start_date = entries[len(entries) - 1].date
-            end_date = max(entries[0].date, timezone.now())
+        if entries.exists():
+            # can't use .last() or [-1]
+            start_date = entries[len(entries) -1].date
+            end_date = max(entries.first().date, timezone.now())
         else:
             start_date = end_date = None
 
@@ -684,30 +687,21 @@ class RidesList(BikeLoginRequiredMixin):
                                'totals': totals, 'user': self.request.user})
 
 
-    def get_ride_totals(self) -> Dict[str, Union[str,int]]:
+    def get_ride_totals(self) -> Dict[str, Union[float,int]]:
         """ compute sum & count of entries  - only for Rides
         for Odometer entries, an empty dict is returned. """
-        total_distance: Dict[str, float] = {}
-        total_ascent: Dict[str, float] = {}
-        for ride in self.entries:
-            if isinstance(ride, Ride):
-                if ride.distance is not None:
-                    if ride.distance_units_label not in total_distance:
-                        total_distance[ride.distance_units_label] = 0.0
-                    total_distance[ride.distance_units_label] += ride.distance
-                if ride.ascent is not None:
-                    if ride.ascent_units_label not in total_ascent:
-                        total_ascent[ride.ascent_units_label] = 0.0
-                    total_ascent[ride.ascent_units_label] += ride.ascent
-        if not (total_distance or total_ascent):
+        # uses self.entries already filtered & sliced by GET/POST for rider & bike
+
+        if not self.entries.exists():
             return {}
-        distance_str = ', '.join(f"{distance:.1f} {units}"
-                                for units, distance in total_distance.items())
-        ascent_str = ', '.join(f"{ascent:.1f} {units}"
-                                for units, ascent in total_ascent.items())
-        return {'total_distance': distance_str,
-                'total_ascent': ascent_str,
-                'count': len(self.entries)}
+        if not hasattr(self.entries.first(), 'ascent'):
+            return {}  # it's not a Ride (it's an Odometer queryset)
+        totals = self.entries.aggregate(Sum('distance'), Sum('ascent'))
+        if totals["distance__sum"] or totals["ascent__sum"]:
+            return {'total_distance': totals["distance__sum"],
+                    'total_ascent': totals["ascent__sum"],
+                    'count': self.entries.count()}
+        return {}
 
 
 def csv_data_response(request, filename, queryset, fields):
