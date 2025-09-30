@@ -7,7 +7,7 @@ Bike: {{ bike }}
 {% block content %}
 <h1>Bike: {{ bike.name }}</h1>
 <p>{{ bike.description }}</p>
-<p>Calculated odometer: {{ bike.current_odo|floatformat }} {{ distance_units }}</p>
+<p>Calculated odometer: {{ bike.current_odo|floatformat }} {{ bike.distance_units_label.lower }}</p>
 
 {% url 'bike:bike' bike.id as success_url %}
 

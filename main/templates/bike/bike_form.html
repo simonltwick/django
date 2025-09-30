@@ -10,7 +10,7 @@ Bike details: {{ bike }}
 {% csrf_token %}
 <table class="table">
 {{ form }}
-<th>Odometer</th><td>{{ bike.current_odo }} {{ distance_units }}</td>
+<th>Odometer</th><td>{{ bike.current_odo }} {{ bike.distance_units_label.lower }}</td>
 </table>
 {% if bike %}
 <p>

@@ -9,53 +9,44 @@ Mileage{% if bike %} for {{ bike }}{% endif %} in {{ sel_yrs|join:", " }}
 
 <h1>Mileage{% if bike %} for {{ bike }}{% endif %} in {{ sel_yrs|join:", " }}</h1>
 
-<table class="table">
-    <tr><th>Month</th>
-      {% for yr in sel_yrs %}<th>{{ yr }}</th>{% endfor %}
-    </tr>
+<table class="table table-sm">
+  <tr><th>Month</th>
+    {% for yr in sel_yrs %}<th>{{ yr }}</th>{% endfor %}
+  </tr>
 
-    {% for month, month_summary in monthly_mileage.items %}
-      <tr><th>{{ month|month_name }}</th>
+  {% for month, month_summary in monthly_mileage.items %}
+    <tr><th>{{ month|month_name }}</th>
 
-      {% for yr, units_and_dist in month_summary.items %}
-        {% if units_and_dist %}
-
-          {% for mileage_units, miles in units_and_dist.items %}
-            <td><a href="{% url 'bike:rides_month' yr month %}">
-		    {{ miles|floatformat }} {{ mileage_units }}</a></td>
-          {% empty %} -
-          {% endfor %}
-
-        {% else %}
-          <td> - </td>
-        {% endif %}
-      {% empty %}
-        <td>! no items in month_summary !</td>
-      {% endfor %}
+    {% for yr, miles in month_summary.items %}
+      <td>
+        {% if miles %}
+          <a href="{% url 'bike:rides_month' yr month %}">
+          {{ miles|floatformat }} {{ distance_units }}</a>
+        {% else %}-{% endif %}
+      </td>
+    {% empty %}
+      <td>! no items in month_summary !</td>
+    {% endfor %}
 
     </tr>
     {% empty %}(no rides on record)
+  {% endfor %}
+
+  {% if totals %}
+    <tr class="table-info"><th>Totals:</th>
+   	{% for total in totals.values %}
+      <td>{{ total|floatformat}} {{ distance_units }}</td>
     {% endfor %}
+    </tr>
+  {% endif %}
 
-    {% if totals %}
-      <tr><th>Totals:</th>
-      	{% for total in totals.values %}
-		  {% for mileage_units, miles in total.items %}
-	        <td>{{ miles|floatformat}} {{ mileage_units }}</td>
-	      {% endfor %}
-	    {% endfor %}
-	  </tr>
-    {% endif %}
-
-	{% if mileage_ytd %}
-	  <tr><th>YTD:</th>
-		{% for ytd in mileage_ytd.values %}
-		  {% for mileage_units, miles in ytd.items %}
-		  <td>{{ miles|floatformat }} {{ mileage_units }}</td>
-		  {% endfor %}
-		{% endfor %}
-	  </tr>
-	{% endif %}
+  {% if mileage_ytd %}
+    <tr class="table-light"><th>YTD:</th>
+      {% for ytd in mileage_ytd.values %}
+		<td>{{ ytd|floatformat }} {{ distance_units }}</td>
+	  {% endfor %}
+	</tr>
+  {% endif %}
 </table>
 
 <p>{% if prev_yr %}
@@ -64,20 +55,20 @@ Mileage{% if bike %} for {{ bike }}{% endif %} in {{ sel_yrs|join:", " }}
 	{% endif %}
 	{{prev_yr}}<</a>
    {% endif %}
-&nbsp;&nbsp;
+  &nbsp;&nbsp;
 
-{% with sel_yrs|last as last_sel_yr %}
-<a href="{%url 'bike:mileage_graph' year=last_sel_yr %}"
+  {% with sel_yrs|last as last_sel_yr %}
+    <a href="{%url 'bike:mileage_graph' year=last_sel_yr %}"
 	  class='btn btn-secondary'>View as graph</a>
-{% endwith %}
+  {% endwith %}
 
-&nbsp;&nbsp;
-{% if next_yr %}
+  &nbsp;&nbsp;
+  {% if next_yr %}
 	{% if bike_id %}<a href="{%url 'bike:mileage' year=next_yr bike_id=bike_id %}">
 	{% else %}<a href="{%url 'bike:mileage' year=next_yr %}">
 	{% endif %}
 	>{{next_yr}}</a>
-{% endif %}
+  {% endif %}
 </p> 
 
 {% endblock%}

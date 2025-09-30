@@ -26,7 +26,8 @@ Replace Component: {{ cpt }}
 {{ old_cpt_form }}
 </table>
 <p><strong>Age: </strong>
-  {{ cpt.current_distance|floatformat }} {{ distance_units }}<p>
+  {{ cpt.current_distance|floatformat }} {{ cpt.owner.preferences.distance_units_label.lower }}
+  <p>
 
 <h3>Replacement component</h3>
 <table class="table table-sm">

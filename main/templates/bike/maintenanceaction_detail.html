@@ -47,7 +47,7 @@ Component Type:
 {% if maintenanceaction.due_date or maintenanceaction.due_distance %}
   <p>Due in {{ due_in|default_if_none:"?" }}
   {% if maintenanceaction.due_distance %}
-    at {{ maintenanceaction.due_distance|default_if_none:"-" }} {{ distance_units }} 
+    at {{ maintenanceaction.due_distance|default_if_none:"-" }} {{ maintenanceaction.user.preferences.distance_units_label.lower }} 
   {% endif %}
   {% if maintenanceaction.due_date %}
   {{ maintenanceaction.due_date|default_if_none:"-" }}
@@ -58,7 +58,7 @@ Component Type:
 {% if maintenanceaction.recurring %}
   <p>Recurs every 
   {% if maintenanceaction.maintenance_interval_distance %}
-    {{ maintenanceaction.maintenance_interval_distance }} {{ distance_units }}
+    {{ maintenanceaction.maintenance_interval_distance }} {{ maintenanceaction.user.preferences.distance_units_label.lower }}
     {% if maintenanceaction.maintenance_interval_days %} or {% endif %}
   {% endif %}
   {% if maintenanceaction.maintenance_interval_days %}
@@ -83,7 +83,7 @@ Component Type:
         <input type="submit" class="btn btn-primary" value="Mark as Done"
         name="mark-complete-from-maint-details"
         formaction="{% url 'bike:maint_complete' maintenanceaction.id %}?next={{ next_url }}">
-        {{ completion_form }} {{ distance_units }}
+        {{ completion_form }}
         </form>
         </p>
       {% endif %}

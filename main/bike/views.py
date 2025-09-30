@@ -26,7 +26,7 @@ from .models import (
     # MaintActionLink
     )
 from .forms import (
-    RideSelectionForm, RideForm,
+    RideSelectionForm, RideForm, DistanceInputWidget,
     PreferencesForm, PreferencesForm2, PreferencesForm3,
     MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm,
@@ -102,42 +102,6 @@ def bikes(request):
                            'monthname': monthname})
 
 
-# class PreferencesCreate(BikeLoginRequiredMixin, CreateView):
-#     form_class = PreferencesForm
-#     model = Preferences
-#     # fields = ['distance_units', 'ascent_units',
-#     #           'maint_distance_limit', 'maint_time_limit']
-#
-#     def form_valid(self, form):
-#         obj = form.save(commit=False)
-#         obj.user = self.request.user
-#         return super(PreferencesCreate, self).form_valid(form)
-#
-#
-# class PreferencesUpdate(BikeLoginRequiredMixin, UpdateView):
-#     form_class = PreferencesForm
-#     model = Preferences
-#     # fields = PreferencesCreate.fields
-#
-#     def dispatch(self, request, *args, **kwargs):
-#         if 'pk' not in self.kwargs:
-#             try:
-#                 prefs_pk = Preferences.objects.get(user=request.user).pk
-#                 self.kwargs['pk'] = prefs_pk
-#             except Preferences.DoesNotExist:
-#                 return HttpResponseRedirect(reverse('bike:preferences_new'))
-#         elif not Preferences.objects.filter(pk=self.kwargs['pk'],
-#                                             user=request.user).exists():
-#             return HttpResponse("Unauthorised preferences", status=401)
-#         return super(PreferencesUpdate, self).dispatch(request, *args,
-#                                                        **kwargs)
-#
-#     def get_success_url(self):
-#         if 'next' in self.request.GET:
-#             return self.request.GET['next']
-#         return super(PreferencesUpdate, self).get_success_url()
-
-
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET", "POST"])
 def preferences(request):
@@ -200,8 +164,6 @@ class BikeDetail(BikeLoginRequiredMixin, DetailView):
         context["next_url"] = (
             self.request.GET["next"] if "next" in self.request.GET
             else reverse("bike:home"))
-        preferences = Preferences.objects.get(user=self.request.user)
-        context['distance_units'] = preferences.get_distance_units_display()
         pk = self.kwargs['pk']
         context['components'] = Component.objects.filter(bike_id=pk)
         return add_maint_context(context, self.request.user, bike_id=pk)
@@ -251,8 +213,6 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
 
 def add_maint_context(context: dict, user, bike_id=None, component_id=None):
     """ add upcoming maintenance & maintenance history for a bike or cpt """
-    distance_units = user.preferences.get_distance_units_display()
-    context['distance_units'] = distance_units
     if bike_id is None and component_id is None:
         return context
 
@@ -260,7 +220,7 @@ def add_maint_context(context: dict, user, bike_id=None, component_id=None):
         user=user, bike_id=bike_id, component_id=component_id,
         filter_by_limits=False).all()
     for ma in upcoming:
-        ma.due = ma.due_in(distance_units)
+        ma.due = ma.due_in()
 
     context['maint_history'] = MaintenanceAction.history(
         user=user, bike_id=bike_id, component_id=component_id)
@@ -383,8 +343,6 @@ class ComponentUpdate(BikeLoginRequiredMixin, UpdateView):
         subcomponents = Component.objects.filter(
             subcomponent_of=self.object).all()
         context['subcomponents'] = subcomponents
-        context['distance_units'] = (
-            self.request.user.preferences.get_distance_units_display())
         return add_maint_context(
             context, self.request.user, component_id=self.object.id)
 
@@ -407,7 +365,6 @@ def component_replace(request, pk: int):
     old_cpt = get_object_or_404(Component, pk=pk, owner=request.user)
     subcomponents = Component.objects.filter(
             subcomponent_of=old_cpt).all()
-    distance_units = request.user.preferences.get_distance_units_display()
     # TODO: allow user to update timezone
     if request.method == 'GET':
         # create old_form and new_form with duplicate info & present
@@ -433,7 +390,7 @@ def component_replace(request, pk: int):
                 bike=old_cpt.bike,
                 component=old_cpt,
                 description=(f'Replaced after {old_cpt.current_distance()} '
-                             f'{distance_units}')
+                             f'{old_cpt.distance_units_label.lower()}')
                 )
             # complete missing fields in new_cpt
             # form covers name, specification, date_acquired, supplier, notes
@@ -469,8 +426,7 @@ def component_replace(request, pk: int):
               context={'pk': pk, 'cpt': old_cpt,
                        'subcomponents': subcomponents,
                        'old_cpt_form': old_cpt_form,
-                       'new_cpt_form': new_cpt_form,
-                       'distance_units': distance_units}) 
+                       'new_cpt_form': new_cpt_form}) 
 
 
 @login_required(login_url=LOGIN_URL)
@@ -794,7 +750,7 @@ def odometer_readings_new(request, bike_id=None):
             "No bikes found." if bike_id is None else "Bike not found.",
             status=404)
 
-    initial_values = get_odometer_readings_initial_values(request, bikes)
+    initial_values = [{'bike': bike, 'rider': request.user} for bike in bikes]
 
     if request.method == 'POST':
         # process date/time form
@@ -835,19 +791,6 @@ def odometer_readings_new(request, bike_id=None):
     return render(request, 'bike/odometer_readings_new.html',
                   context={'formset': formset, 'dt_form': dt_form,
                            'bike_id': bike_id, 'user': request.user})
-
-
-def get_odometer_readings_initial_values(request, bikes):
-    """ return values for bikes, with user and distance units for each bike """
-    initial_values = [{'bike': bike, 'rider': request.user}
-                      for bike in bikes]
-    try:
-        preferences = Preferences.objects.get(user=request.user)
-        for i in initial_values:
-            i['distance_units'] = preferences.distance_units
-    except Preferences.DoesNotExist:
-        pass
-    return initial_values
 
 
 @login_required(login_url=LOGIN_URL)
@@ -900,31 +843,43 @@ class MaintActionList(BikeLoginRequiredMixin, ListView):
 
 
 def upcoming_maint(user, filter_by_limits=True):
-    distance_units = user.preferences.get_distance_units_display()
     upcoming = MaintenanceAction.upcoming(
         user=user, filter_by_limits=filter_by_limits).select_related('bike')
     for ma in upcoming:
-        ma.due = ma.due_in(distance_units)
+        ma.due = ma.due_in()
     return upcoming
 
 
 class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
     model = MaintenanceAction
     # template_name_suffix = '_create_form'
-    fields = ['bike', 'component', 'maint_type', 'description', 'due_date',
-              'due_distance', 'completed', 'recurring',
+    fields = ['bike', 'component', 'maint_type', 'description',
+              'due_date', 'due_distance', 'completed', 'recurring',
               'maintenance_interval_distance', 'maint_interval_days']
+    # specifying widgets here doesn't seem to work
+    # widgets = {'due_distance': DistanceInputWidget(attrs={"size": 8}),
+    #            'maintenance_interval_distance':
+    #            DistanceInputWidget(attrs={"size": 8})}
 
     def get_form(self, *args, **kwargs):
-        form = super(MaintActionCreate, self).get_form(*args, **kwargs)
+        form = super().get_form(*args, **kwargs)
         form.fields['bike'].queryset = self.request.user.bikes
         form.fields['component'].queryset = self.request.user.components
         form.fields['maint_type'].queryset = \
             self.request.user.maintenance_types
+        for field_name in ('due_distance', 'maintenance_interval_distance'):
+            f = form.fields[field_name]
+            f.widget = DistanceInputWidget(attrs={"size": 8})
+            f.widget.distance_units = (
+                self.request.user.preferences.distance_units_label.lower())
+        log.debug("MaintActionCreate.get_form: due_distance.widget=%s",
+                  form.fields['due_distance'].widget)
+        form.distance_units = (
+            self.request.user.preferences.distance_units_label.lower())
         return form
 
     def get_initial(self):
-        initial = super(MaintActionCreate, self).get_initial()
+        initial = super().get_initial()
         bike_id = self.request.GET.get('bike')
         component_id = self.request.GET.get('component_id')
         if bike_id or component_id:
@@ -934,6 +889,7 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
                 initial['bike'] = bike_id
             if component_id:
                 initial['component'] = component_id
+            initial['user'] = self.request.user
         return initial
 
     def form_valid(self, form):
@@ -946,9 +902,7 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
         return super(MaintActionCreate, self).form_valid(form)
 
     def get_success_url(self):
-        if 'next' in self.request.GET:
-            return self.request.GET['next']
-        return super(MaintActionCreate, self).get_success_url()
+        return self.request.GET.get('next') or super().get_success_url()
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
@@ -985,13 +939,12 @@ def maint_action_update(request, pk: int):
 
     completion_form = MaintCompletionDetailsForm(initial={
         'completed_date': timezone.now().date(),
-        'distance': maintenanceaction.current_bike_odo()})
-    distance_units = request.user.preferences.distance_units_label.lower()
+        'distance': maintenanceaction.current_bike_odo(),
+        'action': maintenanceaction})
     return render(
         request, 'bike/maintenanceaction_form.html',
         context={'form': form, 'maintenanceaction': maintenanceaction,
                  'completion_form': completion_form,
-                 'distance_units': distance_units,
                  'link_formset': link_formset})
 
 
@@ -1004,7 +957,6 @@ def maint_action_complete(request, pk: int):
     maint_action = get_object_or_404(
         MaintenanceAction, pk=pk, user=request.user)
     completion_form = MaintCompletionDetailsForm(request.POST)
-    distance_units = request.user.preferences.distance_units_label.lower()
     if "mark-complete-from-maint-details" not in request.POST:
         # a MaintenanceActionUpdateForm was submitted: validate that first
         maint_action_form = MaintenanceActionUpdateForm(
@@ -1017,7 +969,6 @@ def maint_action_complete(request, pk: int):
                 context={'form': maint_action_form,
                          'maintenanceaction': maint_action,
                          'completion_form': completion_form,
-                         'distance_units': distance_units,
                          'link_formset': link_formset})
         # else:  # MaintenanceActionUpdateForm is valid
         maint_action = maint_action_form.save()
@@ -1037,7 +988,7 @@ def maint_action_complete(request, pk: int):
         completion_form = MaintCompletionDetailsForm(initial={
             'completed_date': timezone.now().date(),
             'distance': maint_action.current_bike_odo(),
-            'distance_units': distance_units})
+            'action': maint_action})
         # or maint_action_form.data[field_name]=new_value
         # for due_distance and for completed
         maint_action_form = MaintenanceActionUpdateForm(instance=maint_action)
@@ -1047,8 +998,7 @@ def maint_action_complete(request, pk: int):
     context = {'form': maint_action_form, 'maintenanceaction': maint_action,
                'completion_form': completion_form,
                'completion_msg': maint_history,
-               'distance_units': distance_units,
-               'due_in': maint_action.due_in(distance_units)
+               'due_in': maint_action.due_in()
                }
     log.info("maint_action_complete: maint_action=%s, maint_action.id=%s",
              maint_action, maint_action.id)
@@ -1073,8 +1023,10 @@ class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
             else reverse("bike:home"))
         context['completion_form'] = MaintCompletionDetailsForm(initial={
             'completed_date': timezone.now().date(),
-            'distance': self.object.current_bike_odo()})
-        return add_maint_action_detail_context_data(context, self.object)
+            'distance': self.object.current_bike_odo(),
+            "due_in": self.object.due_in(),
+            'action': self.object})
+        return context
 
 
 def get_maint_action_detail_queryset(user, pk):
@@ -1085,11 +1037,6 @@ def get_maint_action_detail_queryset(user, pk):
             due_in_duration=MaintenanceAction.due_in_duration
             ).select_related("bike", "component", "component__type",
                              "maint_type", "user__preferences")
-
-def add_maint_action_detail_context_data(context, instance):
-    context['distance_units'] = instance.distance_units_label.lower()
-    context["due_in"] = instance.due_in(instance.distance_units_label.lower())
-    return context
 
 
 class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
@@ -1107,6 +1054,14 @@ class MaintActionDelete(BikeLoginRequiredMixin, DeleteView):
 class MaintHistoryUpdate(BikeLoginRequiredMixin, UpdateView):
     model = MaintenanceActionHistory
     fields = ['description', 'completed_date', 'distance']
+    # widgets = {'distance': DistanceInputWidget(attrs={'size': 8})}
+
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+        f = form.fields["distance"]
+        f.widget = DistanceInputWidget(attrs={'size': 8})
+        f.widget.distance_units = form.instance.distance_units_label.lower()
+        return form
 
     def get_success_url(self):
         try:
@@ -1249,11 +1204,13 @@ def mileage(request, year: Optional[int]=None, bike_id=None):
         monthly_mileage[month] = dict(sorted(month_summary.items()))
     # log.info("monthly_mileage=%s, sel_yrs=%r, prev_yr=%s, next_yr=%s",
     #          monthly_mileage, sel_yrs, prev_yr, next_yr)
+    distance_units = request.user.preferences.distance_units_label.lower()
     return render(request, 'bike/mileage_monthly.html',
                   context={'monthly_mileage': monthly_mileage,
                            'bike': bike, 'bike_id': bike_id,
                            'sel_yrs': sel_yrs_str, 'totals': totals,
                            'mileage_ytd': mileage_ytd,
+                           'distance_units': distance_units,
                            'prev_yr': prev_yr, 'next_yr': next_yr})
 
 
@@ -1285,19 +1242,20 @@ def mileage_graph(request, year: Optional[int]=None):
     rides_cum_total = Ride.cumulative_mileage(request.user, sel_yrs)
     # create cum mileage dict (this version has int keys, need str for template)
     # also convert ride.datetime to a dt.date object
-    cumulative_mileage: Dict[int, Dict[int, Dict[dt.date, float]]] = {}
+    cumulative_mileage: Dict[int, Dict[dt.date, float]] = {}
+    #             {year: {ride.date.date(): ride.cum_distance}}
     for ride in rides_cum_total:
         year = ride.date.year
         if year not in cumulative_mileage:
-            cumulative_mileage[year] = {ride.distance_units: {}}
-        if ride.distance_units not in cumulative_mileage[year]:
-            cumulative_mileage[year][ride.distance_units] = {}
-        cumulative_mileage[year][ride.distance_units][ride.date.date()] = (
+            cumulative_mileage[year] = {}
+        cumulative_mileage[year][ride.date.date()] = (
             ride.cum_distance)
 
     #log.info("cum_mileage=%s", convert_cum_mileage_keys_to_strings(
     #    cumulative_mileage))
-    plot = get_cum_mileage_plot(cumulative_mileage)
+    plot = get_cum_mileage_plot(
+        cumulative_mileage,
+        request.user.preferences.distance_units_label.lower())
     plot_string = plot_as_string(plot)
 
     sel_yrs_str = [str(yr) for yr in sel_yrs]
@@ -1310,7 +1268,8 @@ def mileage_graph(request, year: Optional[int]=None):
 
 
 def get_cum_mileage_plot(
-        cumulative_mileage: Dict[int, Dict[int, Dict[dt.date, float]]]):
+        cumulative_mileage: Dict[int, Dict[dt.date, float]],
+        distance_units: str):
     """return a plot of cumulative mileage.
     The different years are rebased to a single year: a leap year if there's
     one in the range
@@ -1324,26 +1283,25 @@ def get_cum_mileage_plot(
 
     # convert years of cum_mileage into a series
     base_year = get_plot_base_year(list(cumulative_mileage.keys()))
-    for year, year_data in cumulative_mileage.items():
-        for distance_unit, distance_dict in year_data.items():
-            series_name = (
-                f"{year} ({DistanceUnits(distance_unit).name.lower()})")
-            distance_series = [
-                round(cum_distance, 1)
-                for cum_distance in distance_dict.values()]
-            # rebase dates to base_year
-            date_series = [dt.date(base_year, date.month, date.day)
-                           for  date in distance_dict.keys()]
-            # date_strings = [date.strftime("%d/%m/%y")  # for logging only
-            #                for date in date_series]
-            # log.info("plot series %s: %s",
-            #         series_name, list(zip(date_strings, distance_series)))
+    for year, distance_dict in cumulative_mileage.items():
+        series_name = str(year)
+        distance_series = [
+            round(cum_distance, 1)
+            for cum_distance in distance_dict.values()]
+        # rebase dates to base_year
+        date_series = [dt.date(base_year, date.month, date.day)
+                       for  date in distance_dict.keys()]
+        # date_strings = [date.strftime("%d/%m/%y")  # for logging only
+        #                for date in date_series]
+        # log.info("plot series %s: %s",
+        #         series_name, list(zip(date_strings, distance_series)))
 
-            ensure_jan1_data(date_series, distance_series)
-            plt.plot(date_series, distance_series, label=series_name)
+        ensure_jan1_data(date_series, distance_series)
+        plt.plot(date_series, distance_series, label=series_name)
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%-d %b'))
     plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
     x_labels = plt.gca().get_xticklabels()
+    plt.ylabel(distance_units)
     plt.setp(x_labels, rotation=60)  # , horizontalalignment='right')
     plt.grid(which='both')
     plt.legend()
@@ -1421,20 +1379,19 @@ def convert_cum_mileage_keys_to_strings(
 
 
 def annual_mileage_totals(
-        monthly_mileage: Dict[int, Dict[str, Dict[str, float]]], years: List[int]
-        ) -> Dict[str, Dict[str, float]]:
+        monthly_mileage: Dict[int, Dict[str, float]], years: List[int]
+        ) -> Dict[str, float]:
     """ calculate totals by year for included years
-    monthly_mileage is {month: {year: {distance_unit: mileage}}}
-    totals is {year: {distance_unit: mileage}} """
-    totals: Dict[str, Dict[str, float]] = {str(year): {} for year in years}
+    monthly_mileage is {month: {year: mileage}}
+    totals is {year: mileage} """
     # year is a string in monthly_mileage
+    totals: Dict[str, float] = {}
     for mileage in monthly_mileage.values():
-        for year, units_and_dist in mileage.items():
-            for distance_unit, dist in units_and_dist.items():
-                try:
-                    totals[str(year)][distance_unit] += dist
-                except KeyError:
-                    totals[str(year)][distance_unit] = dist
+        for year, dist in mileage.items():
+            try:
+                totals[str(year)] += dist
+            except KeyError:
+                totals[str(year)] = dist
     return totals
 
 

@@ -16,10 +16,9 @@ Maintenance Action History: {{ maintenanceactionhistory }}
 
 Completion details:
 
-<!-- table class="table" -->
-  {{ form }}
-  {{ maintenanceactionhistory.distance_units_label.lower }}
-<!-- /table -->
+<table class="table">
+  {{ form.as_table }}
+</table>
 
   <p>
   <input type="submit" class="btn btn-primary" value="OK">

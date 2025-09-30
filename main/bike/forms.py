@@ -150,6 +150,8 @@ class OdometerForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # css class odometer is defined as width 8
         self.fields['distance'].widget.attrs['class'] = 'odometer'
+        self.fields['distance'].widget.distance_units = (
+            user.preferences.distance_units_label.lower())
 
     # specialised handling of is_valid and save: forms with no distance data
     # are ignored (no validation, and no save)
@@ -194,7 +196,7 @@ OdometerFormSet = modelformset_factory(
     fields=[  # 'rider',
             'bike', 'distance', 'initial_value', 'comment', ],
     #       'date'],
-    widgets={"distance": forms.TextInput(attrs={"size": 8})},
+    widgets={"distance": DistanceInputWidget(attrs={"size": 8})},
     extra=1  # overridden in view
     )
 
@@ -220,10 +222,19 @@ class MaintenanceActionUpdateForm(forms.ModelForm):
                   ]
         widgets = {
             "due_date": forms.DateInput(attrs={"size": 10}),
-            "due_distance": forms.TextInput(attrs={"size": 8}),
-            "maintenance_interval_distance": forms.TextInput(attrs={"size": 8}),
+            "due_distance": DistanceInputWidget(attrs={"size": 8}),
+            "maintenance_interval_distance": DistanceInputWidget(attrs={"size": 8}),
             "maint_interval_days":  DaysDurationInput(attrs={"size": 6}),
            }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user = (self.instance.user if hasattr(self, 'instance')
+                else self.initial['user'])
+        distance_units = user.preferences.distance_units_label.lower()
+        self.fields["due_distance"].widget.distance_units = distance_units
+        self.fields["maintenance_interval_distance"].widget.distance_units = (
+            distance_units)
 
 
 class MaintCompletionDetailsForm(forms.ModelForm):
@@ -233,5 +244,11 @@ class MaintCompletionDetailsForm(forms.ModelForm):
         fields = ['completed_date', 'distance']
         widgets = {
             "completed_date": forms.DateInput(attrs={"size": 10}),
-            "distance": forms.TextInput(attrs={"size": 8}),
+            "distance": DistanceInputWidget(attrs={"size": 8}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        maint_action = self.initial["action"]
+        self.fields['distance'].widget.distance_units = (
+            maint_action.distance_units_label.lower())

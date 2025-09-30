@@ -7,14 +7,14 @@ Component details: {{ component }}
 {% block content %}
 <h1>Component details:</h1>
 <form method='POST'>
-<table class="table table-sm">
-{{ form }}
 {% csrf_token %}
+<table class="table table-sm">
+{{ form.as_table }}
 </table>
 
 {% if component %}
   <p><strong>Age: </strong>
-  {{ component.current_distance|floatformat }} {{ distance_units }}</p>
+  {{ component.current_distance|floatformat }} {{ component.distance_units_label.lower }}</p>
 {% endif %}
 
   <p>

@@ -235,6 +235,10 @@ class Preferences(models.Model):
         return DistanceUnits(self.distance_units).label
 
     @property
+    def ascent_units_label(self) -> str:
+        return AscentUnits2(self.ascent_units).label
+
+    @property
     def track_nearby_search_distance_metres(self):
         """ for use in Leaflet - distances are in metres """
         return DistanceUnits.convert(
@@ -336,7 +340,7 @@ class Ride(models.Model):
 
     @property
     def ascent_units_label(self):
-        return AscentUnits2(self.rider.preferences.ascent_units).label
+        return self.rider.preferences.ascent_units_label
 
     # TODO: is this ever used?
     @property
@@ -345,7 +349,7 @@ class Ride(models.Model):
 
     @property
     def distance_units_label(self):
-        return DistanceUnits(self.rider.preferences.distance_units).label
+        return self.rider.preferences.distance_units_label
 
     def __str__(self):
         return f"{self.date.date()}: {self.description}"
@@ -399,13 +403,12 @@ class Ride(models.Model):
 
     @classmethod
     def mileage_by_month(cls, user, years: Union[int, List[int]], bike_id=None
-                         ) -> Dict[int, Dict[str, Dict[str, float]]]:
+                         ) -> Dict[int, Dict[str, float]]:
         """ return total mileage by month, by year and by mileage unit,
         for a given year [and optionally bike] """
         rides = cls.rides_for_years(user, years, bike_id)
 
-        rides = rides.order_by(
-            'date__month', 'date__year', 'distance_units').all()
+        rides = rides.order_by('date__month', 'date__year').all()
         # monthly mileage: {month: {year: {distanceunit: distance}}}
 
         # monthly_mileage = defaultdict(lambda: defaultdict(Counter))
@@ -413,43 +416,37 @@ class Ride(models.Model):
         # templates won't iterate over defaultdict
         # also template dict lookup doesn't work with numeric keys (year)
         # but iteration over dict.items does work with numeric keys (month)
-        monthly_mileage: Dict[int, Dict[str, Dict[str, float]]] = {}
+        monthly_mileage: Dict[int, Dict[str, float]] = {}
         for ride in rides:
             if ride.distance is not None:
                 month = ride.date.month
                 # template dict lookup doesn't work with numeric keys
                 year = str(ride.date.year)
-                units = ride.distance_units_display
                 if month not in monthly_mileage:
                     monthly_mileage[month] = {}
                 if year not in monthly_mileage[month]:
-                    monthly_mileage[month][year] = {}
-                if units not in monthly_mileage[month][year]:
-                    monthly_mileage[month][year][units] = 0.0
-                monthly_mileage[month][year][units] += ride.distance
+                    monthly_mileage[month][year] = 0.0
+                monthly_mileage[month][year] += ride.distance
 
         return monthly_mileage
 
     @classmethod
     def mileage_ytd(cls, user, years: Union[int, List[int]], bike_id=None,
                     date_now: Optional[dt.datetime]=None  # for testing
-                    ) -> Dict[int, Dict[str, float]]:
+                    ) -> Dict[int, float]:
         rides = cls.rides_for_years(user, years, bike_id)
         now = date_now or dt.datetime.utcnow()
         ytd_filter = Q(date__month__lt=now.month) | Q(
             date__month=now.month, date__day__lte=now.day)
         rides = rides.filter(ytd_filter)
-        mileage_ytd: Dict[int, Dict[str, float]] = {}
+        mileage_ytd: Dict[int, float] = {}
         for ride in rides:
             if ride.distance is None:
                 continue
             year = ride.date.year
-            units = ride.distance_units_display
             if year not in mileage_ytd:
-                mileage_ytd[year] = {}
-            if units not in mileage_ytd[year]:
-                mileage_ytd[year][units] = 0.0
-            mileage_ytd[year][units] += ride.distance
+                mileage_ytd[year] = 0.0
+            mileage_ytd[year] += ride.distance
         return mileage_ytd
 
     @classmethod
@@ -464,7 +461,7 @@ class Ride(models.Model):
         else:
             rides = cls.objects.filter(rider=user, date__year=years)
         if bike_id is not None:
-                rides = rides.filter(bike_id=bike_id)
+            rides = rides.filter(bike_id=bike_id)
         return rides
 
     @classmethod
@@ -475,21 +472,13 @@ class Ride(models.Model):
         # if there's more than one distance unit per year, results won't be
         # converted.
         prev_year = None
-        cum_total: Dict[int, float]
         for ride in rides:
             if ride.date.year != prev_year:
-                if prev_year is not None and len(cum_total) > 1:
-                    log.warning("cumulative mileage for rides with mixed "
-                                "distance units")
                 prev_year = ride.date.year
-                cum_total = {}
-            if ride.distance_units not in cum_total:
-                cum_total[ride.distance_units] = 0.0
+                cum_total = 0.0
             if ride.distance is not None:
-                cum_total[ride.distance_units] += ride.distance
-            ride.cum_distance = cum_total[ride.distance_units]
-        if len(cum_total) > 1:
-            log.warning("cumulative mileage for rides with mixed distance units")
+                cum_total += ride.distance
+            ride.cum_distance = cum_total
         return rides
 
     @staticmethod
@@ -691,6 +680,10 @@ class Component(models.Model):
     def __str__(self):
         return f"{self.type}: {self.name}"
 
+    @property
+    def distance_units_label(self):
+        return self.owner.preferences.distance_units_label
+
     def get_absolute_url(self):
         return reverse('bike:component', kwargs={'pk': self.id})
 
@@ -851,6 +844,10 @@ class MaintenanceAction(MaintIntervalMixin):
     def get_absolute_url(self):
         return reverse('bike:maint', kwargs={'pk': self.id})
 
+    def clean(self):
+        if self.bike is None and self.component is None:
+            raise ValidationError("Either bike or component must be specified.")
+
     @classmethod
     def update_distance_units(cls, user, factor):
         """ bulk update maint_interval_distance and due_distance values,
@@ -965,7 +962,7 @@ class MaintenanceAction(MaintIntervalMixin):
             q |= Q(due_in_duration__lte=prefs.maint_time_limit)
         return upcoming.filter(q)
 
-    def due_in(self, distance_units):
+    def due_in(self):
         """ return a string with "Due in xxx days, xxx <distance units".
         Used after calling Maintaction.upcoming """
         # log.debug("Maintenanceaction.due_in: due_in_duration=%s",
@@ -981,7 +978,7 @@ class MaintenanceAction(MaintIntervalMixin):
         due = [
             (f"{self.due_in_duration.days} days"
              if self.due_in_duration else None),
-            (f"{self.due_in_distance:0.0f} {distance_units}"
+            (f"{self.due_in_distance:0.0f} {self.distance_units_label.lower()}"
              if self.due_in_distance else None)]
         self._due_in = ', '.join(d for d in due if d is not None)
         return self._due_in
@@ -1009,6 +1006,9 @@ class MaintenanceActionHistory(models.Model):
         if self.completed_date is None and self.completed_distance is None:
             raise ValidationError(
                 "Either completion date or distance is required.")
+        if self.bike is None and self.component is None:
+            raise ValidationError(
+                "Either bike or component is required.")
 
     class Meta:
         verbose_name_plural = "Maintenance action history"
