@@ -583,10 +583,13 @@ class Odometer(models.Model):
                                             is_adjustment=False)
         distances = (rides_between.values('bike_id')
             .annotate(sum_distance=Sum('distance')))
-        assert distances.count() == 1, (
-            f"expecting a single distance sum, not {distances}")
-        distance = distances.order_by('bike_id').first()["sum_distance"]
-        log.info("update_adjustment_ride: ride distances=%s", distances)
+        if distances.exists():
+            assert distances.count() == 1, (
+                f"expecting a single distance sum, not {distances}")
+            distance = distances.order_by('bike_id').first()["sum_distance"]
+            #log.info("update_adjustment_ride: ride distances=%s", distances)
+        else:
+            distance = 0.0
         distance = distance + prev_odo.distance - current_odo.distance
         # distances is now prev_odo + rides - current_odo,
         # which is the NEGATIVE of what we need for the adjustment ride
