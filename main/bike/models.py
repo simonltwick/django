@@ -63,11 +63,11 @@ class Bike(models.Model):
         recalculates based on last odometer reading plus subsequent rides. """
 
     def update_current_odo(self):
-        last_odo = Odometer.previous_odo(self.id, timezone.now())
+        """ update the calculated current_odo with the sum of all rides since
+        the last odo reading,  if there was one """
+        last_odo = Odometer.previous_odo(self.pk, timezone.now())
         date_after = last_odo.date if last_odo else None
-        distance_since = list(
-            Ride.distance_after(date_after, self))[0]["distance"]
-        # also contains bike_id, but ignored
+        distance_since = Ride.distance_after(date_after, bike=self)
         if last_odo:
             distance_since += last_odo.distance
         self.current_odo = distance_since
@@ -382,7 +382,8 @@ class Ride(models.Model):
         return self.get_ascent_units_display()
 
     @classmethod
-    def distance_after(cls, when: Optional[dt.datetime], bike=None):
+    def distance_after(cls, when: Optional[dt.datetime],* , bike=None,
+                       user=None) -> float:
         """ return ride distance after a datetime,
         on bike=bike if given, else for all bikes
         Result is a list of dicts with {bike_id:, distance:} """
@@ -392,14 +393,22 @@ class Ride(models.Model):
         if bike is not None:
             query = query.filter(bike=bike)
             # log.info("distance_after(2). query=%s", query)
+        elif user is None:
+            raise ValueError("Ride.distance_after must have user or bike")
+        if user is not None:
+            query = query.filter(rider=user)
         if when is not None:
             query = query.filter(date__gt=when)
             # log.info("distance_after(3). query=%s", query)
-        return (query
-                .order_by('bike_id')
-                .values('bike_id')
-                .annotate(distance=Sum('distance'))
-                )
+        if not query.exists():
+            return 0.0
+        query = (query
+                .order_by('rider_id')
+                .values('rider_id')
+                .annotate(distance=Sum('distance')))
+        assert query.count() == 1, (
+            f"multiple values returned in Ride.distance_after: {query}")
+        return query.first()['distance']
 
     @classmethod
     def mileage_by_month(cls, user, years: Union[int, List[int]], bike_id=None
@@ -505,7 +514,7 @@ class Odometer(models.Model):
 
     @property
     def distance_units_label(self) -> str:
-        return DistanceUnits(self.rider.preferences.distance_units).label
+        return self.rider.preferences.distance_units_label
 
     class Meta:
         verbose_name = 'Odometer reading'
@@ -525,7 +534,7 @@ class Odometer(models.Model):
     def delete(self):
         if self.adjustment_ride:
             self.adjustment_ride.delete()
-        super(Odometer, self).delete()
+        super().delete()
 
     @classmethod
     def ride_updated(cls, ride_date, bike_id):
@@ -572,17 +581,16 @@ class Odometer(models.Model):
                                             date__gt=prev_odo.date,
                                             date__lte=current_odo.date,
                                             is_adjustment=False)
-        distances = list(rides_between.values('distance_units')
-                         .annotate(distance=Sum('distance')))
-        # log.info("update_adjustment_ride: ride distances=%s", distances)
-        distances.append({'distance_units': prev_odo.distance_units,
-                          'distance': prev_odo.distance})
-        distances.append({'distance_units': current_odo.distance_units,
-                          'distance':-current_odo.distance})
-        # distances is now prev_odo + rides - current_odo, maybe in mixed units
+        distances = (rides_between.values('bike_id')
+            .annotate(sum_distance=Sum('distance')))
+        assert distances.count() == 1, (
+            f"expecting a single distance sum, not {distances}")
+        distance = distances.order_by('bike_id').first()["sum_distance"]
+        log.info("update_adjustment_ride: ride distances=%s", distances)
+        distance = distance + prev_odo.distance - current_odo.distance
+        # distances is now prev_odo + rides - current_odo,
         # which is the NEGATIVE of what we need for the adjustment ride
-        total_distance = -DistanceUnits.sum(
-            distances, target_units=current_odo.distance_units)
+        total_distance = -distance
         # log.info("update_adjustment_ride: total_distance=%s", total_distance)
         adj_ride = current_odo.adjustment_ride
         # log.info("update_adjustment_ride(current_odo=%s (adj_ride=%s), "
@@ -593,11 +601,12 @@ class Odometer(models.Model):
                 is_adjustment=True)
         # else:
             # log.info(">update_adjustment_ride: adj_ride_id=%s", adj_ride.id)
+        distance_units = (
+            current_odo.distance_units_label.lower())
         adj_ride.date = current_odo.date
         adj_ride.distance = total_distance
-        adj_ride.distance_units = current_odo.distance_units
         adj_ride.description = "Adjustment for odometer reading %0.1f %s" % (
-            current_odo.distance, prev_odo.distance_units_display)
+            current_odo.distance, distance_units)
         adj_ride.save()
         # log.info("adj_ride=%s, distance %s", adj_ride, adj_ride.distance)
         if current_odo.adjustment_ride is None:
@@ -608,7 +617,7 @@ class Odometer(models.Model):
             current_odo.save()
 
     @classmethod
-    def previous_odo(cls, bike_id, date):
+    def previous_odo(cls, bike_id, date: dt.datetime):
         """ return the previous odometer reading for this bike, or None """
         return (Odometer.objects
                 .filter(bike=bike_id, date__lt=date)
@@ -616,7 +625,7 @@ class Odometer(models.Model):
                 .first())
 
     @classmethod
-    def next_odo(cls, bike_id, date):
+    def next_odo(cls, bike_id, date: dt.datetime):
         """ return the next odometer reading for this bike, or None """
         return (Odometer.objects
                 .filter(bike=bike_id, date__gt=date)
