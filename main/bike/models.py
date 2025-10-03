@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Union
 # from django import contrib
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Sum, F, Q, ExpressionWrapper, fields
 from django.db.models.functions import Now, TruncDate
 from django.urls import reverse
@@ -259,21 +259,29 @@ class Preferences(models.Model):
 
     def save(self, *args, force_insert=False, force_update=False, **kwargs):
         if self.distance_units != self.__original_distance_units:
-            factor = DistanceUnits.conversion_factor(
-                self.__original_distance_units, self.distance_units)
-            log.warning(
-                "Preferences.distance_units changed from %s to %s: applying "
-                "conversion factor=%s",
-                DistanceUnits(self.__original_distance_units).label,
-                self.distance_units_label, factor)
-            Bike.update_distance_units(self.user, factor)
-            MaintenanceType.update_distance_units(self.user, factor)
-            MaintenanceAction.update_distance_units(self.user, factor)
-            self.maint_distance_limit *= factor
-            self.place_nearby_search_distance *= factor
-            self.track_nearby_search_distance *= factor
-        super().save(*args, force_insert=force_insert,
-                     force_update=force_update, **kwargs)
+            self.update_distance_units(*args, force_insert=force_insert,
+                 force_update=force_update, **kwargs)
+        else:
+            super().save(*args, force_insert=force_insert,
+                 force_update=force_update, **kwargs)
+
+    @transaction.atomic()
+    def update_distance_units(self, *args, **kwargs):
+        factor = DistanceUnits.conversion_factor(
+            self.__original_distance_units, self.distance_units)
+        log.warning(
+            "Preferences.distance_units changed from %s to %s: applying "
+            "conversion factor=%s",
+            DistanceUnits(self.__original_distance_units).label,
+            self.distance_units_label, factor)
+        Bike.update_distance_units(self.user, factor)
+        MaintenanceType.update_distance_units(self.user, factor)
+        MaintenanceAction.update_distance_units(self.user, factor)
+        MaintenanceActionHistory.update_distance_units(self.user, factor)
+        self.maint_distance_limit *= factor
+        self.place_nearby_search_distance *= factor
+        self.track_nearby_search_distance *= factor
+        super().save(*args, **kwargs)
 
     @staticmethod
     def conversion_factor_distance(user: User) -> float:
@@ -646,7 +654,7 @@ class ComponentType(models.Model):
                                    blank=True, null=True)
 
     class Meta:
-        # INVALID: causes infinite loop ordering = ['subtype_of']
+        # INVALID: causes infinite loop: ordering = ['subtype_of']
         pass
 
     def __str__(self):
@@ -1050,6 +1058,16 @@ class MaintenanceActionHistory(models.Model):
                                  ).label
         return ''  # can't determine user for distance_units
 
+    @classmethod
+    def update_distance_units(cls, user, factor):
+        """ bulk update maint history.distance values,
+        multiplying by conversion factor """
+        # update distance
+        log.warning("Updating %s.distances * %s", cls.__name__, factor)
+        items = cls.objects.filter(Q(bike__owner=user)|Q(component__owner=user),
+                                   distance__isnull=False)
+        items.update(distance=F('distance') * factor)
+
 
 class ComponentChange(models.Model):
     date = models.DateField(default=dt.date.today, null=True, blank=True)
@@ -1059,63 +1077,3 @@ class ComponentChange(models.Model):
                                          related_name='subcomponent_history')
     description = models.CharField(max_length=200)
     distance = models.FloatField(null=True, blank=True)
-
-# ------ new version of preferences, under development ------
-#
-#
-#
-#
-# UNIT_CONVERSION_FACTOR = {
-#     AscentUnits2.METRES: {AscentUnits2.METRES: 1.0,
-#                           AscentUnits2.FEET: 3.28084,
-#                           DistanceUnits.KILOMETRES: .001,
-#                           DistanceUnits.MILES: 0.000621371},
-#     AscentUnits2.FEET: {AscentUnits2.FEET: 1.0,
-#                         AscentUnits2.METRES: 1.0/3.28084},
-#     DistanceUnits.MILES: {DistanceUnits.MILES: 1,
-#                           DistanceUnits.KILOMETRES: 1.60934,
-#                           AscentUnits2.METRES: 1609.34},
-#     DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 0.621371,
-#                               DistanceUnits.KILOMETRES: 1,
-#                               AscentUnits2.METRES: 1000}
-#     }
-#
-#
-# def from_metres(value: float, unit_type) -> float:
-#     """ convert a value from metres to the chosen unit """
-#     factor = UNIT_CONVERSION_FACTOR[AscentUnits2.METRES][unit_type]
-#     return value * factor
-#
-# def to_metres(value: float, unit_type) -> float:
-#     """ convert a value in the chosen unit to metres """
-#     factor = UNIT_CONVERSION_FACTOR[unit_type][AscentUnits2.METRES]
-#     return value * factor
-
-# class Prefs2(models.Model):
-#     distance_unit = models.SmallIntegerField(
-#         choices=DistanceUnits, default=DistanceUnits.MILES)
-#     # distance_unit.label gives a str representation
-#     distance_metres = models.FloatField() # always stored in metres
-#
-#     # TODO: can these conversions be done as a DB function?
-#     # https://stackoverflow.com/questions/17682567/how-to-add-a-calculated-field-to-a-django-model
-#     @property
-#     def distance(self) -> float:
-#         """ return distance in preferred units """
-#         return from_metres(self.distance_metres, self.distance_unit)
-#
-#     @distance.setter
-#     def distance(self, value: float):
-#         """ set distance from a value in preferred units """
-#         self.distance_metres = to_metres(value, self.distance_unit)
-#
-#     @property
-#     def distance_unit_label(self)-> str:
-#         return DistanceUnits(self.distance_unit).label
-
-# class Prefs3(models.Model):
-#     distance_unit = models.SmallIntegerField(
-#         choices=DistanceUnits, default=DistanceUnits.MILES)
-#     distance = models.FloatField()  # in units of distance_unit
-#     distance_metres = models.Expression(
-#         to_metres(F('distance_unit'), F('distance')))
