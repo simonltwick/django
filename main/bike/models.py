@@ -838,12 +838,13 @@ class MaintenanceAction(MaintIntervalMixin):
     completed = models.BooleanField(default=False)
     due_date = models.DateField(null=True, blank=True, default=dt.date.today)
     due_distance = models.FloatField(null=True, blank=True)
-    # Expressions to be used in .annotate(...).  See upcoming()
+    # Expressions to be used in .annotate(...) and in .due_in.  See upcoming().
+    # They return None if due_date/due_distance is None
     due_in_duration = ExpressionWrapper(
             F('due_date') - TruncDate(Now()),
             output_field=fields.DurationField()
             )
-    due_in_distance = F('due_distance') - F('bike__current_odo')
+    due_in_distance = F('due_distance') - (F('bike__current_odo') or 0)
 
     class Meta:
         unique_together = ('user', 'bike', 'component', 'maint_type',
@@ -859,6 +860,10 @@ class MaintenanceAction(MaintIntervalMixin):
     def clean(self):
         if self.bike is None and self.component is None:
             raise ValidationError("Either bike or component must be specified.")
+        if not (self.description
+                or (self.maint_type and self.maint_type.description)):
+            raise ValidationError("Either description or maintenance type "
+                                  "description must be specified.")
 
     @classmethod
     def update_distance_units(cls, user, factor):
@@ -898,7 +903,7 @@ class MaintenanceAction(MaintIntervalMixin):
                    .all())
         return history
 
-    def maint_completed(
+    def mark_completed(
             self, comp_date: Optional[dt.date]=None,
             comp_distance: Optional[float]=None
             ) -> "MaintenanceActionHistory":
@@ -910,26 +915,27 @@ class MaintenanceAction(MaintIntervalMixin):
         comp_date = comp_date or timezone.now().date()
         comp_distance = comp_distance or self.current_bike_odo()
         history = MaintenanceActionHistory(
-            bike_id=self.bike_id, component_id=self.component_id, action=self,
+            action=self,
+            bike_id=self.bike_id,
+            component_id=self.component_id,
             description=self.description or self.maint_type,
             completed_date=comp_date,
             distance=comp_distance)
         if not self.recurring:
             self.completed = True
         else:
-            if self.maint_interval_days:
-                self.due_date = comp_date + dt.timedelta(
-                    self.maint_interval_days)
-            else:
-                self.due_date = None
-            if self.maintenance_interval_distance:
-                maint_interval_distance = self.maintenance_interval_distance
-                self.due_distance = comp_distance + maint_interval_distance
-            else:
-                self.due_distance = None
+            self._update_maint_due(comp_date, comp_distance)
         history.save()
         self.save()
         return history
+
+    def _update_maint_due(self, comp_date, comp_distance):
+        """ after maintenance, update the due_date and due_distance, if set """
+        if self.maint_interval_days and comp_date:
+            self.due_date = comp_date + dt.timedelta(self.maint_interval_days)
+        if self.maintenance_interval_distance and comp_distance:
+            self.due_distance = (
+                comp_distance + self.maintenance_interval_distance)
 
     def current_bike_odo(self):
         bike = self.bike
@@ -960,8 +966,8 @@ class MaintenanceAction(MaintIntervalMixin):
             ))
         if filter_by_limits:
             return cls.apply_prefs_limits(upcoming, user)
-        else:
-            return upcoming
+        # else:
+        return upcoming
 
     @classmethod
     def apply_prefs_limits(cls, upcoming, user):
@@ -974,8 +980,9 @@ class MaintenanceAction(MaintIntervalMixin):
             q |= Q(due_in_duration__lte=prefs.maint_time_limit)
         return upcoming.filter(q)
 
-    def due_in(self):
+    def due_in(self) -> str:
         """ return a string with "Due in xxx days, xxx <distance units".
+        Returns '' if no due_distance/due_date is set.
         Used after calling Maintaction.upcoming """
         # log.debug("Maintenanceaction.due_in: due_in_duration=%s",
         #           self.due_in_duration)

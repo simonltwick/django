@@ -5,6 +5,11 @@ Maintenance Action: {{ maintenanceaction }}
 {% endblock %}
 
 {% block content %}
+{% comment %}
+  Required context:  maintenanceaction, next_url,
+  completion_msg|None OR completion_form,
+  (if completed, completion_msg should be there and completion_form not reqd)
+{% endcomment %}
 <h1>Maintenance Action: {{ maintenanceaction }}</h1>
 
 
@@ -44,16 +49,11 @@ Component Type:
 
 {% if maintenanceaction.completed %}<p>This action is complete.</p>{% endif %}
 
-{% if maintenanceaction.due_date or maintenanceaction.due_distance %}
-  <p>Due in {{ due_in|default_if_none:"?" }}
-  {% if maintenanceaction.due_distance %}
-    at {{ maintenanceaction.due_distance|default_if_none:"-" }} {{ maintenanceaction.user.preferences.distance_units_label.lower }} 
-  {% endif %}
-  {% if maintenanceaction.due_date %}
-  {{ maintenanceaction.due_date|default_if_none:"-" }}
-  {% endif %}
-  </p>
+{% with due_in=maintenanceaction.due_in %}
+{% if due_in %}
+  <p>Due in {{ due_in }}</p>
 {% endif %}
+{% endwith  %}
 
 {% if maintenanceaction.recurring %}
   <p>Recurs every 

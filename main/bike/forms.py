@@ -237,18 +237,19 @@ class MaintenanceActionUpdateForm(forms.ModelForm):
             distance_units)
 
 
-class MaintCompletionDetailsForm(forms.ModelForm):
+class MaintCompletionDetailsForm(forms.Form):
     error_css_class = "text-danger"
-    class Meta:
-        model = MaintenanceActionHistory
-        fields = ['completed_date', 'distance']
-        widgets = {
-            "completed_date": forms.DateInput(attrs={"size": 10}),
-            "distance": DistanceInputWidget(attrs={"size": 8}),
-        }
+    completed_date = forms.DateField(widget=forms.DateInput(attrs={'size': 10}))
+    distance = forms.FloatField(
+        widget=DistanceInputWidget(attrs={"size": 8}))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        maint_action = self.initial["action"]
+        try:
+            maint_action = self.initial["action"]
+        except KeyError as e:
+            raise ValueError("MaintCompletionDetailsForm requires action="
+                             " to be specified") from e
         self.fields['distance'].widget.distance_units = (
             maint_action.distance_units_label.lower())
+        

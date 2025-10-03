@@ -3,12 +3,13 @@
 import csv
 import datetime as dt
 import logging
-from typing import List, Tuple, Optional, Dict, Union
+from typing import List, Tuple, Optional, Dict, Union, TYPE_CHECKING
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum, Q, Max, Count
+from django.db.models import Sum, Q, Max
+from django.db.utils import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -18,7 +19,6 @@ from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic.list import ListView
 from django.views.generic.detail import DetailView
 # from django.views.generic.dates import MonthArchiveView
-
 
 from .models import (
     Bike, Ride, ComponentType, Component, Preferences, MaintenanceAction,
@@ -31,8 +31,9 @@ from .forms import (
     MaintenanceActionUpdateForm, MaintCompletionDetailsForm,
     OdometerFormSet, OdometerAdjustmentForm, DateTimeForm,
     MaintActionLinkFormSet, ComponentForm)
-from django.db.utils import IntegrityError
 
+if TYPE_CHECKING:
+    from django.db.models.query import QuerySet
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -413,7 +414,7 @@ def component_replace(request, pk: int):
                 maint_action.save()
 
             repl_maint_action.save()
-            repl_maint_action.maint_completed()  # saves maint_action & history
+            repl_maint_action.mark_completed()  # saves maint_action & history
 
             next_url = request.GET.get('next') or reverse('bike:home')
             return HttpResponseRedirect(next_url)
@@ -836,7 +837,7 @@ class MaintActionList(BikeLoginRequiredMixin, ListView):
         return upcoming_maint(self.request.user)
 
 
-def upcoming_maint(user, filter_by_limits=True):
+def upcoming_maint(user, filter_by_limits=True) -> "QuerySet":
     upcoming = MaintenanceAction.upcoming(
         user=user, filter_by_limits=filter_by_limits).select_related('bike')
     for ma in upcoming:
@@ -866,8 +867,6 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
             f.widget = DistanceInputWidget(attrs={"size": 8})
             f.widget.distance_units = (
                 self.request.user.preferences.distance_units_label.lower())
-        log.debug("MaintActionCreate.get_form: due_distance.widget=%s",
-                  form.fields['due_distance'].widget)
         form.distance_units = (
             self.request.user.preferences.distance_units_label.lower())
         return form
@@ -909,6 +908,7 @@ class MaintActionCreate(BikeLoginRequiredMixin, CreateView):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def maint_action_update(request, pk: int):
     maintenanceaction = get_object_or_404(MaintenanceAction, pk=pk,
                                           user=request.user)
@@ -943,21 +943,20 @@ def maint_action_update(request, pk: int):
 
 
 @login_required
+@require_http_methods(["POST"])
 def maint_action_complete(request, pk: int):
     """ mark a maintenance action as complete """
-    if request.method == "GET":
-        return HttpResponse("Invalid method", status=405)
-
     maint_action = get_object_or_404(
         MaintenanceAction, pk=pk, user=request.user)
-    completion_form = MaintCompletionDetailsForm(request.POST)
+    completion_form = MaintCompletionDetailsForm(
+        request.POST, initial={"action": maint_action})
     if "mark-complete-from-maint-details" not in request.POST:
         # a MaintenanceActionUpdateForm was submitted: validate that first
         maint_action_form = MaintenanceActionUpdateForm(
             request.POST, instance=maint_action)
         link_formset = MaintActionLinkFormSet(
             request.POST, instance=maint_action)
-        if not maint_action_form.is_valid():
+        if not maint_action_form.is_valid() and link_formset.is_valid():
             return render(
                 request, 'bike/maintenanceaction_form.html',
                 context={'form': maint_action_form,
@@ -965,42 +964,44 @@ def maint_action_complete(request, pk: int):
                          'completion_form': completion_form,
                          'link_formset': link_formset})
         # else:  # MaintenanceActionUpdateForm is valid
-        maint_action = maint_action_form.save()
-        if link_formset.is_valid():
-            link_formset.save(commit=False)
-            for link_form in link_formset:
-                link_form.instance.maint_action = maint_action
-            link_formset.save()
-    # now, we are going to validate the completion form and mark complete,
-    # returning a maint details instance
-    # get augmented maint action details plus context for detail template
-    maint_action = get_maint_action_detail_queryset(request.user, pk).first()
-    if completion_form.is_valid():
-        comp_date = completion_form.cleaned_data['completed_date']
-        comp_distance = completion_form.cleaned_data['distance']
-        maint_history = maint_action.maint_completed(comp_date, comp_distance)
-        completion_form = MaintCompletionDetailsForm(initial={
-            'completed_date': timezone.now().date(),
-            'distance': maint_action.current_bike_odo(),
-            'action': maint_action})
-        # or maint_action_form.data[field_name]=new_value
-        # for due_distance and for completed
-        maint_action_form = MaintenanceActionUpdateForm(instance=maint_action)
-    else:
-        maint_history = ''
+        maint_action = save_maint_action_form(maint_action_form, link_formset)
 
-    context = {'form': maint_action_form, 'maintenanceaction': maint_action,
-               'completion_form': completion_form,
-               'completion_msg': maint_history,
-               'due_in': maint_action.due_in()
-               }
-    log.info("maint_action_complete: maint_action=%s, maint_action.id=%s",
-             maint_action, maint_action.id)
-    context["next_url"] = (
-        request.POST["next"] if "next" in request.POST
-        else reverse("bike:home"))
+    return handle_maint_action_completion_form(
+        request, completion_form, maint_action)
+
+
+def handle_maint_action_completion_form(request, completion_form, maint_action):
+    """ validate the completion form and mark complete """
+    if completion_form.is_valid():
+        maint_action_history = maint_action.mark_completed(
+            comp_date=completion_form.cleaned_data['completed_date'],
+            comp_distance=completion_form.cleaned_data['distance'])
+        messages.success(request, "Marked as completed.")
+    else:
+        log.error("completion form was not valid: %s", completion_form.errors)
+        maint_action_history = None
+
+    # refresh maint_action in order to recalculate due_in_distance/duration
+    maint_action = get_maint_action_detail_queryset(
+        request.user, maint_action.pk).first()
     return render(
-        request, 'bike/maintenanceaction_detail.html', context=context)
+        request, 'bike/maintenanceaction_detail.html', context={
+           'maintenanceaction': maint_action,
+           'completion_form': completion_form,
+           'completion_msg': maint_action_history,
+           'next_url': request.POST.get("next", reverse_lazy("bike:home"))
+           })
+
+
+def save_maint_action_form(maint_action_form, link_formset
+                           ) -> MaintenanceAction:
+    """ save a validated maintenance action form, and any links """
+    maint_action = maint_action_form.save()
+    link_formset.save(commit=False)
+    for link_form in link_formset:
+        link_form.instance.maint_action = maint_action
+    link_formset.save()
+    return maint_action
 
 
 class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
@@ -1018,12 +1019,13 @@ class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
         context['completion_form'] = MaintCompletionDetailsForm(initial={
             'completed_date': timezone.now().date(),
             'distance': self.object.current_bike_odo(),
-            "due_in": self.object.due_in(),
             'action': self.object})
         return context
 
 
-def get_maint_action_detail_queryset(user, pk):
+def get_maint_action_detail_queryset(user, pk) -> "QuerySet":
+    """ return a queryset (of one entry) of maintenanceaction matching user,pk
+    """
     return MaintenanceAction.objects.filter(
         user=user, pk=pk
         ).annotate(

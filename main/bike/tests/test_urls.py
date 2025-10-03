@@ -52,7 +52,7 @@ class BikeUrlTest(TestCase):
         self.maint = MaintenanceAction.objects.create(
             bike=self.bike, user=self.user, recurring=True)
         self.maint.save()
-        self.maint_history = self.maint.maint_completed(comp_distance=99.0)
+        self.maint_history = self.maint.mark_completed(comp_distance=99.0)
 
         self.client = Client(raise_request_exception=True)
         self.client.login(username='tester', password='testpw')
