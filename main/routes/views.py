@@ -230,7 +230,8 @@ def _encode_track_search(request, cleaned_data
     if (boundary_name := cleaned_data.get("boundary_name")):
         boundary_category = cleaned_data.get("boundary_category")
         boundary_search_q = BoundarySearchQ(request.user, boundary_category,
-                                            location__within=boundary_name)
+                                            track__crosses=boundary_name)
+        # overlaps, touches, intersects, crosses all possible
         boundary_polygon = json.loads(
             serialize("geojson", [boundary_search_q.boundary]))
         q.append(boundary_search_q)
@@ -259,7 +260,7 @@ def _do_track_search(request, cleaned_data) -> JsonResponse:
     tracks = Track.objects.filter(query_json.Q(), user=request.user)
 
     result_count = tracks.count()
-    result_limit = request.user.routes_preferences.track_search_result_limit
+    result_limit = request.user.preferences.track_search_result_limit
     tracks=tracks[:result_limit]
     tracks_json = json.loads(serialize("geojson", tracks))
     query_as_json = query_json.json()

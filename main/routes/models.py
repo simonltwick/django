@@ -258,7 +258,7 @@ class Track(models.Model):
     def __str__(self):
         s = self.name or self.start_time or "unnamed Track"
         if self.moving_distance:
-            preferred_distance_units = self.user.routes_preference.distance_units
+            preferred_distance_units = self.user.preferences.distance_units
             distance = DistanceUnits.convert(
                 self.moving_distance/1000.0,
                 DistanceUnits.KILOMETRES, preferred_distance_units)

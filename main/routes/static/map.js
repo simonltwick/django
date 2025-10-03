@@ -19,6 +19,7 @@ let boundariesLayer; // initialised in makeMapLayers
 /* ------ initialisation ------ */
 let tracksHidden = [];
 let dialog = document.getElementById("map-dialog");
+let initialPlaces;  // init. in showInitialMapContent
 
 const map = makeMap();
 makeMapLayers();
@@ -170,9 +171,9 @@ function showInitialMapContent() {
 // show initial tracks/places, or if none, show welcome dialog
 	const initialTracks = JSON.parse(document.getElementById('initialTracks'
 		).textContent);
-	const initialPlaces = JSON.parse(document.getElementById('initialPlaces'
-		).textContent);
-	
+	initialPlaces = JSON.parse(document.getElementById('initialPlaces'
+				).textContent);
+	// initialPlaces is used later in buildPlaceIconDict
 	if (initialTracks) {
 		showTracks(initialTracks);
 	} else if (initialPlaces) {
@@ -446,7 +447,7 @@ function getNearbyMarkers(search_history) {
 					opacity: 0.5,
 					fill: false})];
 	} else if ("BoundarySearchQ" in search_history) {
-		console.warning("BoundarySearchQ marker not yet implemented");
+		console.warn("BoundarySearchQ marker not yet implemented");
 	}
 	return null;
 }
@@ -516,7 +517,9 @@ function showTracks(trackList, nearbyMarkers) {
 		style: styles.track,
 		onEachFeature: onTrackShow
 	});
-	nearbyMarkers.forEach(function(marker) {marker.addTo(tracksLayer)});
+	if (nearbyMarkers) { 
+		nearbyMarkers.forEach(function(marker) {marker.addTo(tracksLayer)});
+	}
 	tracksHidden = [];
 	// showSidebarSection(true, 'track');
 	tracksLayer = replaceMapOverlay(oldTracksLayer, tracksLayer, "Tracks");
@@ -721,7 +724,9 @@ function showPlaces(data, nearbyMarkers) {
 		pointToLayer: getPlaceMarker,
 		onEachFeature: onPlaceShow
 	});
-	nearbyMarkers.forEach(function(marker) {marker.addTo(placesLayer)});
+	if (nearbyMarkers) {
+		nearbyMarkers.forEach(function(marker) {marker.addTo(placesLayer)});
+	}
 	// showSidebarSection(true, 'place');
 	placesLayer = replaceMapOverlay(oldPlacesLayer, placesLayer, "Places");
 	setMapBounds();
@@ -1074,7 +1079,10 @@ function showMapDialog(data) {
 	dialog.showModal();
 }
 
-function onCloseMapDialog() {
+function onCloseMapDialog(event) {
+	if (event) {
+		L.DomEvent.stopPropagation(event);
+	}
 	document.getElementById("map-dialog").close();
 }
 
