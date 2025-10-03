@@ -834,7 +834,7 @@ class MaintenanceType(MaintIntervalMixin):
             maintenance_interval_distance=F('maintenance_interval_distance') *
             factor)
 
-    # @property  # @contrib.admin.display(ordering='user')
+    # @property
     def user_preferences_distance_units(self):
         return self.user.preferences.distance_units
 
