@@ -278,6 +278,7 @@ class Preferences(models.Model):
         MaintenanceType.update_distance_units(self.user, factor)
         MaintenanceAction.update_distance_units(self.user, factor)
         MaintenanceActionHistory.update_distance_units(self.user, factor)
+        Odometer.update_distance_units(self.user, factor)
         self.maint_distance_limit *= factor
         self.place_nearby_search_distance *= factor
         self.track_nearby_search_distance *= factor
@@ -642,6 +643,14 @@ class Odometer(models.Model):
                 .filter(bike=bike_id, date__gt=date)
                 .order_by('date')
                 .first())
+
+    @classmethod
+    def update_distance_units(cls, user, factor):
+        """ bulk update odometer distance values multiplying by
+        conversion factor """
+        log.warning("Updating %s.distances * %s", cls.__name__, factor)
+        items = cls.objects.filter(rider=user, distance__isnull=False)
+        items.update(distance=F('distance') * factor)
 
 
 class ComponentType(models.Model):
