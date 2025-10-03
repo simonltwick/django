@@ -12,17 +12,22 @@ Bikes
 {% for bike in bikes %}
 {% if forloop.first %}
 <table class="table">
-<tr><th></th><th>last ride</th>
-    <th>{{ monthname }}</th><th>{{ today.year }}</th>
-	<th>total</th><th>units</th>
-    <th>maint</th>
+<tr><th>Bike</th><th>last ride</th>
+    <th>{{ monthname }}<br><small class="text-muted">{{ distance_units }}</small></th>
+    <th>{{ today.year }}<br><small class="text-muted">{{ distance_units }}</small></th>
+	<th>total<br><small class="text-muted">{{ distance_units }}</small></th>
+	<th>maint</th>
 </tr>
 {% endif %}
 
 <tr>
   <td><a href="{% url 'bike:bike' bike.id %}">{{ bike.name }}</a>
   </td>
-  <td>{{ bike.last_ridden.date|default:"" }}</td>
+  <td>{% if bike.last_ridden %}
+    {% if bike.last_ride_id %}<a href="{% url 'bike:ride' bike.last_ride_id %}">{% endif %}
+  	{{ bike.last_ridden.date }}</a>
+  {% else %}-{% endif %}
+  </td>
     {# loop through all mileage distance_units for each of 4 columns #}
   </td>
     {% if bike.mileage %}
@@ -35,11 +40,8 @@ Bikes
   <td>{% for entry in bike.mileage %}
 	  {{ entry.distance|floatformat|default:"" }}<br />
       {% endfor %}</td>
-  <td>{% for entry in bike.mileage %}
-	  {{ bike.distance_units_label|default:"" }}<br />
-      {% endfor %}</td>
     {% else %}
-    <td></td><td></td><td></td><td></td>
+    <td></td><td></td><td></td>
     {% endif %}
   <td>{% for maint in bike.maint_upcoming %}
       {% if forloop.first %}<ul>{% endif %}

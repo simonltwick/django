@@ -8,7 +8,7 @@ from typing import List, Tuple, Optional, Dict, Union, TYPE_CHECKING
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum, Q, Max
+from django.db.models import Sum, Q, Max, Subquery, OuterRef
 from django.db.utils import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
@@ -80,8 +80,13 @@ def bikes(request):
                    distance_month=sum_month,
                          )
                )
+    latest_ride = Subquery(Ride.objects.filter(
+        bike_id=OuterRef("id"), is_adjustment=False, rider=request.user,
+        ).order_by("-date").values('pk')[:1])
+
     bikes = bikes.annotate(
-        last_ridden=Max('rides__date', filter=Q(rides__is_adjustment=False))
+        last_ridden=Max('rides__date', filter=Q(rides__is_adjustment=False)),
+        last_ride_id=latest_ride  # pk of latest ride
         ).order_by('-last_ridden').all()
     # bikes is a queryset of dicts, one for each bike/distance_unit combo
     # log.info("mileage=%s", mileage)
@@ -98,9 +103,11 @@ def bikes(request):
         except AttributeError:
             bike.maint_upcoming = [entry]
     monthname = today.strftime('%b')  # eg. Jan
-    return render(request, 'bike/bikes.html',
-                  context={'bikes': bikes, 'today': today,
-                           'monthname': monthname})
+    return render(
+        request, 'bike/bikes.html', context={
+            'bikes': bikes, 'today': today, 'monthname': monthname,
+            'distance_units': 
+            request.user.preferences.distance_units_label.lower()})
 
 
 @login_required(login_url=LOGIN_URL)
