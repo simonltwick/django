@@ -230,8 +230,10 @@ def _encode_track_search(request, cleaned_data
     if (boundary_name := cleaned_data.get("boundary_name")):
         boundary_category = cleaned_data.get("boundary_category")
         boundary_search_q = BoundarySearchQ(request.user, boundary_category,
-                                            track__crosses=boundary_name)
+                                            track__intersects=boundary_name)
         # overlaps, touches, intersects, crosses all possible
+        # not crosses (has to cross boundary so excludes fully enclosed)
+        # not overlaps, touches (none found)
         boundary_polygon = json.loads(
             serialize("geojson", [boundary_search_q.boundary]))
         q.append(boundary_search_q)

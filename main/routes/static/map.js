@@ -337,9 +337,10 @@ function onRoutesSearch() {
 	}
 }
 
-function onRefreshBoundaryNames() {
+function onRefreshBoundaryNames(event) {
 	/* update the boundary names select field in the search dialog, 
 	corresponding to the chosen boundary category */
+	L.DomEvent.stopPropagation(event);
 	let boundaryCategory = $("#id_boundary_category").find(":selected").text();
 	requestUrl = '/routes/api/boundary/category/' + boundaryCategory + '/names'
 	$.get(requestUrl, null, refreshBoundaryNames, 'html').fail(requestFailMsg);
@@ -351,7 +352,7 @@ function refreshBoundaryNames(data) {
 }
 
 function onSearchFormSubmit(event, joinType) {
-	event.preventDefault();
+	L.DomEvent.stopPropagation(event);
 	let searchType = document.getElementById("tracks-search"
 		).classList.contains("active") ? 'track': 'place'
 	let params = {search_type: searchType, join: joinType};
