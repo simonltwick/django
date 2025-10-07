@@ -690,11 +690,11 @@ class BoundaryDeleteView(BikeLoginRequiredMixin, DeleteView):
 def boundary_category_names(request, category:str):
     """ return boundary names in a given category, formatted as <option>s for
     a select statement """
-    instances = Boundary.objects.filter(user=request.user, category=category).all()
+    results = (Boundary.objects.filter(user=request.user, category=category)
+                 .values_list("id", "name"))
     options = ['<option value="" selected>-select name(s)-</option>']
     options.extend(
-        [f'<option value="{inst.pk}">{inst.name}</option>'
-         for inst in instances.all()])
+        [f'<option value="{pk}">{name}</option>' for pk, name in results])
     return HttpResponse('\n'.join(options), status=200)
 
 

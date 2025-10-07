@@ -319,7 +319,7 @@ class Boundary(models.Model):
         return polygon
 
     @classmethod
-    def get_category_choices(cls) -> List[Tuple[int, str]]:
+    def get_category_choices(cls) -> List[Tuple[str, str]]:
         """ return the distinct values of boundary categories, as 2-tuple.
         The category name is also the key ([0] as well as the value [1],
         so that the name is returned in form POST data """
