@@ -1,13 +1,14 @@
 from django import forms
+from django.contrib.auth.models import User
 from django.forms import modelformset_factory, inlineformset_factory
 from django.utils.dateparse import parse_duration
 import datetime as dt
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 from .models import (
-    Component, Ride, Odometer, MaintenanceAction, MaintenanceActionHistory,
-    Preferences, MaintActionLink)
+    Component, Ride, Odometer, MaintenanceAction, MaintActionLink,
+    Preferences)
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -69,6 +70,18 @@ class DistanceInputWidget(forms.NumberInput):
         return ctx
 
 
+class AscentInputWidget(forms.NumberInput):
+    """ expects & renders a variable {{ distance_units }} after the input field
+    self.distance_units has to be initialised by the form's __init__ """
+    template_name = "ascent_input_widget.html"
+    ascent_units = "(ascent_units unset)"
+
+    def get_context(self, name, value, attrs) -> Dict:
+        ctx = super().get_context(name, value, attrs)
+        ctx["ascent_units"] = self.ascent_units
+        return ctx
+
+
 class PreferencesForm(forms.ModelForm):
     error_css_class = "text-danger"
 
@@ -123,9 +136,24 @@ class RideForm(forms.ModelForm):
         fields = ['bike', 'date', 'distance',
                   'ascent', 'description', ]
         widgets = {
-            'distance': forms.TextInput(attrs={"size": 6}),
-            'ascent': forms.TextInput(attrs={"size": 6}),
+            'distance': DistanceInputWidget(attrs={"size": 6}),
+            'ascent': AscentInputWidget(attrs={"size": 6}),
             'description': forms.Textarea()}
+
+    def __init__(self, *args, user: Optional[User]=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if user is None:
+            try:
+                user = kwargs["instance"].rider
+            except KeyError:
+                pass
+        if user is not None:
+            distance_units = user.preferences.distance_units_label.lower()
+            ascent_units = user.preferences.ascent_units_label.lower()
+        else:
+            distance_units = ascent_units = "?units?"
+        self.fields["distance"].widget.distance_units = distance_units
+        self.fields["ascent"].widget.ascent_units = ascent_units
 
 
 class OdometerAdjustmentForm(forms.ModelForm):

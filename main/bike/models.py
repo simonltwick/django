@@ -17,29 +17,6 @@ from django.utils import timezone
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-""" Migration to common stored distance unit:
-Pilot using Ride.Ascent.  Steps:
-      Standardise on Preferences.distance_units and .ascent_units: remove them
-      from ride, odometer & ensure forms display distance units from prefs.
-      (Done)
-      The field in the Db has to be the same as what's in the form, so we cannot
-      simply have the DB field in metres and the form field in a different unit.
-      Try to define simpler ways of presenting distances with units
-      - widget class for distance, with Widget.__init__ copying the instance or
-        the distance_units_label (example:
-        https://stackoverflow.com/questions/1226590/django-how-can-i-access-the-form-field-from-inside-a-custom-widget/2135739#2135739
-        )
-     Remove complicated summing & conversion of ride totals in different units
-     from the view & the form, simply sum in regular units.
-     Test that these work.
-     Merge the Routes preferences properties (in a separate form tab) into
-     the same Preferences model.   Distances have to be in a separate form tab
-     from the distance units, in case units are changed.   And preferences
-     distances will have to be auto-converted if distance units are changed,
-     and the form redisplayed.
-     Optimise DB calls to get preferences & pass to templates
-"""
-
 
 class Bike(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -344,17 +321,8 @@ class Ride(models.Model):
         unique_together = ('rider', 'date', 'bike', 'description')
 
     @property
-    def ascent_units(self):
-        return self.rider.preferences.ascent_units
-
-    @property
     def ascent_units_label(self):
         return self.rider.preferences.ascent_units_label
-
-    # TODO: is this ever used?
-    @property
-    def distance_units(self):
-        return self.rider.preferences.distance_units
 
     @property
     def distance_units_label(self):
@@ -364,13 +332,13 @@ class Ride(models.Model):
         return f"{self.date.date()}: {self.description}"
 
     def get_absolute_url(self):
-        return reverse('bike:ride', kwargs={'pk': self.id})
+        return reverse('bike:ride', kwargs={'pk': self.pk})
 
     def save(self, *args, **kwargs):
         """ update odometer adjustment ride(s), if any """
         # update odo adj ride for "old" bike if bike has been changed
         try:
-            old_ride = Ride.objects.get(id=self.id)
+            old_ride = Ride.objects.get(id=self.pk)
             old_bike = old_ride.bike
         except Ride.DoesNotExist:
             old_bike = None
@@ -388,7 +356,7 @@ class Ride(models.Model):
 
     @property
     def ascent_units_display(self):
-        return self.get_ascent_units_display()
+        return self.ascent_units_label.lower()
 
     @classmethod
     def distance_after(cls, when: Optional[dt.datetime],* , bike=None,

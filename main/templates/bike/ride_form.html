@@ -8,31 +8,7 @@ Ride details: {{ ride }}
 <h1>Ride details:</h1>
 <form method='POST'>
 {% csrf_token %}
-{{ form.non_field_errors }}
-{% for hidden in form.hidden_fields %}
-{{ hidden.errors }}
-{{ hidden }}
-{% endfor %}
-
-<table class="table">
-{% for field in form.visible_fields %}
-  {% if field.name == 'distance_units' or field.name == 'ascent_units' %}
-  {# skip - handled elsewhere #}
-  {% else %}
-  <div class="fieldWrapper">
-    <tr><th>{{ field.label_tag }}</th>
-    <td>{{ field.errors }}
-    {{ field }}
-    {% if field.name == 'distance' %} {{ ride.distance_units_label.lower }}
-    {% elif field.name == 'ascent' %}
-      {{ form.ascent_units.errors }} {{ ride.ascent_units_label.lower }}
-    {% endif %}
-    </td></tr>
-  </div>
-  {% endif %}
-{% endfor %}
-</table>
-
+<table class="table">{{ form.as_table}}</table>
 
 {% if ride %}
   {% url 'bike:ride' ride.id as save_url %}
