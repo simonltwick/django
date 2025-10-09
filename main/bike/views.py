@@ -8,9 +8,10 @@ from typing import List, Tuple, Optional, Dict, Union, TYPE_CHECKING
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 from django.db.models import Sum, Q, Max, Subquery, OuterRef
 from django.db.utils import IntegrityError
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, HttpRequest
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -34,6 +35,7 @@ from .forms import (
 
 if TYPE_CHECKING:
     from django.db.models.query import QuerySet
+    from django import forms
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -604,19 +606,22 @@ class RidesList(BikeLoginRequiredMixin):
     entries = Ride.objects
     plural_name = 'rides'
     template_name = 'bike/rides.html'
+    form: "forms.Form"
 
     @classmethod
     def as_view(cls):
         return cls.dispatch
 
+    def __init__(self, request: HttpRequest, bike_id: Optional[int]=None):
+        self.request = request
+        self.bike_id = bike_id
+
     @classmethod
     def dispatch(cls, request, bike_id=None):
-        inst = cls()
-        inst.request = request
-        inst.bike_id = bike_id
+        inst = cls(request, bike_id)
         if request.method == 'POST':
             return inst.POST()
-        elif request.method == 'GET':
+        if request.method == 'GET':
             return inst.GET()
         raise ValueError(f"Invalid method {request.method}")
 
@@ -625,28 +630,18 @@ class RidesList(BikeLoginRequiredMixin):
             self.request.POST,
             bikes=Bike.objects.filter(owner=self.request.user).all())
         if form.is_valid():
-            entries = (self.entries.filter(rider=self.request.user)
-                       .exclude(distance__range=(-0.01, 0.01)))
-            bike = form.cleaned_data['bike']
-            if bike:
-                entries = entries.filter(bike=bike)
-            start_date = form.cleaned_data['start_date']
-            if start_date:
+            if (bike := form.cleaned_data['bike']):
+                self.entries = self.entries.filter(bike=bike)
+            if (start_date := form.cleaned_data['start_date']):
                 start_date = dt.datetime.combine(start_date, dt.time(0),
                                                  tzinfo=CURRENT_TIMEZONE)
-                entries = entries.filter(date__gte=start_date)
-            end_date = form.cleaned_data['end_date']
-            if end_date:
+                self.entries = self.entries.filter(date__gte=start_date)
+            if (end_date := form.cleaned_data['end_date']):
                 end_date = dt.datetime.combine(end_date, dt.time(23, 59, 59),
                                                tzinfo=CURRENT_TIMEZONE)
-                entries = entries.filter(date__lte=end_date)
-            entries = entries.order_by('-date')
-            num_entries = form.cleaned_data['max_entries']
-            if num_entries:
-                # log.info("Applying filter num_rides=%d", num_rides)
-                entries = entries[:num_entries]
+                self.entries = self.entries.filter(date__lte=end_date)
+            max_entries = form.cleaned_data['max_entries']
             # log.info("request.GET=%s", request.GET)
-            self.entries = entries
 
             if not self.entries.exists():
                 form.add_error(
@@ -654,44 +649,50 @@ class RidesList(BikeLoginRequiredMixin):
                     f"No {self.plural_name} found matching those criteria.")
             elif self.request.GET.get('action') == 'download_as_csv':
                 log.info("csv download requested")
-                if self.plural_name != 'rides':
-                    return HttpResponse(
-                        "CSV download not supported for {plural_name}",
-                        status=501)
-                fields = ['date', 'bike', 'distance', 'distance_units_label',
-                          'ascent', 'ascent_units_label', 'description']
-                return csv_data_response(
-                    self.request, 'rides.csv', entries, fields)
-        else:
-            self.entries = self.entries.filter(
-                rider=self.request.user).order_by('-date')[:20]
-        totals = self.get_ride_totals()
-        return render(self.request, self.template_name,
-                      context={'form': self.form, 'entries': self.entries,
-                               'totals': totals, 'user': self.request.user})
+                return self.download_as_csv()
+
+            return self.complete_response(max_entries)
+
+        # else:  # form not valid
+        return self.complete_response()
+
+    def download_as_csv(self):
+        if self.plural_name != 'rides':
+            return HttpResponse(
+                f"CSV download not supported for {self.plural_name}",
+                status=501)
+        fields = ['date', 'bike', 'distance', 'distance_units_label',
+                  'ascent', 'ascent_units_label', 'description']
+        self.entries = (self.entries.filter(rider=self.request.user)
+                        .exclude(distance__range=(-0.01, 0.01))
+                        .order_by('-date'))
+        return csv_data_response(
+            self.request, 'rides.csv', self.entries, fields)
 
     def GET(self):
-        self.entries = self.entries.filter(rider=self.request.user)
         if self.bike_id is not None:
             self.entries = self.entries.filter(bike_id=self.bike_id)
-        entries = self.entries = self.entries.order_by('-date')[:20]
-
-        if entries.exists():
-            # can't use .last() or [-1]
-            start_date = entries[len(entries) -1].date
-            end_date = max(entries.first().date, timezone.now())
-        else:
-            start_date = end_date = None
-
-        initial = {'start_date': start_date, 'end_date': end_date}
         if self.bike_id is not None:
-            initial['bike'] = self.bike_id
+            initial = {'bike': self.bike_id}
+        else:
+            initial = {}
         self.form = RideSelectionForm(
             bikes=Bike.objects.filter(owner=self.request.user).all(),
             initial=initial)
+        return self.complete_response()
+
+    def complete_response(self, max_entries: Optional[int]=None):
+        self.entries = (self.entries.filter(
+            rider=self.request.user)
+            .exclude(distance__range=(-0.01, 0.01))
+            .order_by('-date'))
+        paginator = Paginator(
+            self.entries, max_entries or RideSelectionForm.INITIAL_MAX_ENTRIES)
+        page_number = self.request.GET.get("page")
+        page_obj = paginator.get_page(page_number)
         totals = self.get_ride_totals()
         return render(self.request, self.template_name,
-                      context={'form': self.form, 'entries': self.entries,
+                      context={'form': self.form, 'page_obj': page_obj,
                                'totals': totals, 'user': self.request.user})
 
 
@@ -737,6 +738,18 @@ class OdometerList(RidesList):
     entries = Odometer.objects
     plural_name = 'odometer readings'
     template_name = 'bike/odometer_readings.html'
+
+    def download_as_csv(self):
+        if self.plural_name != 'odometer readings':
+            return HttpResponse(
+                f"CSV download not supported for {self.plural_name}",
+                status=501)
+        fields = ['date', 'bike', 'distance', 'distance_units_label',
+                  'initial_value', 'comment']
+        self.entries = (self.entries.filter(rider=self.request.user)
+                        .order_by('-date'))
+        return csv_data_response(
+            self.request, 'odometer readings.csv', self.entries, fields)
 
 
 @login_required(login_url=LOGIN_URL)

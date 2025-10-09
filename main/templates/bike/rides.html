@@ -7,12 +7,13 @@ Rides
 {% block content %}
 <h1>Rides</h1>
 
-<form method='POST' action="{{ form_action }}">
+<form id="rides-form" method='POST' action="">
 {% csrf_token %}
 <table class="table-sm">
 <tr><td colspan="8">Rides selection:
-<input type="submit" class="btn btn-link" value="Apply Filter">
-<input type="submit" class="btn btn-link" value="Download as CSV"
+<button type="submit" class="btn btn-outline-primary"
+  formaction="">Apply Filter</button>
+<input type="submit" class="btn btn-outline-secondary" value="Download as CSV"
     formaction="{% url 'bike:rides' %}?action=download_as_csv">
 </td></tr>
 
@@ -31,11 +32,37 @@ Rides
   </div><td>
 {% endfor %}
 </tr></table>
-<br><p>Selected rides:</p>
+<br><p>Selected rides:
+
+<span class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+        	<button type="submit" class="btn btn-link"
+        	formaction="?page=1">&laquo; first</button>
+            <button type="submit" class="btn btn-link"
+            formaction="?page={{ page_obj.previous_page_number }}"
+            >previous</button>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+        	<button type="submit" class="btn btn-link"
+        	formaction="?page={{ page_obj.next_page_number }}"
+        	>next</button>
+        	<button type="submit" class="btn btn-link"
+        	formaction="?page={{ page_obj.paginator.num_pages }}"
+        	>last &raquo;</button>
+        {% endif %}
+    </span>
+</span></p>
+
 </form>
 
 
-{% for ride in entries %}
+{% for ride in page_obj %}
 
 {% if forloop.first %}
   <table class="table table-sm table-hover">
@@ -55,13 +82,12 @@ Rides
     {% endif %}
     {{ ride.description|truncatechars:40 }}</a></td>
   <td>{{ ride.distance|floatformat|default:"-" }}</td>
-  {% if ride.ascent %}
-  <td>{{ ride.ascent|floatformat }}</td>
-  {% endif %}
+  <td>{% if ride.ascent %}{{ ride.ascent|floatformat }}{% endif %}</td>
 </tr>
 
 {% if forloop.last %}
-  {% if totals %}<tr class="table-info"><th>Totals</th>
+  {% if totals %}<tr class="table-info">
+  <th>Totals{% if page_obj.paginator.num_pages > 1 %} (all pages){% endif %}</th>
 	<td>{{ totals.count }} rides</td><td></td>
 	<td>{{ totals.total_distance|floatformat }}</td>
 	<td>{{ totals.total_ascent|floatformat }}</td>

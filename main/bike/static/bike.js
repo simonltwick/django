@@ -26,6 +26,33 @@ function mark_link_deleted(id) {
 		"link.style.textDecoration=", link.style.textDecoration);
 }
 
+
+// error handling
+function requestFailMsg(jqXHR, textStatus, errorThrown) {
+	console.debug("Request failed:",
+		{jqXHR: jqXHR, textStatus: textStatus, errorThrown: errorThrown,
+		 requestURL: requestUrl
+		});
+	if (jqXHR.responseText.startsWith("<!DOCTYPE html>")) {
+		// it's an unexpected html failure message, could be django debug info
+		document.open()
+		document.write(jqXHR.responseText);
+		document.close()
+		return
+	}
+	let msg = jqXHR;
+	if (jqXHR.status) {
+		msg = "Status code " + jqXHR.status + ": " + (jqXHR.responseText ? jqXHR.responseText: jqXHR.statusText);
+	}
+	log_error(msg);
+}
+
+function log_error(msg) {
+	console.error(msg, "; from server request=", requestUrl);
+	console.info("trackSearchHistory=", trackSearchHistory);
+	displayMessage("Error: " + msg, "text-error");
+}
+
 function displayMessage(message, msgClass) {
 	/* display a message in the message area.  msg_class, if provided,
 	is a bootstrap class such as text-info/warning/error/success */

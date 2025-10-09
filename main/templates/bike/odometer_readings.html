@@ -11,9 +11,10 @@ Odometer readings:
 {% csrf_token %}
 <table class="table-sm">
 <tr><td colspan="8">Odometer readings selection:
-<input type="submit" class="btn btn-link" value="Apply Filter">
-<input type="submit" class="btn btn-link" value="Download as CSV"
-    formaction="{% url 'bike:rides' %}?action=download_as_csv">
+<button type="submit" class="btn btn-outline-primary"
+ >Apply Filter</button>
+<input type="submit" class="btn btn-outline-secondary" value="Download as CSV"
+    formaction="?action=download_as_csv">
 </td></tr>
 
 {% if form.non_field_errors %}
@@ -31,11 +32,37 @@ Odometer readings:
   </div><td>
 {% endfor %}
 </tr></table>
-<br><p>Selected readings:</p>
+<br><p>Selected readings:
+
+<span class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <button type="submit" class="btn btn-link"
+        	formaction="?page=1">&laquo; first</button>
+            <button type="submit" class="btn btn-link"
+            formaction="?page={{ page_obj.previous_page_number }}"
+            >previous</button>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <button type="submit" class="btn btn-link"
+        	formaction="?page={{ page_obj.next_page_number }}">next</button>
+        	<button type="submit" class="btn btn-link"
+        	formaction="?page={{ page_obj.paginator.num_pages }}"
+        	>last &raquo;</button>
+        {% endif %}
+    </span>
+</span></p>
+
+
 </form>
 
 
-{% for reading in entries %}
+{% for reading in page_obj %}
 
 {% if forloop.first %}
   <table class="table table-sm table-hover">

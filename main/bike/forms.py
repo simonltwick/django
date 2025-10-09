@@ -27,10 +27,10 @@ class DaysDurationInput(forms.TextInput):
 
 class RideSelectionForm(forms.Form):
     error_css_class = "text-danger"
+    INITIAL_MAX_ENTRIES = 20
     max_entries = forms.IntegerField(
-        required=False, initial=20, min_value=1,
-        label="Maximum number to display",
-        help_text="Leave blank for all.")
+        initial=INITIAL_MAX_ENTRIES, min_value=1,
+        label="Maximum number per page")
     bike = forms.ChoiceField(required=False, choices=[])  # set in constructor
     start_date = forms.DateField(required=False)
     end_date = forms.DateField(required=False)
