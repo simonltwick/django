@@ -1170,7 +1170,7 @@ class SearchQ:
                 searchq_list = SearchQ.list_from_json(user, searchq_list_source)
                 return OrSearchQ(*searchq_list)
             case {"BoundarySearchQ": {"category": category, "key": key,
-                                      "name": name}}:
+                                      "pk": name}}:
                 return BoundarySearchQ(user, category, **{key: name})
             case {"NearbySearchQ": {"lat": lat, "lon": lon, "key": key,
                                     "distance": distance}}:
@@ -1249,19 +1249,19 @@ class BoundarySearchQ(SearchQ):
     def __init__(self, user, boundary_category, **kwargs):
         self.boundary_category = boundary_category
         assert len(kwargs) == 1, f"expecting one keyword arg, not {kwargs}"
-        self._key, self.boundary_name = next(iter(kwargs.items()))
+        self._key, self.boundary_pk = next(iter(kwargs.items()))
         try:
             self.boundary = Boundary.objects.get(
-                user=user, category=boundary_category, pk=self.boundary_name)
+                user=user, category=boundary_category, pk=self.boundary_pk)
         except Boundary.DoesNotExist as e:
             log.error("Boundary pk=%s, category=%s not found",
-                      self.boundary_name, boundary_category)
+                      self.boundary_pk, boundary_category)
             raise ValidationError(
                 "No boundary found with this name and category") from e
 
     def __repr__(self):
         return (f"BoundarySearchQ("
-                f"{self.boundary_category}, {self._key}={self.boundary_name})")
+                f"{self.boundary_category}, {self._key}={self.boundary.name})")
 
     def __eq__(self, other):
         return (self.__class__ == other.__class__ and self.user == other.user
@@ -1273,7 +1273,7 @@ class BoundarySearchQ(SearchQ):
     def json(self) -> Dict[str, Any]:
         return {"BoundarySearchQ": {
             "category": self.boundary_category, "key": self._key,
-            "name": self.boundary_name}}
+            "pk": self.boundary_pk}}
 
 class NearbySearchQ(SearchQ):
     """ Contains a search query for tracks/places within a set distance of a
