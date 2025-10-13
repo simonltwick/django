@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Union
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Sum, F, Q, ExpressionWrapper, fields
+from django.db.models import Sum, F, Q, ExpressionWrapper, fields, Window
 from django.db.models.functions import Now, TruncDate
 from django.urls import reverse
 from django.utils import timezone
@@ -453,18 +453,22 @@ class Ride(models.Model):
     @classmethod
     def cumulative_mileage(cls, user, years: Union[int, List[int]]
                            ) -> List["Ride"]:
-        rides = cls.rides_for_years(user, years).order_by("date").all()
-        #  annotate each ride with cum_mileage in ride distance units
-        # if there's more than one distance unit per year, results won't be
-        # converted.
-        prev_year = None
-        for ride in rides:
-            if ride.date.year != prev_year:
-                prev_year = ride.date.year
-                cum_total = 0.0
-            if ride.distance is not None:
-                cum_total += ride.distance
-            ride.cum_distance = cum_total
+        #  annotate each ride with cum_mileage
+        rides = (cls.rides_for_years(user, years)
+                 .annotate(date__year=F('date__year'))
+                 .annotate(
+                     cum_distance=Window(Sum('distance'),
+                                   partition_by="date__year",
+                                   order_by="date")))
+        
+        # prev_year = None
+        # for ride in rides:
+        #     if ride.date.year != prev_year:
+        #         prev_year = ride.date.year
+        #         cum_total = 0.0
+        #     if ride.distance is not None:
+        #         cum_total += ride.distance
+        #     ride.cum_distance = cum_total
         return rides
 
     @staticmethod
