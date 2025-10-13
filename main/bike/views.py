@@ -10,15 +10,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Sum, Q, Max, Subquery, OuterRef
-from django.db.utils import IntegrityError
+from django.db import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect, HttpRequest
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
-from django.views.generic.edit import CreateView, UpdateView, DeleteView
-from django.views.generic.list import ListView
-from django.views.generic.detail import DetailView
+from django.views.generic import (
+    View, CreateView, UpdateView, DeleteView, ListView, DetailView)
 # from django.views.generic.dates import MonthArchiveView
 
 from .models import (
@@ -607,7 +606,7 @@ def rides_month(request, year, month):
                            'entries': entries})
 
 
-class RidesList(BikeLoginRequiredMixin):
+class RidesList(BikeLoginRequiredMixin, View):
     """ this class is also used for OdometerList """
     # TODO: implement search rides with QuerySet.(description_icontains=xx)
     # TODO: search for year/month with Queryset.filter(date__year=xx)
@@ -615,31 +614,25 @@ class RidesList(BikeLoginRequiredMixin):
     plural_name = 'rides'
     template_name = 'bike/rides.html'
     form: "forms.Form"
+    csv_fields = ['date', 'bike', 'distance', 'distance_units_label',
+                  'ascent', 'ascent_units_label', 'description']
+    csv_filename = 'rides.csv'
 
-    @classmethod
-    def as_view(cls):
-        return cls.dispatch
+    def get(self, request, *args, bike_id: Optional[int] = None, **kwargs):
+        self.get_initial_queryset(bike_id)
+        self.form = RideSelectionForm(
+            bikes=Bike.objects.filter(owner=request.user).all(),
+            initial={"bike": bike_id})
+        return self.complete_response()
 
-    def __init__(self, request: HttpRequest, bike_id: Optional[int]=None):
-        self.request = request
-        self.bike_id = bike_id
-
-    @classmethod
-    def dispatch(cls, request, bike_id=None):
-        inst = cls(request, bike_id)
-        if request.method == 'POST':
-            return inst.POST()
-        if request.method == 'GET':
-            return inst.GET()
-        raise ValueError(f"Invalid method {request.method}")
-
-    def POST(self):
+    def post(self, request, *args, **kwargs):
+        # bike_id kwarg is ignored on a POST because it's selected in the form.
         self.form = form = RideSelectionForm(
             self.request.POST,
-            bikes=Bike.objects.filter(owner=self.request.user).all())
+            bikes=Bike.objects.filter(owner=request.user).all())
+
         if form.is_valid():
-            if (bike := form.cleaned_data['bike']):
-                self.entries = self.entries.filter(bike=bike)
+            self.get_initial_queryset(form.cleaned_data["bike"])
             if (start_date := form.cleaned_data['start_date']):
                 start_date = dt.datetime.combine(start_date, dt.time(0),
                                                  tzinfo=CURRENT_TIMEZONE)
@@ -656,44 +649,24 @@ class RidesList(BikeLoginRequiredMixin):
                     None,
                     f"No {self.plural_name} found matching those criteria.")
             elif self.request.GET.get('action') == 'download_as_csv':
-                log.info("csv download requested")
-                return self.download_as_csv()
+                return csv_data_response(self.request, self.csv_filename,
+                                         self.entries, self.csv_fields)
 
             return self.complete_response(max_entries)
 
         # else:  # form not valid
         return self.complete_response()
 
-    def download_as_csv(self):
-        if self.plural_name != 'rides':
-            return HttpResponse(
-                f"CSV download not supported for {self.plural_name}",
-                status=501)
-        fields = ['date', 'bike', 'distance', 'distance_units_label',
-                  'ascent', 'ascent_units_label', 'description']
+
+    def get_initial_queryset(self, bike_id: Optional[int]):
+        """ as for rides but don't exclude small distance readings """
+        if bike_id not in {None, ''}:
+            self.entries = self.entries.filter(bike_id=bike_id)
         self.entries = (self.entries.filter(rider=self.request.user)
-                        .exclude(distance__range=(-0.01, 0.01))
-                        .order_by('-date'))
-        return csv_data_response(
-            self.request, 'rides.csv', self.entries, fields)
-
-    def GET(self):
-        if self.bike_id is not None:
-            self.entries = self.entries.filter(bike_id=self.bike_id)
-        if self.bike_id is not None:
-            initial = {'bike': self.bike_id}
-        else:
-            initial = {}
-        self.form = RideSelectionForm(
-            bikes=Bike.objects.filter(owner=self.request.user).all(),
-            initial=initial)
-        return self.complete_response()
-
-    def complete_response(self, max_entries: Optional[int]=None):
-        self.entries = (self.entries.filter(
-            rider=self.request.user)
             .exclude(distance__range=(-0.01, 0.01))
             .order_by('-date'))
+
+    def complete_response(self, max_entries: Optional[int]=None):
         paginator = Paginator(
             self.entries, max_entries or RideSelectionForm.INITIAL_MAX_ENTRIES)
         page_number = self.request.GET.get("page")
@@ -703,27 +676,24 @@ class RidesList(BikeLoginRequiredMixin):
                       context={'form': self.form, 'page_obj': page_obj,
                                'totals': totals, 'user': self.request.user})
 
-
     def get_ride_totals(self) -> Dict[str, Union[float,int]]:
         """ compute sum & count of entries  - only for Rides
         for Odometer entries, an empty dict is returned. """
         # uses self.entries already filtered & sliced by GET/POST for rider & bike
 
-        if not self.entries.exists():
-            return {}
-        if not hasattr(self.entries.first(), 'ascent'):
-            return {}  # it's not a Ride (it's an Odometer queryset)
-        totals = self.entries.aggregate(Sum('distance'), Sum('ascent'))
-        if totals["distance__sum"] or totals["ascent__sum"]:
-            return {'total_distance': totals["distance__sum"],
-                    'total_ascent': totals["ascent__sum"],
-                    'count': self.entries.count()}
+        if self.entries.exists() and hasattr(self.entries.first(), 'ascent'):
+            # check entries are Rides (not Odometer readings)
+            totals = self.entries.aggregate(Sum('distance'), Sum('ascent'))
+            if totals["distance__sum"] or totals["ascent__sum"]:
+                return {'total_distance': totals["distance__sum"],
+                        'total_ascent': totals["ascent__sum"],
+                        'count': self.entries.count()}
         return {}
 
 
 def csv_data_response(request, filename, queryset, fields):
-    log.info("csv_data_response: request.headers[accept]=%s",
-             request.headers['accept'])
+    # log.info("csv_data_response: request.headers[accept]=%s",
+    #          request.headers['accept'])
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     log.info("csv_data_response: sending %d records for %s", len(queryset),
@@ -733,8 +703,8 @@ def csv_data_response(request, filename, queryset, fields):
     for row in queryset.all():
         csv_row = [getattr(row, field_name) for field_name in fields]
         writer.writerow(csv_row)
-    log.info("csv_data_response: response=%s, headers=%s", response,
-             response.headers)
+    # log.info("csv_data_response: response=%s, headers=%s", response,
+    #          response.headers)
     return response
 
 
@@ -746,18 +716,16 @@ class OdometerList(RidesList):
     entries = Odometer.objects
     plural_name = 'odometer readings'
     template_name = 'bike/odometer_readings.html'
-
-    def download_as_csv(self):
-        if self.plural_name != 'odometer readings':
-            return HttpResponse(
-                f"CSV download not supported for {self.plural_name}",
-                status=501)
-        fields = ['date', 'bike', 'distance', 'distance_units_label',
+    csv_fields = ['date', 'bike', 'distance', 'distance_units_label',
                   'initial_value', 'comment']
+    csv_filename = 'odometer readings.csv'
+
+    def get_initial_queryset(self, bike_id: Optional[int]):
+        """ as for rides but don't exclude small distance readings """
+        if bike_id not in {None, ''}:
+            self.entries = self.entries.filter(bike_id=bike_id)
         self.entries = (self.entries.filter(rider=self.request.user)
-                        .order_by('-date'))
-        return csv_data_response(
-            self.request, 'odometer readings.csv', self.entries, fields)
+            .order_by('-date'))
 
 
 @login_required(login_url=LOGIN_URL)
