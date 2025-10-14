@@ -36,6 +36,7 @@ urlpatterns = [
     path('maint/<int:pk>/delete', views.MaintActionDelete.as_view(),
          name='maint_delete'),
 
+    path('maint/history', views.MaintenanceActionHistoryList.as_view()),
     path('maint/history/<int:pk>', views.MaintHistoryUpdate.as_view(),
          name='maint_history'),
     path('maint/history/<int:pk>/delete', views.MaintHistoryDelete.as_view(),

@@ -26,6 +26,15 @@ function mark_link_deleted(id) {
 		"link.style.textDecoration=", link.style.textDecoration);
 }
 
+function onLoadMoreMaintHistory(params){
+	// get the requested page of the maint history and load it into the table
+	requestUrl = "/bike/maint/history?" + $.param(params)
+	$.get(requestUrl, null,
+		function(html){$("#maintenance-history").html(html);},
+		"html"
+	).fail(requestFailMsg);
+}
+
 
 // error handling
 function requestFailMsg(jqXHR, textStatus, errorThrown) {

@@ -9,7 +9,8 @@ from typing import Optional, List, Dict, Union
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Sum, F, Q, ExpressionWrapper, fields, Window
+from django.db.models import (
+    Sum, F, Q, ExpressionWrapper, fields, Window, QuerySet)
 from django.db.models.functions import Now, TruncDate
 from django.urls import reverse
 from django.utils import timezone
@@ -874,7 +875,7 @@ class MaintenanceAction(MaintIntervalMixin):
 
     @classmethod
     def history(cls, user, bike_id=None, component_id=None,
-                order_by='-completed_date'):
+                order_by='-completed_date') -> QuerySet:
         """ return a list of maintenance action histories
         ordered by either date or maint action.
         """
@@ -888,8 +889,7 @@ class MaintenanceAction(MaintIntervalMixin):
         history = (MaintenanceActionHistory.objects
                    .filter(action__in=actions)
                    .select_related('action')  # populate action objects
-                   .order_by(order_by)
-                   .all())
+                   .order_by(order_by))
         return history
 
     def mark_completed(

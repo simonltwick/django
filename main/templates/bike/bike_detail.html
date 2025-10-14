@@ -7,11 +7,12 @@ Bike: {{ bike }}
 {% block content %}
 <h1>Bike: {{ bike.name }}</h1>
 <p>{{ bike.description }}</p>
-<p>Calculated odometer: {{ bike.current_odo|floatformat }} {{ bike.distance_units_label.lower }}</p>
+<p>Calculated odometer: {{ bike.current_odo|floatformat }} {{ distance_units }}</p>
 
 {% url 'bike:bike' bike.id as success_url %}
-
+{% with components=bike.components.all %}
 {% include 'bike/bike_extra.html' %}
+{% endwith %}
 
 <a href="{% url 'bike:rides' bike_id=bike.id %}" class="btn btn-secondary">
   Ride history</a>

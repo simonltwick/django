@@ -8,16 +8,11 @@
 {% for subcomponent in components %}
   {% if forloop.first %}
     <table class="table table-sm table-borderless">
-    <tr>
-      <th>Type</th>
-	  <th>Description</th>
-	  <th>Specification</th>
-	</tr>
+    <tr><th>Type</th><th>Description</th><th>Specification</th></tr>
   {% endif %}
 
   {% include 'bike/subcomponent.html' %}
 
   {% if forloop.last %}</table>{% endif %}
-  {% empty %}
-  <p>(no components.)</p>
+  {% empty %}<p>(no components.)</p>
 {% endfor %}

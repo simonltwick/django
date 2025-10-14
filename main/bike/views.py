@@ -3,7 +3,7 @@
 import csv
 import datetime as dt
 import logging
-from typing import List, Tuple, Optional, Dict, Union, TYPE_CHECKING
+from typing import List, Tuple, Optional, Dict, Union, Any, TYPE_CHECKING
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -165,16 +165,24 @@ def get_submitted_prefs_form(request, prefs_form1, prefs_form2, prefs_form3):
             else prefs_form3)  # if prefs_page == '3'
 
 
-class BikeDetail(BikeLoginRequiredMixin, DetailView):
-    model = Bike
+class BikeComponentsMixin:
+    def get_queryset(self) -> "QuerySet":
+        return (Bike.objects
+                .filter(owner=self.request.user)
+                .prefetch_related('components'))
+
+
+class BikeDetail(BikeLoginRequiredMixin, BikeComponentsMixin, DetailView):
+    """ get_queryset from BikeComponentsMixin """
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["distance_units"] = (
+            self.request.user.preferences.distance_units_label.lower())
         context["next_url"] = (
             self.request.GET["next"] if "next" in self.request.GET
             else reverse("bike:home"))
         pk = self.kwargs['pk']
-        context['components'] = Component.objects.filter(bike_id=pk)
         return add_maint_context(context, self.request.user, bike_id=pk)
 
 
@@ -185,16 +193,16 @@ class BikeCreate(BikeLoginRequiredMixin, CreateView):
     def form_valid(self, form):
         obj = form.save(commit=False)
         obj.owner = self.request.user
-        return super(BikeCreate, self).form_valid(form)
+        return super().form_valid(form)
 
     def get_success_url(self):
         if 'next' in self.request.GET:
             return self.request.GET['next']
-        return super(RideCreate, self).get_success_url()
+        return super().get_success_url()
 
 
-class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
-    model = Bike
+class BikeUpdate(BikeLoginRequiredMixin, BikeComponentsMixin, UpdateView):
+    """ get_queryset from BikeComponentsMixin """
     fields = ['name', 'description']
 
     def dispatch(self, request, *args, **kwargs):
@@ -205,6 +213,8 @@ class BikeUpdate(BikeLoginRequiredMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super(BikeUpdate, self).get_context_data(**kwargs)
+        context["distance_units"] = (
+            self.request.user.preferences.distance_units_label.lower())
         pk = self.kwargs['pk']
         context['components'] = Component.objects.filter(bike_id=pk)
         return add_maint_context(context, self.request.user, bike_id=pk)
@@ -232,7 +242,7 @@ def add_maint_context(context: dict, user, bike_id=None, component_id=None):
         ma.due = ma.due_in()
 
     context['maint_history'] = MaintenanceAction.history(
-        user=user, bike_id=bike_id, component_id=component_id)
+        user=user, bike_id=bike_id, component_id=component_id).first()
     return context
 
 
@@ -349,6 +359,8 @@ class ComponentUpdate(BikeLoginRequiredMixin, UpdateView):
 
     def get_context_data(self):
         context = super(ComponentUpdate, self).get_context_data()
+        context["distance_units"] = (
+            self.request.user.preferences.distance_units_label.lower())
         subcomponents = Component.objects.filter(
             subcomponent_of=self.object).all()
         context['subcomponents'] = subcomponents
@@ -998,6 +1010,31 @@ def save_maint_action_form(maint_action_form, link_formset
         link_form.instance.maint_action = maint_action
     link_formset.save()
     return maint_action
+
+
+class MaintenanceActionHistoryList(BikeLoginRequiredMixin, ListView):
+    """ return a list of maintenanceHistory items according to bikeId, cptID
+     and pagination variables page_max and page """
+    model = MaintenanceActionHistory
+    paginate_by = 20
+    template_name = "bike/maint_history_list.html"
+
+    def get_queryset(self) -> "QuerySet":
+        qs = MaintenanceActionHistory.objects.select_related('action').order_by("completed_date")
+        if (bike_id := self.request.GET.get('bike_id')):
+            qs = qs.filter(bike_id=bike_id, bike__owner=self.request.user)
+        if (cpt_id := self.request.GET.get('cpt_id')):
+            qs = qs.filter(component=cpt_id, component__owner=self.request.user)
+        return qs
+
+    def get_context_data(self) -> Dict[str, Any]:
+        """ add distance units to the context """
+        ctx = super().get_context_data()
+        ctx |= {"distance_units":
+            self.request.user.preferences.distance_units_label.lower(),
+            "bike_id": self.request.GET.get('bike_id'),
+            "cpt_id": self.request.GET.get('cpt_id')}
+        return ctx
 
 
 class MaintActionDetail(BikeLoginRequiredMixin, DetailView):
