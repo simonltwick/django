@@ -595,29 +595,6 @@ class RideDelete(BikeLoginRequiredMixin, DeleteView):
         return super(RideDelete, self).dispatch(request, *args, **kwargs)
 
 
-@login_required(login_url=LOGIN_URL)
-def rides_month(request, year, month):
-    """ display rides for a particular month, using the same template as
-    RidesList below, which can then be used to refine the query """
-    entries = Ride.objects.filter(rider=request.user, date__year=year,
-                                  date__month=month)
-    # initialise filter form
-    start_date = dt.date(year=year, month=month, day=1)
-    if month > 11:
-        end_date = dt.date(year=year+1, month=1, day=1)
-    else:
-        end_date = dt.date(year=year, month=month + 1, day=1)
-    end_date -= dt.timedelta(days=1)
-    initial = {'start_date': start_date, 'end_date': end_date,
-               'max_entries': None}
-    form = RideSelectionForm(
-        bikes=Bike.objects.filter(owner=request.user).all(),
-        initial=initial)
-    return render(request, 'bike/rides.html',
-                  context={'form': form, 'form_action': reverse('bike:rides'),
-                           'entries': entries})
-
-
 class RidesList(BikeLoginRequiredMixin, View):
     """ this class is also used for OdometerList """
     # TODO: implement search rides with QuerySet.(description_icontains=xx)
@@ -632,9 +609,13 @@ class RidesList(BikeLoginRequiredMixin, View):
 
     def get(self, request, *args, bike_id: Optional[int] = None, **kwargs):
         self.get_initial_queryset(bike_id)
+        if 'year' in kwargs:
+            initial = self.get_monthly_entries(**kwargs)
+        else:
+            initial = {"bike": bike_id}
         self.form = RideSelectionForm(
             bikes=Bike.objects.filter(owner=request.user).all(),
-            initial={"bike": bike_id})
+            initial=initial)
         return self.complete_response()
 
     def post(self, request, *args, **kwargs):
@@ -677,6 +658,24 @@ class RidesList(BikeLoginRequiredMixin, View):
         self.entries = (self.entries.filter(rider=self.request.user)
             .exclude(distance__range=(-0.01, 0.01))
             .order_by('-date'))
+
+    def get_monthly_entries(self, *_args, year: int, month: Optional[int]=None,
+                            **_kwargs) -> Dict[str, Any]:
+        """ create filter and selection form initial values for a month's
+        entries, or a year's entries if month is not specified """
+        self.entries = self.entries.filter(rider=self.request.user,
+                                           date__year=year)
+        if month is not None:
+            self.entries = self.entries.filter(date__month=month)
+        # initialise filter form
+        start_date = dt.date(year=year, month=month or 1, day=1)
+        if month is None or month > 11:
+            end_date = dt.date(year=year+1, month=1, day=1)
+        else:
+            end_date = dt.date(year=year, month=month + 1, day=1)
+        end_date -= dt.timedelta(days=1)
+        return {'start_date': start_date, 'end_date': end_date,
+                'max_entries': None}
 
     def complete_response(self, max_entries: Optional[int]=None):
         paginator = Paginator(
