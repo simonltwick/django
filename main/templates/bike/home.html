@@ -17,8 +17,8 @@ Home
 
 <p><a class="btn btn-success" href="{% url 'bike:ride_new' %}"
   >Record a ride</a>
-  {% if latest_ride %}&nbsp;&nbsp;<a href="{% url 'bike:ride' latest_ride.pk %}">
-    latest ride: {{ latest_ride.date|date:"D j M" }}</a>
+  {% if latest_ride %}&nbsp;&nbsp;<a href="{% url 'bike:ride' latest_ride.pk %}"
+    >latest ride: {{ latest_ride.date|date:"D j M" }}</a>
   {% endif %}</p>
 
 {% if upcoming_maint %}
