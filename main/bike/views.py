@@ -52,9 +52,12 @@ class BikeLoginRequiredMixin(LoginRequiredMixin):
 def home(request):
     preferences_set = Preferences.objects.filter(user=request.user).exists()
     maint = (upcoming_maint(request.user) if preferences_set else None)
+    latest_ride = (Ride.objects.filter(rider=request.user)
+                   .order_by("-date").first())
     return render(request, 'bike/home.html',
                   context={'preferences_set': preferences_set,
-                           'upcoming_maint': maint})
+                           'upcoming_maint': maint,
+                           'latest_ride': latest_ride})
 
 
 @login_required(login_url=LOGIN_URL)

@@ -15,8 +15,11 @@ Home
 <p>Please <a href="{% url 'bike:preferences_new' %}">set your preferences.</a></p>
 {% endif %}
 
-<p><a class="btn btn-success" href="{% url 'bike:ride_new' %}">
-Record a ride</a></p>
+<p><a class="btn btn-success" href="{% url 'bike:ride_new' %}"
+  >Record a ride</a>
+  {% if latest_ride %}<a href="{% url 'bike:ride' latest_ride.pk %}">
+    &nbsp;&nbsp;latest ride: {{ latest_ride.date|date:"D j M" }}</a>
+  {% endif %}</p>
 
 {% if upcoming_maint %}
 <h3>Upcoming Maintenance
