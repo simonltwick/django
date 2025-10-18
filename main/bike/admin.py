@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
 
 from .models import (
     Component, ComponentType, Ride, Odometer, Preferences,
@@ -10,7 +12,7 @@ admin.site.register(ComponentType)
 # admin.site.register(Ride)
 admin.site.register(Bike)
 admin.site.register(Odometer)
-admin.site.register(Preferences)
+# admin.site.register(Preferences)
 # admin.site.register(MaintenanceAction)
 # admin.site.register(MaintenanceActionHistory)
 
@@ -50,3 +52,20 @@ class MaintActionHistoryAdmin(admin.ModelAdmin):
 class RideAdmin(admin.ModelAdmin):
     readonly_fields=('rider',)
     date_hierarchy='date'
+
+
+# define preferences as an inline form within User Admin
+class PreferencesInline(admin.StackedInline):
+    model = Preferences
+    can_delete = False
+    verbose_name_plural = "preferences"
+
+
+# Define a new User admin
+class UserAdmin(BaseUserAdmin):
+    inlines = [PreferencesInline]
+
+
+# Re-register UserAdmin
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)

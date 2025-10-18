@@ -116,11 +116,15 @@ def bikes(request):
 
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET", "POST"])
-def preferences(request):
+def preferences(request, pk: Optional[int]=None):
     """ allow creation & editing of the user's preferences instance,
     using three forms to separate distance units, bike settings and 
     route settings """
-    prefs = Preferences.objects.get_or_create(user=request.user)[0]
+    if pk is not None and request.user.is_superuser:
+        # superuser can access any preferences
+        prefs = get_object_or_404(Preferences, pk=pk)
+    else:
+        prefs = Preferences.objects.get_or_create(user=request.user)[0]
     if request.method == "GET":
         prefs_form1 = PreferencesForm(instance=prefs)
         prefs_form2 = PreferencesForm2(instance=prefs)

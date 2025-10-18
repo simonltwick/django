@@ -98,8 +98,8 @@ urlpatterns = [
     # path('preferences/new', views.PreferencesCreate.as_view(),
     #      name='preferences_new'),
     path('preferences', views.preferences, name='preferences'),
-    # path('preferences/<int:pk>', views.PreferencesUpdate.as_view(),
-    #      name='preferences'),
+    # admin access to preferences by pk
+    path('preferences/<int:pk>', views.preferences, name='preferences'),
 
     path('login', auth_views.LoginView.as_view(
         template_name='bike/login.html'), name='login'),
