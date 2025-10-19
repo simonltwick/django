@@ -8,11 +8,16 @@ Components
 {% load static %}
 <h1>Components
   <a class="addlink" href="{% url 'bike:component_new' %}">New</a></h1>
+  
+{% regroup components.all by bike as bike_components %}
 
-{% for component in components.all %}
+{% for bike in bike_components %}
+<p>{% if bike.grouper %}<a href="{% url 'bike:bike' bike.grouper.id %}">{{ bike.grouper }}</a>
+  {% else %}{{ bike.grouper|default_if_none:"(no bike)" }}{% endif %}
+</p>
+{% for component in bike.list %}
 {% if forloop.first %}<ul>
 {% endif %}
-
 <li>
   <a href="{% url 'bike:component' component.id %}">
   {{ component.type }}: {{ component.name }}
@@ -20,12 +25,11 @@ Components
   {% if component.subcomponent_of %} 
 	({{ component.subcomponent_of|default:"" }})
   {% endif %}
-  {% if component.bike %} ({{ component.bike|default:"" }})
-  {% endif %}
 </li>
 
 {% if forloop.last %}</ul>
 {% endif %}
+{% endfor %}
 {% empty %}
 <p>No components found :-(</p>
 {% endfor %}
