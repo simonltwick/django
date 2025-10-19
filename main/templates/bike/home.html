@@ -15,7 +15,7 @@ Home
 <p>Please <a href="{% url 'bike:preferences_new' %}">set your preferences.</a></p>
 {% endif %}
 
-<p><a class="btn btn-success" href="{% url 'bike:ride_new' %}"
+<p><a class="btn btn-success" href="{% url 'bike:ride' %}"
   >Record a ride</a>
   {% if latest_ride %}&nbsp;&nbsp;<a href="{% url 'bike:ride' latest_ride.pk %}"
     >latest ride: {{ latest_ride.date|date:"D j M" }}</a>
