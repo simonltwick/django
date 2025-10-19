@@ -12,7 +12,8 @@ Home
 {% if not preferences_set %}
 <h3>Preferences not set</h3>
 <p>Your preferences for distance units have not been set.</p>
-<p>Please <a href="{% url 'bike:preferences_new' %}">set your preferences.</a></p>
+<p>Please <a href="{% url 'bike:preferences_new' %}">set your preferences</a>,
+  in order to show any upcoming maintenance.</p>
 {% endif %}
 
 <p><a class="btn btn-success" href="{% url 'bike:ride' %}"
