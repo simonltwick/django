@@ -13,7 +13,7 @@ Ride details: {{ ride }}
 {% if ride %}
   {% url 'bike:ride' ride.id as save_url %}
 {% else %}
-  {% url 'bike:ride_new' as save_url %}
+  {% url 'bike:ride' as save_url %}
 {% endif %}
 
 <input type="submit" class="btn btn-secondary" value="Apply">

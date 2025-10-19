@@ -76,7 +76,7 @@ class BikeUrlTest(TestCase):
                      context={'ride': self.ride})
         self.try_url(reverse('bike:ride_delete', kwargs={'pk': rid}),
                      context={'ride': self.ride})
-        self.try_url(reverse('bike:ride_new'))
+        self.try_url(reverse('bike:ride'))
 
     def test_maint_action(self):
         maint = self.maint

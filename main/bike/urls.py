@@ -12,8 +12,9 @@ urlpatterns = [
     path('rides/<int:year>/<int:month>', # views.rides_month,
          views.RidesList.as_view(),
          name='rides_month'),
-    path('ride/new', views.ride, name='ride_new'),
-    path('ride/<int:pk>', views.RideUpdate.as_view(), name='ride'),
+    path('ride', views.ride, name='ride'),
+    # path('ride/<int:pk>', views.RideUpdate.as_view(), name='ride'),
+    path('ride/<int:pk>', views.ride, name='ride'),
     path('ride/<int:pk>/delete', views.RideDelete.as_view(),
          name='ride_delete'),
 

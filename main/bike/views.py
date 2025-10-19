@@ -527,7 +527,8 @@ class ComponentTypeDelete(BikeLoginRequiredMixin, DeleteView):
 @login_required(login_url=LOGIN_URL)
 @require_http_methods(["GET", "POST"])
 def ride(request, pk: int=None):
-    ride = None
+    ride = (None if pk is None else
+        get_object_or_404(Ride, rider=request.user, pk=pk))
     if request.method == "GET":
         if pk is None:
             bikes = Bike.objects.filter(
@@ -536,12 +537,13 @@ def ride(request, pk: int=None):
                      }
             form = RideForm(initial=initial, user=request.user)
         else:
-            ride = get_object_or_404(Ride, rider=request.user, pk=pk)
             form = RideForm(instance=ride)
     else: # (POST)
-        form = RideForm(request.POST, user=request.user)
+        form = RideForm(request.POST, instance=ride, user=request.user)
+        log.info("ride: form is_valid=%s", form.is_valid())
         if form.is_valid():
             ride = form.save(commit=False)
+            log.info("ride: ride.pk=%s", ride.pk)
             ride.rider = request.user
             try:
                 # catch duplicate ride exception
@@ -557,38 +559,38 @@ def ride(request, pk: int=None):
                     msg = f"Error saving ride: {e}"
                 form.add_error(None, msg)
     return render(request, "bike/ride_form.html", context={
-        "form": form,
+        "form": form, "ride": ride,
         "bike_id": (None if ride is None else ride.bike.id)
         # bike_id is used for "Add Maint. Action" url 
         })
-
-
-class RideUpdate(BikeLoginRequiredMixin, UpdateView):
-    model = Ride
-    form_class = RideForm
-
-    def dispatch(self, request, *args, **kwargs):
-        if not Ride.objects.filter(pk=kwargs['pk'],
-                                   rider=request.user).exists():
-            return HttpResponse("Unauthorised ride", status=401)
-        return super(RideUpdate, self).dispatch(request, *args, **kwargs)
-
-    def get_form(self, form_class=None):
-        """Return an instance of the form to be used in this view."""
-        if form_class is None:
-            form_class = self.get_form_class()
-        # add user as kwarg
-        return form_class(user=self.request.user, **self.get_form_kwargs())
-
-    def get_context_data(self, **kwargs):
-        context = super(RideUpdate, self).get_context_data(**kwargs)
-        context['bike_id'] = self.object.bike_id
-        return context
-
-    def get_success_url(self):
-        if 'next' in self.request.GET:
-            return self.request.GET['next']
-        return super(RideUpdate, self).get_success_url()
+#
+#
+# class RideUpdate(BikeLoginRequiredMixin, UpdateView):
+#     model = Ride
+#     form_class = RideForm
+#
+#     def dispatch(self, request, *args, **kwargs):
+#         if not Ride.objects.filter(pk=kwargs['pk'],
+#                                    rider=request.user).exists():
+#             return HttpResponse("Unauthorised ride", status=401)
+#         return super(RideUpdate, self).dispatch(request, *args, **kwargs)
+#
+#     def get_form(self, form_class=None):
+#         """Return an instance of the form to be used in this view."""
+#         if form_class is None:
+#             form_class = self.get_form_class()
+#         # add user as kwarg
+#         return form_class(user=self.request.user, **self.get_form_kwargs())
+#
+#     def get_context_data(self, **kwargs):
+#         context = super(RideUpdate, self).get_context_data(**kwargs)
+#         context['bike_id'] = self.object.bike_id
+#         return context
+#
+#     def get_success_url(self):
+#         if 'next' in self.request.GET:
+#             return self.request.GET['next']
+#         return super(RideUpdate, self).get_success_url()
 
 
 class RideDelete(BikeLoginRequiredMixin, DeleteView):
@@ -599,7 +601,7 @@ class RideDelete(BikeLoginRequiredMixin, DeleteView):
         if not Ride.objects.filter(pk=kwargs['pk'],
                                    rider=request.user).exists():
             return HttpResponse("Unauthorised ride", status=401)
-        return super(RideDelete, self).dispatch(request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
 
 
 class RidesList(BikeLoginRequiredMixin, View):
