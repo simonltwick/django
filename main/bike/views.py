@@ -972,7 +972,7 @@ def maint_action_complete(request, pk: int):
             request.POST, instance=maint_action)
         link_formset = MaintActionLinkFormSet(
             request.POST, instance=maint_action)
-        if not maint_action_form.is_valid() and link_formset.is_valid():
+        if not (maint_action_form.is_valid() and link_formset.is_valid()):
             return render(
                 request, 'bike/maintenanceaction_form.html',
                 context={'form': maint_action_form,

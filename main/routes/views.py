@@ -494,6 +494,9 @@ def upload_gpx(request, save: bool=True):
                     return HttpResponse(e, status=400)
                 except FileExistsError as e:
                     duplicate_filenames.append(e.args[0])
+                except UnicodeDecodeError as e:
+                    form.add_error("gpx_file", f"Error decoding {file.name}: {e}")
+                    log.error("Error reading gpx file %s: %r", file.name, e)
 
             if duplicate_filenames:
                 log.warning("uploaded gpx filename(s) already in DB: %s",
@@ -502,7 +505,7 @@ def upload_gpx(request, save: bool=True):
                                "The following track names are already "
                                f"uploaded: {', '.join(duplicate_filenames)}")
             else:
-                if save:
+                if save and form.is_valid():
                     errors = save_uploaded_tracks(request, tracks)
                     for error in errors:
                         form.add_error("gpx_file", error)
