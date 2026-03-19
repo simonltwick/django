@@ -461,7 +461,7 @@ class Ride(models.Model):
                      cum_distance=Window(Sum('distance'),
                                    partition_by="date__year",
                                    order_by="date")))
-        
+
         # prev_year = None
         # for ride in rides:
         #     if ride.date.year != prev_year:
@@ -680,7 +680,8 @@ class Component(models.Model):
         "units from preferences.")
 
     def __str__(self):
-        return f"{self.type}: {self.name}"
+        bike = f"{self.bike} " or ''
+        return f"{bike}{self.type}: {self.name}"
 
     @property
     def distance_units_label(self):
