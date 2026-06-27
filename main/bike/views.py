@@ -417,7 +417,7 @@ def component_replace(request, pk: int):
                 user=request.user,
                 bike=old_cpt.bike,
                 component=old_cpt,
-                description=(f'Replaced after {old_cpt.current_distance()} '
+                description=(f'Replaced after {old_cpt.current_distance():0.2f} '
                              f'{old_cpt.distance_units_label.lower()}')
                 )
             # complete missing fields in new_cpt
