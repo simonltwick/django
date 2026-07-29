@@ -51,6 +51,35 @@ class Bike(models.Model):
         self.current_odo = distance_since
         # log.info("update_current_odo: new value=%s", self.current_odo)
 
+    def handle_odo_reset(self, old_odometer: Optional["Odometer"],
+                         new_odometer: "Odometer"):
+        """ update odo-related fields of components and maint actions """
+        old_odo_distance = self.check_old_odo_distance(old_odometer)
+        for component in self.components:
+            component.update_distances(
+                old_odo_distance, new_odometer.distance)
+            component.update_subcomponentl_distances(
+                old_odo_distance, new_odometer.distance)
+        for maint_action in self.maint_actions:
+            maint_action.update_distances(
+                old_odo_distance, new_odometer.distance)
+
+    def check_old_odo_distance(self, old_odometer: Optional["Odometer"],
+                               new_odometer):
+        """ check we have a valid old_odometer distance & return it.
+        if old_odometer is provided, return the distance from there.
+        If old_odometer is None, then we use the bike.current_odo, but first
+        check that there are no rides recorded at a later datetime than the
+        new_odometer, else the current_odo will be the wrong value. """
+        if old_odometer is not None:
+            assert isinstance(old_odometer, Odometer)
+            return old_odometer.distance
+        if self.rides.filter(date__ge=new_odometer.date).exists():
+            raise ValueError(
+                "Cannot insert an odometer reset before existing rides "
+                "without providing an old odometer reading.")
+        return self.current_odo
+
     @classmethod
     def update_distance_units(cls, user, factor):
         """ bulk update current_odo values multiplying by conversion factor """
@@ -421,6 +450,9 @@ class Ride(models.Model):
     def mileage_ytd(cls, user, years: Union[int, List[int]], bike_id=None,
                     date_now: Optional[dt.datetime]=None  # for testing
                     ) -> Dict[int, float]:
+        """ return ytd mileage for a given year or list of years, up to 
+        the the given date_now in each year (or today's dd/mm if not specified)
+        the result is a dict of {year: distance} """
         rides = cls.rides_for_years(user, years, bike_id)
         now = date_now or dt.datetime.utcnow()
         ytd_filter = Q(date__month__lt=now.month) | Q(
@@ -431,9 +463,11 @@ class Ride(models.Model):
             if ride.distance is None:
                 continue
             year = ride.date.year
-            if year not in mileage_ytd:
-                mileage_ytd[year] = 0.0
-            mileage_ytd[year] += ride.distance
+            try:
+                mileage_ytd[year] += ride.distance
+            except KeyError:
+                mileage_ytd[year] = ride.distance
+
         return mileage_ytd
 
     @classmethod
@@ -540,10 +574,12 @@ class Odometer(models.Model):
         #           self.adjustment_ride)
         if self.initial_value:  # after resetting odo: no adjustment ride
             if self.adjustment_ride:
-                self.adjustment_ride.delete()
+                adj_ride = self.adjustment_ride
+                self.adjustment_ride = None
+                super().save()
+                adj_ride.delete()
                 # log.debug(" >Odometer.update_adjustment_rides: adjustment "
-                #           "ride deleted")
-                self.refresh_from_db()
+                #           "ride for odo.pk=%d deleted", self.pk)
         else:
             prev_odo = self.previous_odo(self.bike_id, self.date)
             if prev_odo:
@@ -729,7 +765,12 @@ class Component(models.Model):
         self.update_distances(old_bike_odo, current_bike_odo)
         self.update_subcomponent_distances(old_bike_odo, current_bike_odo)
 
-    def update_distances(self, old_bike_odo, current_bike_odo):
+    def update_distances(self, old_bike_odo: float, current_bike_odo:float):
+        """ handle a bike odo reset.
+        Retain component "age" by updating start_odo and previous_distance
+        The logic simulates adding to this bike at the time of the odo reset
+        The age before the reset is stored in previous_distance,
+        and the odo after the reset is stored in start_odo """
         # log.debug("updating %d:%s from bike odo %s to %s",
         #           self.pk, self, old_bike_odo, current_bike_odo)
         if old_bike_odo:
@@ -738,6 +779,11 @@ class Component(models.Model):
         # force save so we don't increment previous_distance twice
         self.save(update_fields=[
             'bike', 'subcomponent_of', 'start_odo', 'previous_distance'])
+        # and update any maint actions that do NOT have bike directly specified
+        maint_actions_no_bike = MaintenanceAction.objects.filter(
+            component=self, bike=None)
+        for maint_action in maint_actions_no_bike:
+            maint_action.update_distances(old_bike_odo, current_bike_odo)
 
     def update_subcomponent_distances(
             self, old_bike_odo, current_bike_odo, depth=0):
@@ -778,6 +824,9 @@ class MaintIntervalMixin(models.Model):
 
 
 class MaintenanceType(MaintIntervalMixin):
+    """ describes a type of maintenance associated with a type of component.
+    When a component of that type is created, a maintenance action of this
+    type will also be created for it. """
     # maintenance_interval_distance, maint_interval_days - MaintIntervalMixin
     user = models.ForeignKey(User, on_delete=models.CASCADE,
                              related_name='maintenance_types')
@@ -794,7 +843,7 @@ class MaintenanceType(MaintIntervalMixin):
         return f'{self.component_type} - {self.description}'
 
     def get_absolute_url(self):
-        return reverse('bike:maint_type', kwargs={'pk': self.id})
+        return reverse('bike:maint_type', kwargs={'pk': self.pk})
 
     @classmethod
     def update_distance_units(cls, user, factor):
@@ -846,7 +895,7 @@ class MaintenanceAction(MaintIntervalMixin):
                 f"{self.component or self.bike}")
 
     def get_absolute_url(self):
-        return reverse('bike:maint', kwargs={'pk': self.id})
+        return reverse('bike:maint', kwargs={'pk': self.pk})
 
     def clean(self):
         if self.bike is None and self.component is None:
@@ -855,6 +904,14 @@ class MaintenanceAction(MaintIntervalMixin):
                 or (self.maint_type and self.maint_type.description)):
             raise ValidationError("Either description or maintenance type "
                                   "description must be specified.")
+
+    def update_distances(self, old_odo_distance: float, new_odo_distance: float
+                         ):
+        """ handle an odo reset by adjusting the due_distance. """
+        if self.due_distance is None:
+            return
+        self.due_distance += new_odo_distance - old_odo_distance
+        self.save(update_fields=['due_distance'])
 
     @classmethod
     def update_distance_units(cls, user, factor):
