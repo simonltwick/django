@@ -75,27 +75,22 @@ class TestOdometerAdjustment(TestCase):
         # odo before ride
         self.odo1 = Odometer.objects.create(
             bike=self.bike, rider=self.user,
-            distance=20, distance_units=DistanceUnits.MILES,
-            date=self.now-self.yr)
+            distance=20, date=self.now-self.yr)
         self.odo3 = Odometer.objects.create(
             bike=self.bike2, rider=self.user,
-            distance=100, distance_units=DistanceUnits.MILES,
-            date=self.now-self.yr)
+            distance=100, date=self.now-self.yr)
 
         self.ride = Ride.objects.create(rider=self.user, bike=self.bike,
                                         distance=1,
-                                        date=self.now,
-                                        distance_units=DistanceUnits.MILES)
+                                        date=self.now)
 
         # odo after ride
         self.odo2 = Odometer.objects.create(
             bike=self.bike, rider=self.user,
-            distance=40, distance_units=DistanceUnits.MILES,
-            date=self.now+self.yr)
+            distance=40, date=self.now+self.yr)
         self.odo4 = Odometer.objects.create(
             bike=self.bike2, rider=self.user,
-            distance=150, distance_units=DistanceUnits.MILES,
-            date=self.now+self.yr)
+            distance=150, date=self.now+self.yr)
 
 
 class TestRide(TestOdometerAdjustment):
@@ -113,7 +108,7 @@ class TestRide(TestOdometerAdjustment):
 
         self.ride.bike_id = self.bike2.id
         self.ride.save()
-        
+
         odo2_adjustment_ride.refresh_from_db()
         odo4_adjustment_ride.refresh_from_db()
 
@@ -127,8 +122,7 @@ class TestRide(TestOdometerAdjustment):
             --> adjusts both bike.current_odo """
         ride2 = Ride.objects.create(rider=self.user, bike=self.bike,
                                         distance=7,
-                                        date=self.now + 2 * self.yr,
-                                        distance_units=DistanceUnits.MILES)
+                                        date=self.now + 2 * self.yr)
 
         self.assertEqual(self.bike.current_odo, 47,
                          "bike odo: 47 before changing bike (odo2+ride2)")
@@ -148,32 +142,31 @@ class TestRide(TestOdometerAdjustment):
     def test_mileage_ytd(self):
         """ note that this test will not work if date is within -2 or +4 days
         of year-end, as the dates will not fall in the same year """
-        for distance, time_delta in ((3, -1), (5, -2), (13, +4)):
-            # also have (1, 0) created in setup
+        for time_delta, distance in ((-1, 3), (-2, 5), (+4, 13)):
+            # also have (0, 1) created in setup
             ride_date = self.now + dt.timedelta(days=time_delta)
             assert ride_date.year == self.now.year, (
                 "this test will fail because not all dates fall within the "
-                "same year")
+                "same year.  Please try again after 4 Jan.")
             Ride.objects.create(
                 rider=self.user, bike=self.bike,
                 distance=distance,
-                date=ride_date,
-                distance_units=DistanceUnits.MILES)
+                date=ride_date)
 
-        for date, expected_result in ((None, 9), (-1, 8), (+5, 22)):
-            self.check_mileage_ytd(date, expected_result)
+        for date_delta, expected_result in ((None, 9), (-1, 8), (+5, 22)):
+            with self.subTest(date=date_delta, expected_result=expected_result):
+                self.check_mileage_ytd(date_delta, expected_result)
 
-    def check_mileage_ytd(self, date: Optional[int], expected_result: int):
-        date_now = None if date is None else self.now + dt.timedelta(days=date)
+    def check_mileage_ytd(self, date_delta: Optional[int], expected_result: int):
+        """ check Ride.mileage_ytd for given date_delta """ 
+        date_now = (None if date_delta is None
+                    else self.now + dt.timedelta(days=date_delta))
         ytd1 = Ride.mileage_ytd(
-            self.user, bike=None, years=self.now.year, date_now=date_now)
+            self.user, years=self.now.year, date_now=date_now)
         self.assertIsInstance(ytd1, dict)
         self.assertEqual(len(ytd1), 1)
-        ytd1_this_year = ytd1[self.now.year]
-        self.assertIsInstance(ytd1_this_year, dict)
-        self.assertEqual(len(ytd1_this_year), 1)
-        ytd_miles = next(iter(ytd1_this_year.values()))  # 1st and only value
-        self.assertEqual(ytd_miles, expected_result)
+        ytd_miles_this_year = ytd1[self.now.year]
+        self.assertEqual(ytd_miles_this_year, expected_result)
 
 
 class TestOdometerAdjustmentRides(TestOdometerAdjustment):
@@ -184,6 +177,10 @@ class TestOdometerAdjustmentRides(TestOdometerAdjustment):
         """
 
     def test0_prev_next_odo(self):
+        """ check starting conditions:
+        self.bike has self.odo1 and next_odo is self.odo2.
+            Nothing before self.odo1
+            nothing after self.odo2 """
         self.assertEqual(
             self.odo1.next_odo(self.odo1.bike_id, self.odo1.date), self.odo2)
         self.assertEqual(
@@ -200,8 +197,6 @@ class TestOdometerAdjustmentRides(TestOdometerAdjustment):
         self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
         self.assertIsNotNone(self.odo2.adjustment_ride)
         self.assertEqual(self.odo2.adjustment_ride.distance, 19)
-        self.assertEqual(self.odo2.adjustment_ride.distance_units,
-                         DistanceUnits.MILES)
 
     def test1_update_adjustment_rides_same_units2(self):
         """2 of 4 cases,  odo1 when updating odo2, **odo2 when updating odo1,
@@ -213,8 +208,6 @@ class TestOdometerAdjustmentRides(TestOdometerAdjustment):
         self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
         self.assertIsNotNone(self.odo2.adjustment_ride)
         self.assertEqual(self.odo2.adjustment_ride.distance, 29)
-        self.assertEqual(self.odo2.adjustment_ride.distance_units,
-                         DistanceUnits.MILES)
 
     def test1_update_adjustment_rides_same_units3(self):
         """3 of 4 cases,  odo1 with odo2, odo2 with odo1,
@@ -230,8 +223,6 @@ class TestOdometerAdjustmentRides(TestOdometerAdjustment):
         self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
         self.assertIsNotNone(self.odo2.adjustment_ride, 'unchanged')
         self.assertEqual(self.odo2.adjustment_ride.distance, 19)
-        self.assertEqual(self.odo2.adjustment_ride.distance_units,
-                         DistanceUnits.MILES)
 
     def test1_update_adjustment_rides_same_units4(self):
         """4 of 4 cases,  odo1 with odo2, odo2 with odo1,
@@ -249,56 +240,33 @@ class TestOdometerAdjustmentRides(TestOdometerAdjustment):
         self.assertIsNone(self.odo1.adjustment_ride, 'check unchanged')
         self.assertIsNone(self.odo2.adjustment_ride, 'check deleted')
 
-    def test2_mixed_distance_adjustment_rides1(self):
-        """ mixture of km and miles: odo1 in km """
-        self.odo1.distance_units = DistanceUnits.KILOMETRES
-        self.odo1.distance = 10  # = 6.21371 miles
-        self.odo1.save()
+    # test2 removed - testing odo readings with varying distance units
 
-        self.odo1.refresh_from_db()
-        self.odo2.refresh_from_db()
-        self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
-        expected_distance = 40 - 1 - 6.21371
-        self.assertAlmostEqual(self.odo2.adjustment_ride.distance,
-                               expected_distance, places=3)
-        self.assertEqual(self.odo2.adjustment_ride.distance_units,
-                         DistanceUnits.MILES)
+    def test3_delete_adjustment_ride1(self):
+        """ check correct method for deleting adj. ride without deleting 
+        odo - part 1 - incorrect way """
+        self.assertIsNotNone(self.odo2.adjustment_ride)
+        odo2_pk = self.odo2.pk
+        self.odo2.adjustment_ride.delete()
+        with self.assertRaises(Odometer.DoesNotExist):
+            Odometer.objects.get(pk=odo2_pk)
 
-    def test2_mixed_distance_adjustment_rides2(self):
-        """ mixture of km and miles: odo2 in km """
-        self.odo2.distance_units = DistanceUnits.KILOMETRES
-        self.odo2.distance = 100  # = 62.1371 miles
-        self.odo2.save()
-
-        self.odo1.refresh_from_db()
-        self.odo2.refresh_from_db()
-        self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
-        expected_distance = (62.1371 - 1 - 20) * 1.60934
-        self.assertAlmostEqual(self.odo2.adjustment_ride.distance,
-                               expected_distance, places=3)
-        self.assertEqual(self.odo2.adjustment_ride.distance_units,
-                         DistanceUnits.KILOMETRES)
-
-    def test2_mixed_distance_adjustment_rides3(self):
-        """ mixture of km and miles: ride in km """
-        self.ride.distance_units = DistanceUnits.KILOMETRES
-        self.ride.distance = 1  # = .621371 miles
-        self.ride.save()
-
-        self.odo1.refresh_from_db()
-        self.odo2.refresh_from_db()
-        self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
-        expected_distance = 40 - .621371 - 20
-        self.assertAlmostEqual(self.odo2.adjustment_ride.distance,
-                               expected_distance, places=3)
-        self.assertEqual(self.odo2.adjustment_ride.distance_units,
-                         DistanceUnits.MILES)
+    def test3_delete_adjustment_ride2(self):
+        """ check correct method for deleting adj. ride without deleting odo 
+        - part 2, correct way: set the odo.adjustment_ride to None and save it
+        before deleting the adjustment ride itself """
+        self.assertIsNotNone(self.odo2.adjustment_ride)
+        odo2_pk = self.odo2.pk
+        adj_ride = self.odo2.adjustment_ride
+        self.odo2.adjustment_ride = None
+        super(Odometer, self.odo2).save()
+        adj_ride.delete()
+        odo2 = Odometer.objects.get(pk=odo2_pk)
+        self.assertIsNone(odo2.adjustment_ride)
 
     def test3_alter_odo_initial_setting(self):
         """ setting Odometer.initial_value to True deletes the adjustment ride
         """
-        self.odo1.refresh_from_db()
-        self.odo2.refresh_from_db()
         self.assertIsNone(self.odo1.adjustment_ride, 'unchanged')
         self.assertIsNotNone(self.odo2.adjustment_ride)
 
@@ -313,10 +281,58 @@ class TestOdometerAdjustmentRides(TestOdometerAdjustment):
                              msg="restore adjustment ride if initial=False")
 
 
+class TestUpdateCptDistances(TestOdometerAdjustment):
+    """ tests:
+    - if pass old_odo=None to bike.handle_odo_reset,
+        raise ValueError if rides exist after new_odo datetime
+        else use bike_current_odo
+    - bike's components & subcomponents have age reset to end of last ride,
+        referenced to new odo reading
+        (if an adjustment ride is deleted this will reduce the age)
+    - maintenance actions for bike & components/subcomponents have due_distance
+      reset by reference to new odo reading IF it's the last odo reading. 
+    """
+    def setUp(self):
+        """ set up some components & subcomponents of bike, direct and indirect 
+        from super.setUp, use self.bike, self.odo1, self.ride, self.odo2 """
+        super().setUp()
+        self.cpt1 = Component.objects.create(bike=self.bike, name="cpt1",
+                                             previous_distance=90)
+        self.cpt2 = Component.objects.create(
+            bike=self.bike, name="cpt2", subcomponent_of=self.cpt1, start_odo=1)
+        self.cpt3 = Component.objects.create(
+            name="cpt3", subcomponent_of=self.cpt1, start_odo=5,
+            previous_distance=90)
+
+    def refresh_cpts(self):
+        """ reload the components from the DB """
+        self.cpt1.refresh_from_db()
+        self.cpt2.refresh_from_db()
+        self.cpt2.refresh_from_db()
+
+    def test_replace_odo(self):
+        """ replace odo2 with a reset odo & check the new cpt "ages"(distances)
+        """
+        self.refresh_cpts()
+        self.assertEqual(self.cpt1.current_distance(), 130)
+        self.assertEqual(self.cpt2.current_distance(), 35)
+        self.assertEqual(self.cpt3.current_distance(), 125)
+
+        self.odo2.distance=200
+        self.odo2.initial_value=True
+        self.odo2.save()
+
+        self.refresh_cpts()
+        self.assertEqual(self.cpt1.current_distance(), 190)
+        self.assertEqual(self.cpt2.current_distance(), 39)
+        self.assertEqual(self.cpt3.current_distance(), 129)
+
 class TestMaintenanceAction(TestCase):
     @override_settings(
         PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher', ])
     def setUp(self):
+        """ create user (using simple/fast password hasher)
+        and maint action """
         self.user = User.objects.create(
             username='tester', password=make_password('testpw'))
         self.maint_action = MaintenanceAction.objects.create(
