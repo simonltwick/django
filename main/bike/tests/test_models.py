@@ -28,6 +28,8 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 class TestDistanceUnits(TestCase):
+    """ test we can convert distance units and sum mixed units """
+
     def test_convert(self):
         Dconv = DistanceUnits.convert
         m = DistanceUnits.MILES
@@ -35,8 +37,8 @@ class TestDistanceUnits(TestCase):
 
         self.assertEqual(Dconv(1, m, m), 1, "convert miles to miles")
         self.assertEqual(Dconv(1, km, km), 1, "convert km to km")
-        self.assertEqual(Dconv(1, km, m), 1/1.60934, "convert km to miles")
-        self.assertEqual(Dconv(1, m, km), 1.60934, "convert miles to km")
+        self.assertEqual(Dconv(1, km, m), 0.621371192, "convert km to miles")
+        self.assertEqual(Dconv(1, m, km), 1/0.621371192, "convert miles to km")
 
     def test_sum(self):
         Dsum = DistanceUnits.sum
@@ -48,13 +50,13 @@ class TestDistanceUnits(TestCase):
                                {'distance': 2, 'distance_units': m}],
                               target_units=m), 3, "no conversion")
         self.assertEqual(Dsum([{'distance': 1, 'distance_units': km}],
-                              target_units=m), 1/1.60934, "km to miles")
+                              target_units=m), 0.621371192, "km to miles")
         self.assertEqual(Dsum([{'distance': 1, 'distance_units': m}],
-                              target_units=km), 1.60934, "miles to km")
+                              target_units=km), 1/0.621371192, "miles to km")
         self.assertEqual(Dsum([{'distance': 4, 'distance_units': m},
                                {'distance': 2, 'distance_units': m},
                                {'distance': 1, 'distance_units': km}],
-                              target_units=m), 6 + 1/1.60934,
+                              target_units=m), 6 + 0.621371192,
                          "mixed units sum")
 
 

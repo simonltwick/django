@@ -120,9 +120,10 @@ class DistanceUnits(models.IntegerChoices):
 
     @classmethod
     def conversion_factor(cls, from_units, to_units):
-        factors = {DistanceUnits.MILES: {DistanceUnits.MILES: 1,
-                                         DistanceUnits.KILOMETRES: 1.60934},
-                   DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 0.621371,
+        factors = {DistanceUnits.MILES: {
+            DistanceUnits.MILES: 1,
+            DistanceUnits.KILOMETRES: 1/0.621371192},
+                   DistanceUnits.KILOMETRES: {DistanceUnits.MILES: 0.621371192,
                                               DistanceUnits.KILOMETRES: 1}}
         return factors[from_units][to_units]
 
