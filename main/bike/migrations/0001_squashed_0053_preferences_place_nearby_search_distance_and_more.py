@@ -6,19 +6,37 @@ import django.utils.timezone
 from django.conf import settings
 from django.db import migrations, models
 
+from ..models import AscentUnits2
+
 
 # Functions from the following migrations need manual copying.
 # Move them and any dependencies into this file, then update the
 # RunPython operations to refer to the local versions:
 # bike.migrations.0049_auto_20250913_1451
-## ==>The above migration converts ride units to those in the preferences, but
-##    in a new installation, there will be no pre-existing rides, so this is 
-##    not required.
+##    in a new installation, there will be no pre-existing rides, so this is
+##    probably not required, but included for consistency with Django migration
+##    logic
+def migrate_ride_ascent(apps, _schema_editor):
+    """ manual data migration of bike.ride.ascent to .ascent_metres 
+        copied from bike.migrations.0049_auto_20250913_1451 """
+    # We can't import the Ride model directly as it may be a newer
+    # version than this migration expects. We use the historical version.
+    Ride = apps.get_model("bike", "Ride")
+    for ride in Ride.objects.all():
+        ride.ascent_metres = AscentUnits2.to_metres(ride.ascent_units, ride.ascent)
+        ride.save()
 
 
 class Migration(migrations.Migration):
 
-    replaces = [('bike', '0001_squashed_0047_auto_20250528_2007'), ('bike', '0048_prefs2_ride_ascent_metres_and_more'), ('bike', '0049_auto_20250913_1451'), ('bike', '0050_remove_ride_ascent_units'), ('bike', '0051_remove_componentchange_distance_units_and_more'), ('bike', '0052_delete_prefs2_remove_odometer_distance_units'), ('bike', '0053_preferences_place_nearby_search_distance_and_more')]
+    replaces = [
+        ('bike', '0001_squashed_0047_auto_20250528_2007'),
+        ('bike', '0048_prefs2_ride_ascent_metres_and_more'),
+        ('bike', '0049_auto_20250913_1451'),
+        ('bike', '0050_remove_ride_ascent_units'),
+        ('bike', '0051_remove_componentchange_distance_units_and_more'),
+        ('bike', '0052_delete_prefs2_remove_odometer_distance_units'),
+        ('bike', '0053_preferences_place_nearby_search_distance_and_more')]
 
     initial = True
 
@@ -203,11 +221,11 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'preferences',
             },
         ),
-        ## not required as in an initial migration, there are no Ride instances
-        ## to migrate
-        # migrations.RunPython(
-        #     code=bike.migrations.0049_auto_20250913_1451.migrate_ride_ascent,
-        # ),
+        ## probably not required as in an initial migration, there are no
+        ## Ride instances to migrate
+        migrations.RunPython(
+            code=migrate_ride_ascent,
+        ),
         migrations.RemoveField(
             model_name='ride',
             name='ascent_units',
