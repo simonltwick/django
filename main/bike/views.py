@@ -383,7 +383,7 @@ class ComponentDelete(BikeLoginRequiredMixin, DeleteView):
         if not Component.objects.filter(pk=kwargs['pk'],
                                         owner=request.user).exists():
             return HttpResponse("Unauthorised component", status=401)
-        return super(ComponentDelete, self).dispatch(request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
 
 
 @login_required(login_url=LOGIN_URL)

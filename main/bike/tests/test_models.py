@@ -4,17 +4,17 @@ Created on 29 May 2020
 
 @author: simon
 '''
+from copy import deepcopy
+import datetime as dt
+import logging
+from typing import Optional
+
 from django.test import TestCase, override_settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db.models import F, ExpressionWrapper, fields
 from django.db.models.functions import Now, TruncDate
-
-from copy import deepcopy
-import datetime as dt
-import logging
-from typing import Optional
 
 from ..models import (
     Bike, ComponentType, Component,  # MaintenanceAction,
@@ -31,6 +31,7 @@ class TestDistanceUnits(TestCase):
     """ test we can convert distance units and sum mixed units """
 
     def test_convert(self):
+        """ test the conversion ratios are as expected """
         Dconv = DistanceUnits.convert
         m = DistanceUnits.MILES
         km = DistanceUnits.KILOMETRES
@@ -41,6 +42,7 @@ class TestDistanceUnits(TestCase):
         self.assertEqual(Dconv(1, m, km), 1/0.621371192, "convert miles to km")
 
     def test_sum(self):
+        """ test we can add up distances in different units """
         Dsum = DistanceUnits.sum
         m = DistanceUnits.MILES
         km = DistanceUnits.KILOMETRES
@@ -61,6 +63,7 @@ class TestDistanceUnits(TestCase):
 
 
 class TestOdometerAdjustment(TestCase):
+    """ base class for odo adjustment tests """
 
     @override_settings(
         PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher', ])
@@ -73,26 +76,35 @@ class TestOdometerAdjustment(TestCase):
         self.bike2 = Bike.objects.create(
             name='Test bike 2', description="test2", owner=self.user)
         self.now = timezone.now()
-        self.yr = dt.timedelta(days=365)
         # odo before ride
+        one_year_ago = self.now - dt.timedelta(days=366)
+        two_weeks_ago = self.now - dt.timedelta(days=14)
+        ten_days_ago = self.now - dt.timedelta(days=10)
+        self.one_day = dt.timedelta(days=1)
         self.odo1 = Odometer.objects.create(
             bike=self.bike, rider=self.user,
-            distance=20, date=self.now-self.yr)
+            distance=20, date=one_year_ago)
         self.odo3 = Odometer.objects.create(
             bike=self.bike2, rider=self.user,
-            distance=100, date=self.now-self.yr)
+            distance=100, date=one_year_ago)
+
+        # bike current_odo=20, bike2 current_odo=100
 
         self.ride = Ride.objects.create(rider=self.user, bike=self.bike,
-                                        distance=1,
-                                        date=self.now)
+                                        distance=1, date=two_weeks_ago)
+
+        # bike current_odo=21
 
         # odo after ride
         self.odo2 = Odometer.objects.create(
             bike=self.bike, rider=self.user,
-            distance=40, date=self.now+self.yr)
+            distance=40, date=ten_days_ago)
         self.odo4 = Odometer.objects.create(
             bike=self.bike2, rider=self.user,
-            distance=150, date=self.now+self.yr)
+            distance=150, date=ten_days_ago)
+
+        # bike current_odo 40 but the adjustment ride is is 10 days ago
+        # bike2 current_odo= 150 but the adjustment ride is 10 days ago
 
 
 class TestRide(TestOdometerAdjustment):
@@ -123,8 +135,7 @@ class TestRide(TestOdometerAdjustment):
         """ change the bike for self ride (after last odo reading) to bike2
             --> adjusts both bike.current_odo """
         ride2 = Ride.objects.create(rider=self.user, bike=self.bike,
-                                        distance=7,
-                                        date=self.now + 2 * self.yr)
+                                        distance=7, date=self.now)
 
         self.assertEqual(self.bike.current_odo, 47,
                          "bike odo: 47 before changing bike (odo2+ride2)")
@@ -296,15 +307,28 @@ class TestUpdateCptDistances(TestOdometerAdjustment):
     """
     def setUp(self):
         """ set up some components & subcomponents of bike, direct and indirect 
-        from super.setUp, use self.bike, self.odo1, self.ride, self.odo2 """
+        from super.setUp, use self.bike, self.odo1, self.ride, self.odo2
+        bike has current_odo=40 
+        cpt1 previous_distance=90, start_odo=40 (when added to bike)
+        subcomponents below:
+        - cpt2 start_odo=-39  (when added to bike)
+        - cpt3 start_odo=-35, previous_distance=90 """
         super().setUp()
+        self.cpt_type = ComponentType.objects.create(
+            user=self.bike.owner, type="Widget")
         self.cpt1 = Component.objects.create(bike=self.bike, name="cpt1",
+                                             owner=self.bike.owner,
+                                             type=self.cpt_type,
                                              previous_distance=90)
         self.cpt2 = Component.objects.create(
-            bike=self.bike, name="cpt2", subcomponent_of=self.cpt1, start_odo=1)
+            bike=self.bike, name="cpt2", subcomponent_of=self.cpt1, start_odo=1,
+            type=self.cpt_type, owner=self.bike.owner)
         self.cpt3 = Component.objects.create(
             name="cpt3", subcomponent_of=self.cpt1, start_odo=5,
-            previous_distance=90)
+            type=self.cpt_type, owner=self.bike.owner, previous_distance=80)
+        log.debug("created %s; %s, %s, %s", self.cpt_type, self.cpt1,
+                  self.cpt2, self.cpt3)
+        log.debug(f"%s.setUp() completed", self.__class__.__name__)
 
     def refresh_cpts(self):
         """ reload the components from the DB """
@@ -312,22 +336,83 @@ class TestUpdateCptDistances(TestOdometerAdjustment):
         self.cpt2.refresh_from_db()
         self.cpt2.refresh_from_db()
 
-    def test_replace_odo(self):
-        """ replace odo2 with a reset odo & check the new cpt "ages"(distances)
-        """
-        self.refresh_cpts()
-        self.assertEqual(self.cpt1.current_distance(), 130)
-        self.assertEqual(self.cpt2.current_distance(), 35)
-        self.assertEqual(self.cpt3.current_distance(), 125)
+    def test0_add_cpts(self):
+        """ check components have been added correctly 
+        all cpts get start_odo set to bike.current_odo when added to bike,
+        and current_distance should be equal to previous_distance when added """
+        self.assertEqual(self.bike.current_odo, 40)
+        self.assertEqual(self.cpt1.start_odo, 40)
+        self.assertEqual(self.cpt2.start_odo, 40)
+        self.assertEqual(self.cpt3.start_odo, 40)
+        # current_distance returns previous_distance as no new rides recorded
+        self.assertEqual(self.cpt1.current_distance(), 90)
+        self.assertEqual(self.cpt2.current_distance(), 0)
+        self.assertEqual(self.cpt3.current_distance(), 80)
 
+    def test1_adjust_after_ride(self):
+        """ check that component distance gets increased after a ride """
+        Ride.objects.create(rider=self.user, bike=self.bike,
+                            distance=100, date=self.now)
+        self.assertEqual(self.cpt1.current_distance(), 190)
+        self.assertEqual(self.cpt2.current_distance(), 100)
+        self.assertEqual(self.cpt3.current_distance(), 180)
+
+    def test2_bike_distance(self):
+        """ test the bike_distance() function """
+        # at setup, should be bike.current_odo - cpt.start_odo
+        cpt = self.cpt1
+        distance0 = cpt.bike_distance()
+        current_odo0 = cpt.bike.current_odo
+        self.assertEqual(distance0, cpt.bike.current_odo - cpt.start_odo)
+
+        # after a ride, bike_distance increases by ride.distance
+        ride1 = Ride.objects.create(rider=self.user, bike=self.bike,
+                                    distance=19,
+                                    date=self.now - 9* self.one_day)
+        self.assertEqual(self.bike.current_odo,
+                         current_odo0 + ride1.distance)
+        bike_distance1 = cpt.bike_distance()
+        self.assertEqual(bike_distance1, distance0 + ride1.distance)
+
+        # after an odo reading, distance increases by size of adjustment ride
+        odo2 = Odometer.objects.create(
+            bike=self.bike, rider=self.user,
+            distance=120, date=self.now - 8* self.one_day)
+        self.assertEqual(self.bike.current_odo, odo2.distance)
+        bike_distance2 = cpt.bike_distance()
+        self.assertEqual(bike_distance2,
+                         bike_distance1 + odo2.adjustment_ride.distance)
+
+        # after an odo reset, bike_distance is unchanged
+        odo3 = Odometer.objects.create(
+            bike=self.bike, rider=self.user, initial_value=True,
+            distance=200, date=self.now -7* self.one_day)
+        self.bike.refresh_from_db()
+        self.assertEqual(self.bike.current_odo, odo3.distance)
+        self.assertEqual(cpt.bike_distance(), bike_distance2)
+
+
+    def test3_replace_odo(self):
+        """ replace odo2 with a reset odo & check the new cpt "ages"(distances)
+        Distances should have changed as the adjustment ride has been deleted
+        """
+        log.debug("test_replace_odo: before reset: odo2.adjustment ride=%s,"
+                  " bike.current_odo=%s, cpt1.current_distance=%s",
+                  self.odo2.adjustment_ride.distance,
+                  self.bike.current_odo, self.cpt1.current_distance())
         self.odo2.distance=200
         self.odo2.initial_value=True
         self.odo2.save()
+        self.bike.refresh_from_db()
+        log.debug("test_replace_odo: after reset: odo2.adjustment ride=%s,"
+                  " bike.current_odo=%s, cpt1.current_distance=%s",
+                  self.odo2.adjustment_ride, self.bike.current_odo,
+                  self.cpt1.current_distance())
 
         self.refresh_cpts()
-        self.assertEqual(self.cpt1.current_distance(), 190)
-        self.assertEqual(self.cpt2.current_distance(), 39)
-        self.assertEqual(self.cpt3.current_distance(), 129)
+        self.assertEqual(self.cpt1.current_distance(), 90)
+        self.assertEqual(self.cpt2.current_distance(), 0)
+        self.assertEqual(self.cpt3.current_distance(), 80)
 
 class TestMaintenanceAction(TestCase):
     @override_settings(

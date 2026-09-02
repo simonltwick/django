@@ -20,6 +20,11 @@ log.setLevel(logging.DEBUG)
 
 
 class Bike(models.Model):
+    """ handling of current_odo and adjustment rides:
+        current_odo is intended to keep track of the calculated bike odometer,
+        based on last odo reading plus any subsequent rides.  It's updated by
+        Odometer.save, and by Ride.save, through update_current_odo which
+        recalculates based on last odometer reading plus subsequent rides. """
     name = models.CharField(max_length=100, unique=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='bikes')
@@ -29,16 +34,10 @@ class Bike(models.Model):
         " from preferences.")
 
     def get_absolute_url(self):
-        return reverse('bike:bike', kwargs={'pk': self.id})
+        return reverse('bike:bike', kwargs={'pk': self.pk})
 
     def __str__(self):
         return self.name
-
-    """ handling of current_odo and adjustment rides:
-        current_odo is intended to keep track of the calculated bike odometer,
-        based on last odo reading plus any subsequent rides.  It's updated by
-        Odometer.save, and by Ride.save, through update_current_odo which
-        recalculates based on last odometer reading plus subsequent rides. """
 
     def update_current_odo(self):
         """ update the calculated current_odo with the sum of all rides since
@@ -138,49 +137,6 @@ class DistanceUnits(models.IntegerChoices):
     @classmethod
     def display_name(cls, value: int) -> str:
         return cls(value).name.lower()
-
-# # TODO: remove DistanceMixin.distance_units_display
-# class DistanceMixin(models.Model):
-#     # distance = models.FloatField(null=True, blank=True)
-#     # distance_units = models.PositiveSmallIntegerField(
-#     #     choices=DistanceUnits, default=DistanceUnits.MILES)
-#
-#     class Meta:
-#         abstract = True
-#
-#     @property
-#     def distance_units_display(self):
-#         return self.get_distance_units_display().lower()
-#
-#     def distance_units_label(self) -> str:
-#         return DistanceUnits(self.user.preferences.distance_units).label
-
-# class DistanceRequiredMixin(DistanceMixin):
-#     distance = models.FloatField()
-#
-#     class Meta:
-#         abstract = True
-
-# class AscentUnits0:
-#     METRES = 1
-#     FEET = 2
-#     CHOICES = ((METRES, 'm'), (FEET, 'Ft'))
-#
-#     @classmethod
-#     def conversion_factor(cls, from_units, to_units):
-#         factors = {AscentUnits0.METRES: {AscentUnits0.METRES: 1.0,
-#                                         AscentUnits0.FEET: 3.28084},
-#                    AscentUnits0.FEET: {AscentUnits0.FEET: 1.0,
-#                                       AscentUnits0.METRES: 1.0/3.28084}
-#                    }
-#         return factors[from_units][to_units]
-#
-#     @classmethod
-#     def to_metres(cls, former_unit: "AscentUnits0", value: float) -> float:
-#         if value is None:
-#             return None
-#         factor = cls.conversion_factor(former_unit, AscentUnits0.METRES)
-#         return value * factor
 
 
 class AscentUnits2(models.IntegerChoices):
@@ -338,16 +294,6 @@ class Ride(models.Model):
     bike = models.ForeignKey(Bike, on_delete=models.SET_NULL, null=True,
                              blank=True, related_name='rides')
 
-    # @property
-    # def ascent(self) -> Optional[float]:
-    #     """ take a value in user's preference units and store as ascent_metres
-    #     """
-    #     return  self.ascent_units.from_metres(self.ascent_metres)
-    #
-    # @ascent.setter
-    # def ascent(self, value: Optional[float]):
-    #     self.ascent_metres = self.ascent_units.to_metres(value)
-
     class Meta:
         unique_together = ('rider', 'date', 'bike', 'description')
 
@@ -417,6 +363,21 @@ class Ride(models.Model):
         assert query.count() == 1, (
             f"multiple values returned in Ride.distance_after: {query}")
         return query.first()['distance']
+
+    @classmethod
+    def distance_ridden(bike_id, **filter_kwargs) -> float:
+        """ return total distance ridden on a specific bike filtered by kwargs,
+        for example date range """
+        rides_between = Ride.objects.filter(bike_id=bike_id, **filter_kwargs)
+        distances = (rides_between.values('bike_id')
+                     .annotate(sum_distance=Sum('distance')))
+        if distances.count() == 0:
+            return 0.0
+
+        assert distances.count() == 1, (
+            f"expecting a single distance sum, not {distances}")
+        return distances.order_by('bike_id').first()["sum_distance"]
+
 
     @classmethod
     def mileage_by_month(cls, user, years: Union[int, List[int]], bike_id=None
@@ -516,6 +477,13 @@ class Ride(models.Model):
         instance.bike.update_current_odo()
 
 
+def check_date_not_future(value: dt.datetime):
+    """ Odo readings cannot be in the future because it breaks the way that 
+    bike.current_odo is recalculated after a new odo reading """
+    if value > timezone.now():
+        raise ValidationError("Odometer reading date may not be in the future.")
+
+
 class Odometer(models.Model):
     rider = models.ForeignKey(User, on_delete=models.CASCADE)
     distance = models.FloatField()  # distance units as prefs
@@ -525,7 +493,8 @@ class Odometer(models.Model):
     comment = models.CharField(max_length=100, null=True, blank=True)
     bike = models.ForeignKey(Bike, on_delete=models.CASCADE,
                              related_name='odometer_readings')
-    date = models.DateTimeField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now,
+                                validators=[check_date_not_future])
     adjustment_ride = models.OneToOneField(Ride, on_delete=models.CASCADE,
                                            null=True, blank=True)
 
@@ -543,7 +512,16 @@ class Odometer(models.Model):
                 f" on {self.date.date()}")
 
     def save(self, *args, **kwargs):
+        """ update the other objects affected by the changed odo reading,
+        including any adjustment ride and the bike's current_odo value,
+        which in turn might affect the bike's components and maint actions
+        distance settings 
+        odo.date must not be in the future as bike.current_odo calculation
+        relies on it being now or in the past. """
+        check_date_not_future(self.date)
         super().save(*args, **kwargs)
+        if self.initial_value or self.adjustment_ride is None:
+            self.handle_odo_reset()
         self.update_adjustment_rides()
         self.bike.update_current_odo()
         self.bike.save()
@@ -551,28 +529,83 @@ class Odometer(models.Model):
     def delete(self):
         if self.adjustment_ride:
             self.adjustment_ride.delete()
+        else:
+            assert self.initial_value, (
+                "odo should have adjustment ride or initial value")
+            # TODO: update adjustment ride for next odo reading.
+            # TODO: remove "distance delta" from bike
         super().delete()
 
     @classmethod
     def ride_updated(cls, ride_date, bike_id):
-        """ called when a ride is saved, to allow adjustment of following
+        """ called when a Ride is saved, to allow adjustment of following
         odometer adjustment ride, if any.  Most times there will be none """
         next_odo = cls.next_odo(bike_id, ride_date)
-        if next_odo is None:
+        if next_odo is None or next.odo.initial_value:
             return
         prev_odo = cls.previous_odo(bike_id, ride_date)
         if prev_odo is None:
             return
         cls.update_adjustment_ride(next_odo, prev_odo)
 
-    def update_adjustment_rides(self):
-        """ create or update adjustment rides between this odo reading and
-        previous/next odo readings, so that the rides mileage totals to the
+    @classmethod
+    def update_adjustment_ride(cls, current_odo, prev_odo):
+        """ create or update the adjustment ride for current_odo.
+        Recalculate the total ride distance between the two odo readings &
+        add/update an adjustment ride to ensure it adds up to the 
+        difference between the two odo readings """
+        distance_ridden = Ride.distance_ridden(
+            bike_id=current_odo.bike_id, is_adjustment=False,
+            date__gt=prev_odo.date, date__lte=current_odo.date)
+        adj_distance = (current_odo.distance - prev_odo.distance
+                        - distance_ridden) 
+        # log.info("update_adjustment_ride: adj_distance=%s", adj_distance)
+        adj_ride = current_odo.adjustment_ride
+        # log.info("update_adjustment_ride(current_odo=%s (adj_ride=%s), "
+        #          "prev_odo=%s, ", current_odo, adj_ride, prev_odo)
+        if adj_ride is None:
+            adj_ride = Ride(
+                bike=current_odo.bike, rider=current_odo.rider,
+                is_adjustment=True)
+        # else:
+            # log.info(">update_adjustment_ride: adj_ride_id=%s", adj_ride.id)
+        distance_units = (
+            current_odo.distance_units_label.lower())
+        adj_ride.date = current_odo.date
+        adj_ride.distance = adj_distance
+        adj_ride.description = "Adjustment for odometer reading %0.1f %s" % (
+            current_odo.distance, distance_units)
+        adj_ride.save()
+        # log.info("adj_ride=%s, distance %s", adj_ride, adj_ride.distance)
+        if current_odo.adjustment_ride is None:
+            current_odo.adjustment_ride = adj_ride
+            # log.info("saving current_odo=%s", current_odo)
+            # log.info("current_odo.adjustment_ride=%s",
+            #          current_odo.adjustment_ride)
+            current_odo.save()
+
+    def handle_odo_reset(self):
+        """ newly saved Odo.initial_value or removed Odo.initial_value.
+        The odo reading in question may be a historic reading, not the latest.
+        
+        If a new Odo.initial value then tell the bike about the mileage delta
+        (odo miles but not ridden miles).
+        If a removed Odo.initial value, then tell the bike about the removed
+        mileage delta previously stored in the adjustment ride. """
+        if self.initial_value:
+            
+
+    def update_adjustment_rides(self) -> float:
+        """ create, update or delete adjustment rides for this odo reading
+        and next odo reading, so that the rides mileage totals to the
         same as the difference between the odo readings.
-        Mileage before a "reset" odo reading is not adjusted """
+        Mileage before a "reset" odo reading is not adjusted. 
+        If an adjustment ride is created or removed, the mileage added/removed
+        is returned, otherwise 0.0 is returned """
         # log.debug("Odometer.update_adjustment_rides(%s): initial_value=%s, "
         #           "adjustment_ride=%s", self, self.initial_value,
         #           self.adjustment_ride)
+        adjustment_distance = 0.0
         if self.initial_value:  # after resetting odo: no adjustment ride
             if self.adjustment_ride:
                 adj_ride = self.adjustment_ride
@@ -587,56 +620,13 @@ class Odometer(models.Model):
                 # log.debug(" >Odometer.update_adjustment_rides: adjustment "
                 #           "ride updated")
                 self.update_adjustment_ride(self, prev_odo)
+                adjustment_distance = 0.0
 
         # update following adjustment ride, if necessary
         next_odo = self.next_odo(self.bike_id, self.date)
         if next_odo and not next_odo.initial_value:
             self.update_adjustment_ride(next_odo, self)
-
-    @classmethod
-    def update_adjustment_ride(cls, current_odo, prev_odo):
-        """ create or update the adjustment ride for current_odo """
-        rides_between = Ride.objects.filter(bike_id=current_odo.bike_id,
-                                            date__gt=prev_odo.date,
-                                            date__lte=current_odo.date,
-                                            is_adjustment=False)
-        distances = (rides_between.values('bike_id')
-            .annotate(sum_distance=Sum('distance')))
-        if distances.exists():
-            assert distances.count() == 1, (
-                f"expecting a single distance sum, not {distances}")
-            distance = distances.order_by('bike_id').first()["sum_distance"]
-            #log.info("update_adjustment_ride: ride distances=%s", distances)
-        else:
-            distance = 0.0
-        distance = distance + prev_odo.distance - current_odo.distance
-        # distances is now prev_odo + rides - current_odo,
-        # which is the NEGATIVE of what we need for the adjustment ride
-        total_distance = -distance
-        # log.info("update_adjustment_ride: total_distance=%s", total_distance)
-        adj_ride = current_odo.adjustment_ride
-        # log.info("update_adjustment_ride(current_odo=%s (adj_ride=%s), "
-        #          "prev_odo=%s, ", current_odo, adj_ride, prev_odo)
-        if adj_ride is None:
-            adj_ride = Ride(
-                bike=current_odo.bike, rider=current_odo.rider,
-                is_adjustment=True)
-        # else:
-            # log.info(">update_adjustment_ride: adj_ride_id=%s", adj_ride.id)
-        distance_units = (
-            current_odo.distance_units_label.lower())
-        adj_ride.date = current_odo.date
-        adj_ride.distance = total_distance
-        adj_ride.description = "Adjustment for odometer reading %0.1f %s" % (
-            current_odo.distance, distance_units)
-        adj_ride.save()
-        # log.info("adj_ride=%s, distance %s", adj_ride, adj_ride.distance)
-        if current_odo.adjustment_ride is None:
-            current_odo.adjustment_ride = adj_ride
-            # log.info("saving current_odo=%s", current_odo)
-            # log.info("current_odo.adjustment_ride=%s",
-            #          current_odo.adjustment_ride)
-            current_odo.save()
+        return adjustment_distance
 
     @classmethod
     def previous_odo(cls, bike_id, date: dt.datetime):
@@ -677,7 +667,7 @@ class ComponentType(models.Model):
         pass
 
     def __str__(self):
-        return str(self.type)
+        return f"type {self.type}"
 
     def get_absolute_url(self):
         return reverse('bike:component_type', kwargs={'pk': self.id})
@@ -685,7 +675,13 @@ class ComponentType(models.Model):
 
 class Component(models.Model):
     """ IMPORTANT: you must save() after updating bike or subcomponent_of,
-    otherwise mileage tracking won't work """
+    otherwise mileage tracking won't work.
+    Mileage is tracked by the following:
+      .previous_distance = mileage before attached to current bike 
+      .start_odo = odo of current bike when cpt first attached to it
+      .bike_distance() -> mileage travelled on current bike SINCE ATTACHMENT
+    So .current_distance() -> .bike_distance() + .previous_distance
+       .bike_distance() -> bike.current_odo - self.start_odo """
     owner = models.ForeignKey(User, on_delete=models.CASCADE,
                               related_name='components')
     bike = models.ForeignKey(
@@ -717,11 +713,12 @@ class Component(models.Model):
         "units from preferences.")
 
     def __str__(self):
-        bike = f"{self.bike} " or ''
-        return f"{bike}{self.type}: {self.name}"
+        bike = f"->{self.bike}" if self.bike else ''
+        return f"{self.name}({self.type}){bike}"
 
     @property
-    def distance_units_label(self):
+    def distance_units_label(self) -> str:
+        """ miles or km """
         return self.owner.preferences.distance_units_label
 
     def get_absolute_url(self):
@@ -729,13 +726,20 @@ class Component(models.Model):
 
     def current_distance(self) -> float:
         """ return distance travelled by this cpt, current + prev bikes """
-        return self.previous_distance + self.bike_distance()
+        bike_distance = self.bike_distance()
+        log.debug("%s.current_distance (curr_bike=%s): prev_dist=%s + bike_dist=%s-> %s",
+                  self, self.current_bike(), self.previous_distance,
+                  bike_distance, self.previous_distance + bike_distance)
+        return self.previous_distance + bike_distance
 
     def bike_distance(self) -> float:
         """ return distance travelled on current bike, which may be through
         a parent component """
         current_bike = self.current_bike()
         if current_bike is not None:
+            log.debug("%s.bike_distance(): %s.current_odo=%s - start_odo=%s -> %s",
+                      self, current_bike, current_bike.current_odo,
+                      self.start_odo, current_bike.current_odo - self.start_odo)
             return current_bike.current_odo - self.start_odo
         return 0.0
 
